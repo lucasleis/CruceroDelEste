@@ -72,6 +72,78 @@ Estos módulos están documentados en `/specs/Crucero del Este - Modulos Extras.
 
 ---
 
-## Primera tarea al iniciar la sesión
+## Stack aprobado
 
-Proponé el stack backend y la estructura de carpetas del proyecto. Incluí: lenguaje/runtime, framework, base de datos, ORM, SDK de pagos, SDK de email. Justificá cada elección en una oración. **Esperá aprobación antes de escribir cualquier código.**
+| Componente | Elección |
+|---|---|
+| Runtime | Python 3.12 |
+| Framework | FastAPI |
+| Base de datos | PostgreSQL |
+| ORM + migraciones | SQLAlchemy 2 (async) + Alembic |
+| SDK de pagos | mercadopago (SDK oficial Python) |
+| SDK de email | Resend (resend-python) |
+| Config | pydantic-settings |
+| Testing | pytest + pytest-asyncio |
+| Scheduler | APScheduler + JobStore en PostgreSQL — jobs persistidos en DB, sobreviven reinicios del proceso |
+
+---
+
+## Estructura de carpetas aprobada
+
+```
+CruceroDelEste/
+├── app/
+│   ├── main.py
+│   ├── config.py
+│   ├── database.py
+│   ├── models/
+│   │   ├── trip.py          # Trip, SeatType, PriceTranche
+│   │   ├── booking.py       # Booking, Passenger
+│   │   └── __init__.py
+│   ├── schemas/
+│   │   ├── trips.py
+│   │   ├── bookings.py
+│   │   └── admin.py
+│   ├── routers/
+│   │   ├── trips.py
+│   │   ├── bookings.py
+│   │   ├── payments.py      # Webhook MercadoPago
+│   │   └── admin.py
+│   ├── services/
+│   │   ├── pricing.py
+│   │   ├── inventory.py
+│   │   ├── booking.py
+│   │   ├── payment.py
+│   │   └── email.py
+│   ├── deps.py
+│   └── errors.py
+├── tasks/
+│   └── reminders.py         # APScheduler con SQLAlchemyJobStore — jobs persistidos en PostgreSQL
+├── migrations/
+├── tests/
+│   ├── unit/
+│   └── integration/
+├── alembic.ini
+├── pyproject.toml
+├── .env.example
+└── Dockerfile
+```
+
+Arquitectura en tres capas: **routers → services → models**. Los services contienen toda la lógica de negocio y son testeables sin base de datos. Los routers solo parsean HTTP y devuelven respuestas. Sin repositorios abstractos, sin CQRS, sin sagas.
+
+---
+
+## Skills de referencia
+
+Antes de implementar cualquier módulo, leé las siguientes skills ubicadas en `/specs/skills/`:
+
+- `api-design-principles/SKILL.md` — aplicar siempre al diseñar endpoints
+- `architecture-patterns/SKILL.md` — aplicar al estructurar servicios y capas
+
+Las carpetas de referencias dentro de cada skill también están disponibles. Usarlas cuando implementes el módulo correspondiente.
+
+---
+
+## Primera tarea al iniciar una sesión nueva
+
+El stack y la estructura ya están aprobados. Leé este archivo, los specs en `/specs/` y las skills en `/specs/skills/`. Luego preguntá qué módulo implementar a continuación.
