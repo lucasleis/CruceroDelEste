@@ -1,0 +1,170 @@
+# Seat-level vs booking-level expiration:
+#   seats.reserved_at  — source of truth for when a seat reservation expires.
+#                        Set when the seat is reserved; cleared on confirm or expire.
+#   bookings.expires_at — derived from reserved_at at booking creation time
+#                         (now + booking_expiry_minutes). Used for booking-level
+#                         queries (e.g. finding overdue bookings). Both fields
+#                         MUST stay in sync: whenever seats are released, the
+#                         booking status must also be set to expired, and vice versa.
+
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from uuid import UUID
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import settings
+from app.models.booking import Booking, BookingStatusEnum, Passenger
+from app.models.trip import Seat, SeatStatusEnum, SeatTypeEnum
+from app.services.inventory import mark_seats_sold, reserve_seats
+from app.services.pricing import get_current_price
+
+
+@dataclass
+class PassengerData:
+    seat_id: UUID
+    first_name: str
+    last_name: str
+    dni: str
+    email: str
+    phone: str | None = None
+
+
+async def create_booking(
+    db: AsyncSession,
+    trip_id: UUID,
+    seat_ids: list[UUID],
+    passengers_data: list[PassengerData],
+) -> Booking:
+    provided = {p.seat_id for p in passengers_data}
+    missing = set(seat_ids) - provided
+    if missing:
+        raise ValueError(f"Missing passenger data for seat(s): {missing}")
+
+    seats = await _fetch_seats_for_pricing(db, seat_ids, trip_id)
+    total_amount = await _calculate_total(db, trip_id, seats)
+
+    seats = await reserve_seats(db, seat_ids, trip_id)
+
+    now = datetime.now(timezone.utc)
+    booking = Booking(
+        trip_id=trip_id,
+        status=BookingStatusEnum.pending_payment,
+        total_amount=total_amount,
+        expires_at=now + timedelta(minutes=settings.booking_expiry_minutes),
+    )
+    db.add(booking)
+    await db.flush()  # populate booking.id before creating passengers
+
+    passenger_by_seat = {p.seat_id: p for p in passengers_data}
+    for seat in seats:
+        data = passenger_by_seat[seat.id]
+        db.add(Passenger(
+            booking_id=booking.id,
+            seat_id=seat.id,
+            first_name=data.first_name,
+            last_name=data.last_name,
+            dni=data.dni,
+            email=data.email,
+            phone=data.phone,
+        ))
+
+    return booking
+
+
+async def confirm_booking(
+    db: AsyncSession,
+    booking_id: UUID,
+    mp_payment_id: str,
+) -> Booking:
+    booking = await _get_booking(db, booking_id)
+
+    seat_ids = await _seat_ids_for_booking(db, booking_id)
+    await mark_seats_sold(db, seat_ids)
+
+    booking.status = BookingStatusEnum.confirmed
+    booking.mp_payment_id = mp_payment_id
+    booking.confirmed_at = datetime.now(timezone.utc)
+
+    return booking
+
+
+async def expire_booking(db: AsyncSession, booking_id: UUID) -> Booking:
+    booking = await _get_booking(db, booking_id)
+
+    seat_ids = await _seat_ids_for_booking(db, booking_id)
+    await _release_booking_seats(db, seat_ids)
+
+    booking.status = BookingStatusEnum.expired
+
+    return booking
+
+
+# --- helpers -----------------------------------------------------------------
+
+async def _fetch_seats_for_pricing(
+    db: AsyncSession,
+    seat_ids: list[UUID],
+    trip_id: UUID,
+) -> list[Seat]:
+    """Read seats without locking — used only to determine seat_type for pricing."""
+    result = await db.execute(
+        select(Seat).where(
+            Seat.id.in_(seat_ids),
+            Seat.trip_id == trip_id,
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def _calculate_total(
+    db: AsyncSession,
+    trip_id: UUID,
+    seats: list[Seat],
+) -> int:
+    # Group seat IDs by type, then price each group at the current tranche.
+    # get_current_price reflects sold count before this reservation, which is
+    # correct: tranches are evaluated at the moment of purchase.
+    by_type: dict[SeatTypeEnum, int] = {}
+    for seat in seats:
+        by_type[seat.seat_type] = by_type.get(seat.seat_type, 0) + 1
+
+    total = 0
+    for seat_type, count in by_type.items():
+        unit_price = await get_current_price(db, trip_id, seat_type)
+        total += unit_price * count
+
+    return total
+
+
+async def _get_booking(db: AsyncSession, booking_id: UUID) -> Booking:
+    result = await db.execute(
+        select(Booking).where(Booking.id == booking_id).with_for_update()
+    )
+    booking = result.scalar_one_or_none()
+    if booking is None:
+        raise BookingNotFound(booking_id)
+    return booking
+
+
+async def _seat_ids_for_booking(db: AsyncSession, booking_id: UUID) -> list[UUID]:
+    result = await db.execute(
+        select(Passenger.seat_id).where(Passenger.booking_id == booking_id)
+    )
+    return list(result.scalars().all())
+
+
+async def _release_booking_seats(db: AsyncSession, seat_ids: list[UUID]) -> None:
+    result = await db.execute(
+        select(Seat).where(Seat.id.in_(seat_ids)).with_for_update()
+    )
+    for seat in result.scalars().all():
+        seat.status = SeatStatusEnum.available
+        seat.reserved_at = None
+
+
+class BookingNotFound(Exception):
+    def __init__(self, booking_id: UUID) -> None:
+        self.booking_id = booking_id
+        super().__init__(f"Booking {booking_id} not found")
