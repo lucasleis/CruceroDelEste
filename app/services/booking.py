@@ -37,9 +37,15 @@ async def create_booking(
     seat_ids: list[UUID],
     passengers_data: list[PassengerData],
 ) -> Booking:
-    seats = await reserve_seats(db, seat_ids, trip_id)
+    provided = {p.seat_id for p in passengers_data}
+    missing = set(seat_ids) - provided
+    if missing:
+        raise ValueError(f"Missing passenger data for seat(s): {missing}")
 
+    seats = await _fetch_seats_for_pricing(db, seat_ids, trip_id)
     total_amount = await _calculate_total(db, trip_id, seats)
+
+    seats = await reserve_seats(db, seat_ids, trip_id)
 
     now = datetime.now(timezone.utc)
     booking = Booking(
@@ -96,6 +102,21 @@ async def expire_booking(db: AsyncSession, booking_id: UUID) -> Booking:
 
 
 # --- helpers -----------------------------------------------------------------
+
+async def _fetch_seats_for_pricing(
+    db: AsyncSession,
+    seat_ids: list[UUID],
+    trip_id: UUID,
+) -> list[Seat]:
+    """Read seats without locking — used only to determine seat_type for pricing."""
+    result = await db.execute(
+        select(Seat).where(
+            Seat.id.in_(seat_ids),
+            Seat.trip_id == trip_id,
+        )
+    )
+    return list(result.scalars().all())
+
 
 async def _calculate_total(
     db: AsyncSession,
