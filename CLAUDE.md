@@ -25,7 +25,7 @@ Sos un senior backend engineer. Priorizás correctitud sobre cleverness. No agre
 - **Inventario de asientos**: rutas con dos tipos de asiento (Cama / Semi Cama), cada uno con hasta 5 tramos de precio dinámico definidos por pasajes vendidos (no por tiempo). Cama y Semi Cama tienen tramos independientes.
 - **Flujo de compra**: selección de asientos → datos del pasajero → pago → confirmación.
 - **Integración MercadoPago**: tarjetas de crédito, débito y billeteras virtuales. Las comisiones (0,8%–6,6%) corren por cuenta del cliente, el sistema NO las calcula ni las aplica.
-- **Notificaciones por email**: 3 templates transaccionales — confirmación de compra (inmediata), recordatorio de viaje (antes de la fecha), feedback post-viaje. Usar Resend o Brevo en plan gratuito.
+- **Notificaciones por email**: 3 templates transaccionales — confirmación de compra (inmediata), recordatorio de viaje (antes de la fecha), feedback post-viaje. Usar Resend en plan gratuito.
 - **API del panel de administración**: endpoints con autenticación para configurar tramos de precio y listar ventas (solo lectura).
 
 ### Explícitamente fuera del alcance de este MVP
@@ -84,7 +84,7 @@ Estos módulos están documentados en `/specs/Crucero del Este - Modulos Extras.
 | SDK de email | Resend (resend-python) |
 | Config | pydantic-settings |
 | Testing | pytest + pytest-asyncio |
-| Scheduler | APScheduler + JobStore en PostgreSQL — jobs persistidos en DB, sobreviven reinicios del proceso |
+| Scheduler | APScheduler + SQLAlchemyJobStore — jobs persistidos en PostgreSQL, sobreviven reinicios |
 
 ---
 
@@ -97,8 +97,8 @@ CruceroDelEste/
 │   ├── config.py
 │   ├── database.py
 │   ├── models/
-│   │   ├── trip.py          # Trip, SeatType, PriceTranche
-│   │   ├── booking.py       # Booking, Passenger
+│   │   ├── trip.py          # Route, Trip, Seat, PriceTranche
+│   │   ├── booking.py       # Booking, Passenger, AdminUser
 │   │   └── __init__.py
 │   ├── schemas/
 │   │   ├── trips.py
@@ -118,7 +118,7 @@ CruceroDelEste/
 │   ├── deps.py
 │   └── errors.py
 ├── tasks/
-│   └── reminders.py         # APScheduler con SQLAlchemyJobStore — jobs persistidos en PostgreSQL
+│   └── reminders.py         # APScheduler con SQLAlchemyJobStore
 ├── migrations/
 ├── tests/
 │   ├── unit/
@@ -144,6 +144,38 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 
 ---
 
+## Estado actual del proyecto
+
+### Completado y aprobado
+
+- `migrations/versions/6a04bf7f_initial_schema.py` — schema completo: ENUMs, 7 tablas, índices, downgrade
+- `app/models/trip.py` — Route, Trip, Seat, PriceTranche
+- `app/models/booking.py` — Booking, Passenger, AdminUser
+- `app/models/__init__.py`
+- `app/config.py` — pydantic-settings, falla en arranque si falta variable de entorno
+- `app/database.py` — async engine con pool_pre_ping, echo condicional al entorno, sessionmaker, Base, get_db
+- `app/deps.py` — get_current_admin con PyJWT (HS256), re-exporta get_db
+- `app/errors.py` — SeatUnavailableError (409), ValidationError (422), 404, 500
+- `app/services/pricing.py` — get_current_price, lanza NoPriceTranche si ningún tramo cubre el sold count
+- `app/services/inventory.py` — get_available_seats, reserve_seats (SELECT FOR UPDATE), release_expired_reservations (SKIP LOCKED), mark_seats_sold
+- `app/services/booking.py` — create_booking (validate → price sin lock → reserve con lock), confirm_booking, expire_booking
+
+### Próximo a implementar (en este orden)
+
+- `app/services/payment.py` — wrapper MercadoPago: crear preferencia, validar webhook
+- `app/services/email.py` — wrapper Resend: 3 templates transaccionales
+- `app/schemas/trips.py`, `bookings.py`, `admin.py`
+- `app/routers/trips.py` — GET /trips, GET /trips/{id}/seats
+- `app/routers/bookings.py` — POST /bookings, GET /bookings/{id}
+- `app/routers/payments.py` — POST /payments/webhook
+- `app/routers/admin.py` — endpoints admin con auth JWT
+- `app/main.py` — FastAPI app, registro de routers, startup
+- `tasks/reminders.py` — APScheduler con SQLAlchemyJobStore
+- `tests/unit/` y `tests/integration/`
+- `pyproject.toml` + `Dockerfile`
+
+---
+
 ## Primera tarea al iniciar una sesión nueva
 
-El stack y la estructura ya están aprobados. Leé este archivo, los specs en `/specs/` y las skills en `/specs/skills/`. Luego preguntá qué módulo implementar a continuación.
+El stack y la estructura ya están aprobados. Leé este archivo, los specs en `/specs/` y las skills en `/specs/skills/`. Luego continuá con el primer ítem de "Próximo a implementar" sin preguntar.
