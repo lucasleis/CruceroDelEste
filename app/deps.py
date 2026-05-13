@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,7 +31,7 @@ async def get_current_admin(
         admin_id: str | None = payload.get("sub")
         if admin_id is None:
             raise invalid
-    except JWTError:
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
         raise invalid
 
     result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
