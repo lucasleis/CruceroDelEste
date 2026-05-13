@@ -1,0 +1,34 @@
+Modulos Extras
+
+módulo:
+- Generación del QR y adjunto al mail. 
+- ⁠Lógica de estados del pasaje (válido / reembolsado / abordado )
+- ⁠Interfaz del validador (web y móviles)
+- ⁠Detección de QR duplicado / ya usado
+- ⁠Testing y ajustes
+
+Tiempo estimado de desarrollo: 5 días 
+Precio: $450.000
+
+
+
+
+Lo del tracking no lo había sumado a la estimación del presupuesto. Te pregunto en base a eso
+
+La persona que esté en el micro, así como cuando analiza si el QR es válido, lo va a hacer con su celular o con uno de la empresa? 
+
+Y ademas, que prefieren, que la persona a cargo en el micro tenga tener el celular con la aplicación activa para enviar datos o utilizar un dispositivo extra donde la persona a cargo no tenga que tocar nada
+
+
+
+Para desarrollarlo hay 2 opciones:
+
+Opción A — App en el celular del chofer: $500.000
+Desarrollamos una aplicación que el chofer instala en su celular y que manda la ubicación automáticamente, incluso con la pantalla apagada. Desde la web, el pasajero puede ver en un mapa dónde está el micro en tiempo real. La ventaja es que no requiere ningún hardware extra. La contra es que depende del celular del chofer: si se queda sin batería, sin señal o apaga la app, se pierde el tracking.
+
+Opción B — Dispositivo GPS dedicado: $310.000
+Se instala un pequeño dispositivo GPS en el micro con su propia SIM card. Funciona solo, sin que el chofer tenga que hacer nada. Manda la ubicación al servidor de forma automática y el pasajero la ve en el mapa igual que en la opción anterior. Es más barato de desarrollar y mucho más confiable.
+
+El único costo adicional es el hardware, que corre por cuenta de ustedes: el dispositivo sale entre USD 30 y 80 por unidad, más un plan de datos con SIM que es muy económico dado el poco volumen que maneja.
+
+Mi recomendación es la Opción B. Es más barata, más robusta y no depende de nadie para funcionar.
