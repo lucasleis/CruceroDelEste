@@ -179,3 +179,16 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 ## Primera tarea al iniciar una sesión nueva
 
 El stack y la estructura ya están aprobados. Leé este archivo, los specs en `/specs/` y las skills en `/specs/skills/`. Luego continuá con el primer ítem de "Próximo a implementar" sin preguntar.
+
+---
+
+## Módulos críticos — requieren atención especial
+
+Antes de comenzar a implementar cualquiera de los siguientes módulos, DETENTE y avisá con este mensaje exacto antes de escribir cualquier código:
+
+⚠️ Estás por implementar [nombre del módulo], marcado como crítico. Considerá cambiar al modelo Opus antes de continuar. ¿Continuamos?
+
+Módulos críticos:
+- `app/services/payment.py` — integración MercadoPago
+- `app/routers/payments.py` — webhook MercadoPago
+- Cualquier cambio al schema de base de datos
