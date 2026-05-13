@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -6,6 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.trip import Seat, SeatStatusEnum, SeatTypeEnum
+
+
+class SeatNotAvailable(Exception):
+    def __init__(self, seat_id: UUID) -> None:
+        self.seat_id = seat_id
+        super().__init__(f"Seat {seat_id} is not available")
 
 
 async def get_available_seats(
@@ -47,10 +53,6 @@ async def reserve_seats(
             raise SeatNotAvailable(seat_id)
 
     now = datetime.now(timezone.utc)
-    expires_at = now.replace(
-        second=now.second,
-        microsecond=now.microsecond,
-    )
 
     for seat in seats:
         if seat.status != SeatStatusEnum.available:
@@ -67,8 +69,6 @@ async def release_expired_reservations(db: AsyncSession) -> int:
     Returns the number of seats released.
     Caller must commit the session.
     """
-    from datetime import timedelta
-
     cutoff = datetime.now(timezone.utc) - timedelta(
         minutes=settings.booking_expiry_minutes
     )
@@ -100,9 +100,3 @@ async def mark_seats_sold(db: AsyncSession, seat_ids: list[UUID]) -> None:
     for seat in seats:
         seat.status = SeatStatusEnum.sold
         seat.reserved_at = None
-
-
-class SeatNotAvailable(Exception):
-    def __init__(self, seat_id: UUID) -> None:
-        self.seat_id = seat_id
-        super().__init__(f"Seat {seat_id} is not available")
