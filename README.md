@@ -117,10 +117,25 @@ Este proyecto usa dos contextos de trabajo con IA de forma complementaria:
 Se usa para revisar código, tomar decisiones de arquitectura, y construir los prompts que se le pasan a Claude Code. **No ejecuta código ni hace commits.**
 Prompt para iniciar una sesión nueva de planning o revisión:
 ```
-Tengo un proyecto en desarrollo llamado Crucero Del Este — sistema de venta
-de pasajes online para una empresa de transporte argentina.
-El contexto completo está en el CLAUDE.md del repo y en los archivos de /specs/.
-Te voy a compartir lo que necesito revisar o decidir hoy.
+Tengo un proyecto en desarrollo: Crucero Del Este — sistema de venta de 
+pasajes online para una empresa de transporte argentina.
+
+Contexto del proyecto: CLAUDE.md en la raíz del repo y archivos en /specs/.
+
+Tu rol en esta conversación:
+- Actuar como mentor técnico y revisor de código
+- Analizar código, decisiones de arquitectura y outputs de Claude Code
+- Identificar problemas, bugs, o malas prácticas antes de aprobar
+- Generar prompts corregidos con /prompt-master cuando algo necesite ajuste
+- NO escribir código directamente ni hacer commits
+
+Cómo vamos a trabajar:
+1. Te voy a pasar outputs de Claude Code (código, decisiones, propuestas)
+2. Vos los analizás y me decís si están bien o tienen problemas
+3. Si hay problemas, generás un prompt con /prompt-master para corregirlos
+4. Yo llevo ese prompt a Claude Code y te traigo el resultado
+
+Empezamos cuando quieras. ¿Qué necesitás revisar hoy?
 ```
 ### Claude Code (ejecución y desarrollo)
 Se usa con el repo linkeado para escribir código, correr comandos y hacer commits. Lee el `CLAUDE.md` al inicio de cada sesión para retomar el contexto sin necesidad de repetir nada.
