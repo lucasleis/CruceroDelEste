@@ -1,0 +1,20 @@
+¡Hola, {{ first_name }}!
+
+Tu pasaje con Crucero Del Este quedó confirmado.
+
+Detalles del viaje
+------------------
+Reserva:    {{ booking_id }}
+Pasajero:   {{ first_name }} {{ last_name }}
+Origen:     {{ origin }}
+Destino:    {{ destination }}
+Salida:     {{ departure_at.strftime('%d/%m/%Y %H:%M') }}
+Llegada:    {{ arrival_at.strftime('%d/%m/%Y %H:%M') }}
+Asiento:    {{ seat_number }} ({{ seat_type }})
+Total:      ${{ total_amount }} ARS
+
+Consultá tu reserva en:
+{{ frontend_url }}/bookings/{{ booking_id }}
+
+¡Buen viaje!
+El equipo de Crucero Del Este

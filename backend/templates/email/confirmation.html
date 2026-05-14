@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Confirmación de compra — Crucero Del Este</title>
+</head>
+<body style="font-family: Arial, Helvetica, sans-serif; color: #222; max-width: 600px; margin: 0 auto;">
+  <h1 style="color: #003366;">¡Hola, {{ first_name }}!</h1>
+  <p>Tu pasaje con <strong>Crucero Del Este</strong> quedó confirmado.</p>
+
+  <h2>Detalles del viaje</h2>
+  <table cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
+    <tr><td><strong>Reserva</strong></td><td>{{ booking_id }}</td></tr>
+    <tr><td><strong>Pasajero</strong></td><td>{{ first_name }} {{ last_name }}</td></tr>
+    <tr><td><strong>Origen</strong></td><td>{{ origin }}</td></tr>
+    <tr><td><strong>Destino</strong></td><td>{{ destination }}</td></tr>
+    <tr><td><strong>Salida</strong></td><td>{{ departure_at.strftime('%d/%m/%Y %H:%M') }}</td></tr>
+    <tr><td><strong>Llegada</strong></td><td>{{ arrival_at.strftime('%d/%m/%Y %H:%M') }}</td></tr>
+    <tr><td><strong>Asiento</strong></td><td>{{ seat_number }} ({{ seat_type }})</td></tr>
+    <tr><td><strong>Total abonado</strong></td><td>${{ total_amount }} ARS</td></tr>
+  </table>
+
+  <p style="margin-top: 24px;">
+    Consultá tu reserva en
+    <a href="{{ frontend_url }}/bookings/{{ booking_id }}">{{ frontend_url }}/bookings/{{ booking_id }}</a>.
+  </p>
+
+  <p>¡Buen viaje!<br>El equipo de Crucero Del Este</p>
+</body>
+</html>

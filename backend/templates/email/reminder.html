@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Recordatorio de viaje — Crucero Del Este</title>
+</head>
+<body style="font-family: Arial, Helvetica, sans-serif; color: #222; max-width: 600px; margin: 0 auto;">
+  <h1 style="color: #003366;">¡{{ first_name }}, te recordamos tu viaje!</h1>
+  <p>Te esperamos pronto en <strong>Crucero Del Este</strong>. Estos son los datos de tu próximo viaje:</p>
+
+  <table cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
+    <tr><td><strong>Reserva</strong></td><td>{{ booking_id }}</td></tr>
+    <tr><td><strong>Origen</strong></td><td>{{ origin }}</td></tr>
+    <tr><td><strong>Destino</strong></td><td>{{ destination }}</td></tr>
+    <tr><td><strong>Salida</strong></td><td>{{ departure_at.strftime('%d/%m/%Y %H:%M') }}</td></tr>
+    <tr><td><strong>Asiento</strong></td><td>{{ seat_number }} ({{ seat_type }})</td></tr>
+  </table>
+
+  <p style="margin-top: 24px;">
+    Recordá presentarte en la terminal al menos 30 minutos antes de la salida con tu documento.
+  </p>
+
+  <p>
+    Consultá tu reserva en
+    <a href="{{ frontend_url }}/bookings/{{ booking_id }}">{{ frontend_url }}/bookings/{{ booking_id }}</a>.
+  </p>
+
+  <p>¡Nos vemos a bordo!<br>El equipo de Crucero Del Este</p>
+</body>
+</html>
