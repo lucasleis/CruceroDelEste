@@ -1,6 +1,7 @@
 """MercadoPago payment service.
 
-All I/O is done with httpx.AsyncClient — no sync SDK, no asyncio.to_thread.
+Network I/O uses the official `mercadopago` SDK (synchronous). Each SDK call
+is wrapped with `asyncio.to_thread` so the FastAPI event loop stays free.
 
 Webhook signature algorithm (confirmed from official MP docs and multiple
 production implementations):
@@ -17,6 +18,7 @@ Public API (unchanged from previous version):
   verify_webhook_signature(data_id, x_signature, x_request_id) -> None  (raises on failure)
 """
 
+import asyncio
 import hashlib
 import hmac
 import logging
@@ -24,21 +26,24 @@ import time
 from dataclasses import dataclass
 from uuid import UUID
 
-import httpx
+import mercadopago
+from mercadopago.config import RequestOptions
 
 from app.config import settings
 from app.exceptions import InvalidWebhookSignature, PaymentProcessingError
 
 logger = logging.getLogger(__name__)
 
-_MP_API_BASE = "https://api.mercadopago.com"
-
-# Per httpx docs: connect/write share 5 s; read up to 30 s to handle slow MP responses.
-_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0)
+# The SDK uses `requests` under the hood; `connection_timeout` is forwarded as
+# the single `timeout=` argument and applies to both connect and read.
+_REQUEST_TIMEOUT_S = 30.0
+_REQUEST_OPTIONS = RequestOptions(connection_timeout=_REQUEST_TIMEOUT_S)
 
 # Replay protection: reject webhooks whose ts is outside this window.
 _REPLAY_PAST_S = 120
 _REPLAY_FUTURE_S = 600
+
+_sdk = mercadopago.SDK(settings.mercadopago_access_token)
 
 
 # ---------------------------------------------------------------------------
@@ -69,10 +74,6 @@ class PaymentDetails:
 # ---------------------------------------------------------------------------
 # Async API calls
 # ---------------------------------------------------------------------------
-
-def _auth_headers() -> dict[str, str]:
-    return {"Authorization": f"Bearer {settings.mercadopago_access_token}"}
-
 
 async def create_preference(
     booking_id: UUID,
@@ -106,20 +107,18 @@ async def create_preference(
         "auto_return": "approved",
     }
 
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        response = await client.post(
-            f"{_MP_API_BASE}/checkout/preferences",
-            json=body,
-            headers=_auth_headers(),
-        )
+    result = await asyncio.to_thread(
+        _sdk.preference().create, body, _REQUEST_OPTIONS,
+    )
 
-    if response.status_code not in (200, 201):
+    status_code = result.get("status")
+    if status_code not in (200, 201):
         raise PaymentProcessingError(
-            f"Preference creation failed: HTTP {response.status_code}",
-            status_code=response.status_code,
+            f"Preference creation failed: HTTP {status_code}",
+            status_code=status_code or 500,
         )
 
-    data = response.json()
+    data = result["response"]
     return CreatedPreference(
         preference_id=data["id"],
         init_point=data["init_point"],
@@ -132,19 +131,18 @@ async def get_payment(payment_id: str) -> PaymentDetails:
     Used by the webhook handler to verify the payment status after receiving
     a notification. Raises PaymentProcessingError on non-200 responses.
     """
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        response = await client.get(
-            f"{_MP_API_BASE}/v1/payments/{payment_id}",
-            headers=_auth_headers(),
-        )
+    result = await asyncio.to_thread(
+        _sdk.payment().get, payment_id, _REQUEST_OPTIONS,
+    )
 
-    if response.status_code != 200:
+    status_code = result.get("status")
+    if status_code != 200:
         raise PaymentProcessingError(
-            f"Payment fetch failed: id={payment_id}, HTTP {response.status_code}",
-            status_code=response.status_code,
+            f"Payment fetch failed: id={payment_id}, HTTP {status_code}",
+            status_code=status_code or 500,
         )
 
-    data = response.json()
+    data = result["response"]
     return PaymentDetails(
         payment_id=str(data["id"]),
         status=data["status"],
