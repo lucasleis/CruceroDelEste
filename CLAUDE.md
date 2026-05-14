@@ -36,6 +36,7 @@ Sos un senior backend engineer. Priorizás correctitud sobre cleverness. No agre
 - Reserva sin pago inmediato
 - Cancelaciones y reembolsos
 - Módulo antifraude
+- Pagos en efectivo (Rapipago, Pago Fácil) — solo tarjetas y billeteras virtuales
 
 ---
 
@@ -69,6 +70,7 @@ Estos módulos están documentados en `/specs/Crucero del Este - Modulos Extras.
 - Gestión avanzada de ventas (cancelaciones, reembolsos)
 - Sistema multi-paradas
 - Seguridad y antifraude
+- Pagos en efectivo — si se incorpora en el futuro, el router `app/routers/payments.py` requiere revisión porque hoy ignora `payment.status == "pending"` silenciosamente
 
 ---
 
@@ -158,24 +160,26 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/models/trip.py` — Route, Trip, Seat, PriceTranche
 - `app/models/booking.py` — Booking, Passenger, AdminUser
 - `app/models/__init__.py`
-- `app/config.py` — pydantic-settings, falla en arranque si falta variable de entorno
-- `app/database.py` — async engine con pool_pre_ping, echo condicional al entorno, sessionmaker, Base, get_db
+- `app/config.py` — pydantic-settings con `@model_validator`: valida `backend_url` (URL absoluta, HTTPS obligatorio en producción), `mercadopago_webhook_secret` requerido. Falla en arranque si falta variable de entorno.
+- `app/database.py` — async engine con pool_pre_ping, echo condicional al entorno, sessionmaker, Base, get_db. Sesión NO auto-commitea — el router debe hacer `await db.commit()` explícito.
 - `app/deps.py` — get_current_admin con PyJWT (HS256), re-exporta get_db
 - `app/errors.py` — SeatUnavailableError (409), ValidationError (422), 404, 500
+- `app/exceptions.py` — InvalidWebhookSignature, PaymentProcessingError (lleva status_code), PaymentConfigError
 - `app/services/pricing.py` — get_current_price, lanza NoPriceTranche si ningún tramo cubre el sold count
 - `app/services/inventory.py` — get_available_seats, reserve_seats (SELECT FOR UPDATE), release_expired_reservations (SKIP LOCKED), mark_seats_sold
-- `app/services/booking.py` — create_booking (validate → price sin lock → reserve con lock), confirm_booking, expire_booking
+- `app/services/booking.py` — create_booking (validate → price sin lock → reserve con lock), confirm_booking(db, booking_id, mp_payment_id), expire_booking
+- `app/services/payment.py` — httpx.AsyncClient nativo async, timeouts (connect=5s/read=30s/write=5s), verify_webhook_signature, get_payment, create_preference. Replay protection activa.
+- `app/routers/payments.py` — POST /webhooks/mercadopago con contrato HTTP aprobado (ver sección dedicada abajo)
+- `app/main.py` — FastAPI() mínimo + register_exception_handlers + include_router(payments.router)
 
 ### Próximo a implementar (en este orden)
 
-- `app/services/payment.py` — wrapper MercadoPago: crear preferencia, validar webhook ⚠️ CRÍTICO
-- `app/services/email.py` — wrapper Resend: 3 templates transaccionales
+- `app/services/email.py` — wrapper Resend: 3 templates transaccionales ⚠️ Ver nota en routers/payments.py
 - `app/schemas/trips.py`, `bookings.py`, `admin.py`
 - `app/routers/trips.py` — GET /trips, GET /trips/{id}/seats
 - `app/routers/bookings.py` — POST /bookings, GET /bookings/{id}
-- `app/routers/payments.py` — POST /payments/webhook ⚠️ CRÍTICO
 - `app/routers/admin.py` — endpoints admin con auth JWT
-- `app/main.py` — FastAPI app, registro de routers, startup
+- Completar `app/main.py` — registrar routers restantes cuando existan
 - `tasks/reminders.py` — APScheduler con SQLAlchemyJobStore
 - `tests/unit/` y `tests/integration/`
 - `pyproject.toml` + `Dockerfile`
@@ -192,6 +196,68 @@ Módulos críticos:
 - `app/services/payment.py` — integración MercadoPago
 - `app/routers/payments.py` — webhook MercadoPago
 - Cualquier cambio al schema de base de datos
+
+---
+
+## Decisiones de diseño aprobadas
+
+### app/services/payment.py — verify_webhook_signature
+
+Algoritmo oficial MercadoPago (verificado contra doc oficial):
+
+```
+manifest = "id:{data_id.lower()};request-id:{x_request_id};ts:{ts};"
+```
+
+Reglas obligatorias:
+- `data_id` MUST ser lowercase antes de insertar en el manifest
+- Si `x_request_id` es None o ausente, se omite del manifest (no se incluye `request-id:None;`)
+- `data_id` se extrae de `request.query_params["data.id"]` — NUNCA del JSON body
+- `x_request_id: str | None` — tipado correcto, puede no venir en el request
+- Se usa `hmac.compare_digest` (timing-safe) — no modificar
+
+### app/routers/payments.py — Contrato HTTP del webhook
+
+Contrato aprobado (no modificar sin aprobación explícita):
+
+| Caso | HTTP | Body |
+|---|---|---|
+| Firma válida + pago procesado | 200 | `{"status": "ok"}` |
+| Firma inválida | 200 | `{"status": "ignored", "reason": "invalid_signature"}` |
+| Payload malformado | 200 | `{"status": "ignored", "reason": "malformed_payload"}` |
+| Booking no encontrado | 200 | `{"status": "ignored", "reason": "booking_not_found"}` |
+| Error interno | 500 | `{"status": "error"}` |
+
+**NUNCA devolver 4xx** — MercadoPago reintenta ante cualquier non-2xx, generando loops infinitos.
+
+Orden de operaciones obligatorio (no reordenar):
+
+```
+1. Extraer data_id de request.query_params["data.id"]
+2. Extraer x_request_id del header x-request-id (puede ser None)
+3. Extraer ts y v1 del header x-signature parseando "ts=...,v1=..."
+4. verify_webhook_signature(...) → si falla: return 200 ignored
+5. Parsear JSON body → extraer payment_id de data.id
+6. get_payment(payment_id) → verificar estado real con MercadoPago
+7. Si payment.status != "approved" → return 200 ok sin tocar BD
+8. SELECT FOR UPDATE booking WHERE id = payment.external_reference
+9. Si booking no existe → return 200 ignored booking_not_found
+10. Si booking.status == "confirmed" → return 200 ok (idempotencia)
+11. confirm_booking(db, booking_id, mp_payment_id)
+12. send_confirmation_email(booking)  ← AÚN NO IMPLEMENTADO, ver nota abajo
+13. return 200 ok
+```
+
+**⚠️ Nota sobre el paso 12:** `send_confirmation_email` todavía no existe. El paso 12 no está implementado en el router — el handler termina en `confirm_booking` y retorna 200. Cuando se implemente `app/services/email.py`:
+- Agregar la llamada real en el paso 12, sin stub ni comentario previo
+- El email se envía sincrónicamente dentro del request — si falla lanza excepción → 500 → MP reintenta (comportamiento aceptable y esperado)
+- Verificar que un doble webhook no mande dos emails: el guard de idempotencia del paso 10 lo previene, pero confirmarlo con un test de integración
+
+**Nota sobre idempotencia:** El `SELECT FOR UPDATE` en el paso 8 garantiza que dos webhooks concurrentes para el mismo booking no pasen el check del paso 10 al mismo tiempo. `confirm_booking` también hace su propio `SELECT FOR UPDATE` internamente — están en la misma transacción, no hay conflicto.
+
+### Pagos en efectivo
+
+Fuera de scope para el MVP. El router ignora `payment.status == "pending"` silenciosamente (return 200 ok). Si en el futuro se incorporan pagos en efectivo (Rapipago, Pago Fácil), el router requiere revisión completa del manejo de estado `pending`.
 
 ---
 
