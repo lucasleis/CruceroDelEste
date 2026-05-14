@@ -57,6 +57,7 @@ Sos un senior backend engineer. Priorizás correctitud sobre cleverness. No agre
 - **No agregues nada fuera del alcance listado arriba**, aunque parezca obvio o útil.
 - **Después de completar cada archivo o módulo**, output: `✅ [nombre del archivo] — [descripción en una línea]`
 - **Detente y preguntá antes de**: modificar el schema de base de datos, cambiar el flujo de pago, o agregar cualquier feature no listada explícitamente.
+- **No commitees sin aprobación explícita del revisor.** El output de cada módulo debe incluir "No commiteado, para revisión" hasta recibir el ok.
 - **No des explicaciones** salvo que se te pidan.
 
 ---
@@ -168,13 +169,16 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/services/pricing.py` — get_current_price, lanza NoPriceTranche si ningún tramo cubre el sold count
 - `app/services/inventory.py` — get_available_seats, reserve_seats (SELECT FOR UPDATE), release_expired_reservations (SKIP LOCKED), mark_seats_sold
 - `app/services/booking.py` — create_booking (validate → price sin lock → reserve con lock), confirm_booking(db, booking_id, mp_payment_id), expire_booking
-- `app/services/payment.py` — httpx.AsyncClient nativo async, timeouts (connect=5s/read=30s/write=5s), verify_webhook_signature, get_payment, create_preference. Replay protection activa.
+- `app/services/payment.py` — SDK oficial mercadopago (sincrónico), calls wrapped con asyncio.to_thread, timeouts (connection_timeout=30s), verify_webhook_signature, get_payment (valida external_reference como UUID, usa round() para transaction_amount), create_preference. Replay protection activa.
 - `app/routers/payments.py` — POST /webhooks/mercadopago con contrato HTTP aprobado (ver sección dedicada abajo)
 - `app/main.py` — FastAPI() mínimo + register_exception_handlers + include_router(payments.router)
+- `app/services/email.py` — wrapper Resend: 3 templates transaccionales con Jinja2. Ver decisiones de diseño aprobadas abajo.
+- `templates/email/confirmation.html` + `confirmation.txt`
+- `templates/email/reminder.html` + `reminder.txt`
+- `templates/email/feedback.html` + `feedback.txt`
 
 ### Próximo a implementar (en este orden)
 
-- `app/services/email.py` — wrapper Resend: 3 templates transaccionales ⚠️ Ver nota en routers/payments.py
 - `app/schemas/trips.py`, `bookings.py`, `admin.py`
 - `app/routers/trips.py` — GET /trips, GET /trips/{id}/seats
 - `app/routers/bookings.py` — POST /bookings, GET /bookings/{id}
@@ -199,6 +203,22 @@ Módulos críticos:
 
 ---
 
+## Deuda técnica conocida
+
+Estas limitaciones son conocidas y aceptadas. No implementar soluciones sin aprobación explícita.
+
+1. **`Booking` sin `buyer_email`**: no existe un campo para el email de quien compra. Si el comprador no es pasajero (ej: padre que compra para sus hijos), no recibe ningún email de confirmación. Resolver cuando se implemente gestión avanzada de reservas agregando `contact_email` o `buyer_email` al modelo `Booking` — requiere migración.
+
+2. **`send_reminder_email` / `send_feedback_email` retornan `None`**: el caller no puede distinguir éxito total de éxito parcial por valor de retorno. Los fallos parciales solo quedan en el log (WARNING). Resolver en `tasks/reminders.py` — evaluar cambiar firma a `-> bool` o usar contadores.
+
+3. **`jinja2` y `resend` no están en `pyproject.toml`**: agregar cuando se implemente `pyproject.toml + Dockerfile`.
+
+4. **`selectinload` obligatorio para `email.py`**: cualquier caller de `send_confirmation_email`, `send_reminder_email` o `send_feedback_email` DEBE cargar `booking.passengers`, `booking.trip`, `booking.trip.route` y `passenger.seat` con `selectinload` antes de llamar. Async SQLAlchemy lanza `MissingGreenlet` en lazy-load fuera del contexto de sesión. Verificar en `routers/payments.py` y `tasks/reminders.py` cuando se implementen.
+
+5. **Idempotencia de emails de confirmación**: el guard del paso 10 en el webhook (`booking.status == "confirmed"`) previene doble envío ante webhooks duplicados. Confirmar con test de integración cuando se implemente el módulo de tests.
+
+---
+
 ## Decisiones de diseño aprobadas
 
 ### app/services/payment.py — verify_webhook_signature
@@ -215,6 +235,38 @@ Reglas obligatorias:
 - `data_id` se extrae de `request.query_params["data.id"]` — NUNCA del JSON body
 - `x_request_id: str | None` — tipado correcto, puede no venir en el request
 - Se usa `hmac.compare_digest` (timing-safe) — no modificar
+
+### app/services/payment.py — get_payment
+
+- `external_reference` se valida como UUID antes de retornar. Si está vacío o inválido: lanza `PaymentProcessingError` con `status_code=502`.
+- `transaction_amount` se convierte con `round()` (no `int()`). MP devuelve float; el sistema trabaja en pesos enteros sin centavos.
+
+### app/services/email.py — decisiones de diseño
+
+| Decisión | Valor |
+|---|---|
+| FROM | `no-reply@crucerodeleste.com` |
+| Destinatarios | Un email por pasajero en los 3 templates — iterar `booking.passengers` |
+| Templates | HTML + texto plano, archivos en `/templates/email/`, Jinja2 con `StrictUndefined` |
+| `EmailDeliveryError` | Definida en `email.py` (no en `exceptions.py`) |
+
+**`send_confirmation_email`**:
+- 3 intentos por pasajero (1 original + 2 reintentos inmediatos, sin sleep entre ellos)
+- Itera TODOS los pasajeros aunque alguno falle — no corta el loop
+- Acumula emails fallidos en lista `failed`
+- Si `failed` no está vacío al final: lanza `EmailDeliveryError(failed)`
+- Caller es el webhook handler — excepción propagada causa 500 → MP reintenta (comportamiento esperado)
+
+**`send_reminder_email` / `send_feedback_email`**:
+- Fallo por pasajero: log WARNING, continúa con el siguiente
+- `reminder_sent` / `feedback_sent` solo se marcan `True` si Resend confirma envío exitoso
+- Nunca relanzar excepción
+
+**Contrato obligatorio del caller** (todos los `send_*`):
+Cargar con `selectinload` antes de llamar: `booking.passengers`, `booking.trip`, `booking.trip.route`, `passenger.seat`. De lo contrario: `MissingGreenlet` en async SQLAlchemy.
+
+**Prerequisito de deploy** (responsabilidad del cliente):
+El dominio `crucerodeleste.com` debe estar verificado en Resend con los registros DNS correspondientes antes de que los emails puedan enviarse en producción.
 
 ### app/routers/payments.py — Contrato HTTP del webhook
 
@@ -244,14 +296,11 @@ Orden de operaciones obligatorio (no reordenar):
 9. Si booking no existe → return 200 ignored booking_not_found
 10. Si booking.status == "confirmed" → return 200 ok (idempotencia)
 11. confirm_booking(db, booking_id, mp_payment_id)
-12. send_confirmation_email(booking)  ← AÚN NO IMPLEMENTADO, ver nota abajo
+12. send_confirmation_email(booking)  ← cargar relaciones con selectinload antes de llamar
 13. return 200 ok
 ```
 
-**⚠️ Nota sobre el paso 12:** `send_confirmation_email` todavía no existe. El paso 12 no está implementado en el router — el handler termina en `confirm_booking` y retorna 200. Cuando se implemente `app/services/email.py`:
-- Agregar la llamada real en el paso 12, sin stub ni comentario previo
-- El email se envía sincrónicamente dentro del request — si falla lanza excepción → 500 → MP reintenta (comportamiento aceptable y esperado)
-- Verificar que un doble webhook no mande dos emails: el guard de idempotencia del paso 10 lo previene, pero confirmarlo con un test de integración
+El paso 12 requiere que el booking se cargue con `selectinload(Booking.passengers, Booking.trip, ...)` en el mismo query del paso 8. Verificar esto al implementar el router completo.
 
 **Nota sobre idempotencia:** El `SELECT FOR UPDATE` en el paso 8 garantiza que dos webhooks concurrentes para el mismo booking no pasen el check del paso 10 al mismo tiempo. `confirm_booking` también hace su propio `SELECT FOR UPDATE` internamente — están en la misma transacción, no hay conflicto.
 
