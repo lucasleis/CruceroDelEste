@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>¿Cómo fue tu viaje? — Crucero Del Este</title>
+</head>
+<body style="font-family: Arial, Helvetica, sans-serif; color: #222; max-width: 600px; margin: 0 auto;">
+  <h1 style="color: #003366;">¡{{ first_name }}, gracias por viajar con nosotros!</h1>
+
+  <p>Esperamos que tu viaje de <strong>{{ origin }}</strong> a <strong>{{ destination }}</strong> haya sido cómodo.</p>
+
+  <p>Tu opinión nos ayuda a mejorar. ¿Nos contás cómo te fue?</p>
+
+  <p style="margin: 24px 0;">
+    <a href="{{ frontend_url }}/bookings/{{ booking_id }}/feedback"
+       style="background:#003366;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;">
+      Dejar mi opinión
+    </a>
+  </p>
+
+  <p>Reserva: {{ booking_id }}</p>
+
+  <p>¡Gracias!<br>El equipo de Crucero Del Este</p>
+</body>
+</html>

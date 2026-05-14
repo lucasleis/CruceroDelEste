@@ -1,0 +1,18 @@
+¡{{ first_name }}, te recordamos tu viaje!
+
+Te esperamos pronto en Crucero Del Este. Datos de tu próximo viaje:
+
+Reserva:    {{ booking_id }}
+Origen:     {{ origin }}
+Destino:    {{ destination }}
+Salida:     {{ departure_at.strftime('%d/%m/%Y %H:%M') }}
+Asiento:    {{ seat_number }} ({{ seat_type }})
+
+Recordá presentarte en la terminal al menos 30 minutos antes de la salida
+con tu documento.
+
+Consultá tu reserva en:
+{{ frontend_url }}/bookings/{{ booking_id }}
+
+¡Nos vemos a bordo!
+El equipo de Crucero Del Este

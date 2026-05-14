@@ -1,0 +1,13 @@
+¡{{ first_name }}, gracias por viajar con nosotros!
+
+Esperamos que tu viaje de {{ origin }} a {{ destination }} haya sido cómodo.
+
+Tu opinión nos ayuda a mejorar. ¿Nos contás cómo te fue?
+
+Dejá tu opinión acá:
+{{ frontend_url }}/bookings/{{ booking_id }}/feedback
+
+Reserva: {{ booking_id }}
+
+¡Gracias!
+El equipo de Crucero Del Este
