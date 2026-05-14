@@ -92,44 +92,50 @@ Estos módulos están documentados en `/specs/Crucero del Este - Modulos Extras.
 
 ```
 CruceroDelEste/
-├── app/
-│   ├── main.py
-│   ├── config.py
-│   ├── database.py
-│   ├── models/
-│   │   ├── trip.py          # Route, Trip, Seat, PriceTranche
-│   │   ├── booking.py       # Booking, Passenger, AdminUser
-│   │   └── __init__.py
-│   ├── schemas/
-│   │   ├── trips.py
-│   │   ├── bookings.py
-│   │   └── admin.py
-│   ├── routers/
-│   │   ├── trips.py
-│   │   ├── bookings.py
-│   │   ├── payments.py      # Webhook MercadoPago
-│   │   └── admin.py
-│   ├── services/
-│   │   ├── pricing.py
-│   │   ├── inventory.py
-│   │   ├── booking.py
-│   │   ├── payment.py
-│   │   └── email.py
-│   ├── deps.py
-│   └── errors.py
-├── tasks/
-│   └── reminders.py         # APScheduler con SQLAlchemyJobStore
-├── migrations/
-├── tests/
-│   ├── unit/
-│   └── integration/
-├── alembic.ini
-├── pyproject.toml
-├── .env.example
-└── Dockerfile
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── models/
+│   │   │   ├── trip.py          # Route, Trip, Seat, PriceTranche
+│   │   │   ├── booking.py       # Booking, Passenger, AdminUser
+│   │   │   └── __init__.py
+│   │   ├── schemas/
+│   │   │   ├── trips.py
+│   │   │   ├── bookings.py
+│   │   │   └── admin.py
+│   │   ├── routers/
+│   │   │   ├── trips.py
+│   │   │   ├── bookings.py
+│   │   │   ├── payments.py      # Webhook MercadoPago
+│   │   │   └── admin.py
+│   │   ├── services/
+│   │   │   ├── pricing.py
+│   │   │   ├── inventory.py
+│   │   │   ├── booking.py
+│   │   │   ├── payment.py
+│   │   │   └── email.py
+│   │   ├── deps.py
+│   │   └── errors.py
+│   ├── tasks/
+│   │   └── reminders.py         # APScheduler con SQLAlchemyJobStore
+│   ├── migrations/
+│   ├── tests/
+│   │   ├── unit/
+│   │   └── integration/
+│   ├── alembic.ini
+│   ├── pyproject.toml
+│   ├── .env.example
+│   └── Dockerfile
+├── frontend/                    # A desarrollar en fase siguiente
+├── specs/                       # Documentación y especificaciones del proyecto
+└── CLAUDE.md
 ```
 
 Arquitectura en tres capas: **routers → services → models**. Los services contienen toda la lógica de negocio y son testeables sin base de datos. Los routers solo parsean HTTP y devuelven respuestas. Sin repositorios abstractos, sin CQRS, sin sagas.
+
+**Importante**: todo el código backend vive dentro de `/backend/`. Los paths de archivos en este documento son relativos a `/backend/` salvo que se indique lo contrario.
 
 ---
 
@@ -162,23 +168,17 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 
 ### Próximo a implementar (en este orden)
 
-- `app/services/payment.py` — wrapper MercadoPago: crear preferencia, validar webhook
+- `app/services/payment.py` — wrapper MercadoPago: crear preferencia, validar webhook ⚠️ CRÍTICO
 - `app/services/email.py` — wrapper Resend: 3 templates transaccionales
 - `app/schemas/trips.py`, `bookings.py`, `admin.py`
 - `app/routers/trips.py` — GET /trips, GET /trips/{id}/seats
 - `app/routers/bookings.py` — POST /bookings, GET /bookings/{id}
-- `app/routers/payments.py` — POST /payments/webhook
+- `app/routers/payments.py` — POST /payments/webhook ⚠️ CRÍTICO
 - `app/routers/admin.py` — endpoints admin con auth JWT
 - `app/main.py` — FastAPI app, registro de routers, startup
 - `tasks/reminders.py` — APScheduler con SQLAlchemyJobStore
 - `tests/unit/` y `tests/integration/`
 - `pyproject.toml` + `Dockerfile`
-
----
-
-## Primera tarea al iniciar una sesión nueva
-
-El stack y la estructura ya están aprobados. Leé este archivo, los specs en `/specs/` y las skills en `/specs/skills/`. Luego continuá con el primer ítem de "Próximo a implementar" sin preguntar.
 
 ---
 
@@ -192,3 +192,9 @@ Módulos críticos:
 - `app/services/payment.py` — integración MercadoPago
 - `app/routers/payments.py` — webhook MercadoPago
 - Cualquier cambio al schema de base de datos
+
+---
+
+## Primera tarea al iniciar una sesión nueva
+
+El stack y la estructura ya están aprobados. Leé este archivo, los specs en `/specs/` y las skills en `/specs/skills/`. Luego continuá con el primer ítem de "Próximo a implementar" sin preguntar.
