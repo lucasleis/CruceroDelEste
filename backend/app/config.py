@@ -13,12 +13,14 @@ class Settings(BaseSettings):
 
     # MercadoPago
     mercadopago_access_token: str
+    mercadopago_webhook_secret: str
 
     # Email
     resend_api_key: str
 
     # App
     frontend_url: str
+    backend_url: str
     environment: str = "dev"
     booking_expiry_minutes: int = 15
 
