@@ -82,31 +82,62 @@ def _context_for(booking: Booking, passenger: Passenger) -> dict:
     }
 
 
+class EmailDeliveryError(Exception):
+    """Raised when one or more confirmation emails could not be delivered."""
+
+    def __init__(self, failed_emails: list[str]):
+        self.failed_emails = failed_emails
+        super().__init__(
+            f"Failed to deliver confirmation to: {', '.join(failed_emails)}"
+        )
+
+
 async def send_confirmation_email(booking: Booking) -> None:
     """Send the purchase-confirmation email to every passenger of the booking.
 
-    Raises on the first failed send. Caller is the MercadoPago webhook handler;
-    a propagated exception causes a 500, prompting MP to retry the webhook.
+    Each passenger gets up to 3 attempts (1 original + 2 immediate retries, no
+    sleep between attempts). All passengers are processed even if some fail;
+    a per-passenger ERROR is logged after exhausting attempts and the address
+    is collected into a `failed` list. If `failed` is non-empty at the end of
+    the loop, an EmailDeliveryError is raised carrying every failed email.
+
+    Caller contract: booking.passengers, booking.trip, booking.trip.route, and
+    passenger.seat MUST be eagerly loaded (e.g. via `selectinload`) before
+    invoking this function. Async SQLAlchemy raises MissingGreenlet on lazy
+    attribute access outside the original session context.
     """
+    failed: list[str] = []
     for passenger in booking.passengers:
         ctx = _context_for(booking, passenger)
         subject = f"Confirmación de compra — Crucero Del Este #{ctx['booking_id'][:8]}"
         html = _render("confirmation.html", ctx)
         text = _render("confirmation.txt", ctx)
-        try:
-            resend_id = await asyncio.to_thread(
-                _send_sync, to=passenger.email, subject=subject, html=html, text=text,
-            )
-        except Exception:
+
+        resend_id: str | None = None
+        last_exc: Exception | None = None
+        for _ in range(3):
+            try:
+                resend_id = await asyncio.to_thread(
+                    _send_sync, to=passenger.email, subject=subject, html=html, text=text,
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+
+        if resend_id is None:
             logger.error(
                 "confirmation_email_failed booking_id=%s passenger_email=%s",
-                booking.id, passenger.email, exc_info=True,
+                booking.id, passenger.email, exc_info=last_exc,
             )
-            raise
-        logger.info(
-            "confirmation_email_sent booking_id=%s passenger_email=%s resend_id=%s",
-            booking.id, passenger.email, resend_id,
-        )
+            failed.append(passenger.email)
+        else:
+            logger.info(
+                "confirmation_email_sent booking_id=%s passenger_email=%s resend_id=%s",
+                booking.id, passenger.email, resend_id,
+            )
+
+    if failed:
+        raise EmailDeliveryError(failed)
 
 
 async def send_reminder_email(booking: Booking) -> None:
