@@ -143,11 +143,23 @@ async def get_payment(payment_id: str) -> PaymentDetails:
         )
 
     data = result["response"]
+    external_reference = data.get("external_reference") or ""
+    try:
+        UUID(external_reference)
+    except (ValueError, AttributeError, TypeError):
+        raise PaymentProcessingError(
+            "Invalid external_reference in payment response",
+            status_code=502,
+        )
+
+    # MP returns transaction_amount as a float; the system stores amounts as
+    # whole ARS pesos (no cents), so round to the nearest integer rather than
+    # truncating to avoid off-by-one drift from float representation.
     return PaymentDetails(
         payment_id=str(data["id"]),
         status=data["status"],
-        external_reference=data.get("external_reference") or "",
-        amount=int(data["transaction_amount"]),
+        external_reference=external_reference,
+        amount=round(data["transaction_amount"]),
     )
 
 
