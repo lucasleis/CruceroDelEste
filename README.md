@@ -1,6 +1,8 @@
 # Crucero Del Este
+
 Sistema de venta de pasajes online para Crucero Del Este, empresa argentina de transporte de larga distancia. Plataforma propia que complementa los canales actuales (Plataforma 10, Central de Pasajes) con venta directa, pricing dinámico y control total sobre precios, datos y experiencia de usuario.
 ---
+
 ## Estructura del repositorio
 ```
 CruceroDelEste/
