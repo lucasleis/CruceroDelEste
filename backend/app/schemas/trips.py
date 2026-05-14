@@ -24,6 +24,13 @@ class SeatRead(BaseModel):
 
 
 class TripRead(BaseModel):
+    """
+    Contrato para el caller: available_seats_count, current_price_cama y
+    current_price_semi_cama NO existen en el modelo ORM Trip. El router o service
+    DEBE poblarlos manualmente antes de construir este schema. De lo contrario
+    Pydantic lanza ValidationError en runtime.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
