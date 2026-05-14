@@ -5,7 +5,8 @@ All I/O is done with httpx.AsyncClient — no sync SDK, no asyncio.to_thread.
 Webhook signature algorithm (confirmed from official MP docs and multiple
 production implementations):
   - MP sends header:  x-signature: ts=<epoch_seconds>,v1=<hex_hmac_sha256>
-  - Signed manifest:  "id:{data_id};request-id:{x_request_id};ts:{ts};"
+  - Signed manifest:  "id:{data_id.lower()};[request-id:{x_request_id};]ts:{ts};"
+                      (data_id lowercased; absent fields omitted, not written as None)
   - Key:              MERCADOPAGO_WEBHOOK_SECRET env variable
   - Digest:           HMAC-SHA256, hex-encoded
   - Replay window:    ts must be within 120 s past / 600 s future of server clock
@@ -159,15 +160,20 @@ async def get_payment(payment_id: str) -> PaymentDetails:
 def verify_webhook_signature(
     data_id: str,
     x_signature: str,
-    x_request_id: str,
+    x_request_id: str | None,
 ) -> None:
     """Verify the MercadoPago webhook x-signature header.
 
-    MP signs each notification with HMAC-SHA256 over the manifest:
-        "id:{data_id};request-id:{x_request_id};ts:{ts};"
+    Callers MUST extract data_id from the query parameter "data.id"
+    (request.query_params["data.id"]), NOT from the JSON body.
+    x_request_id comes from the "x-request-id" HTTP header (may be absent → None).
 
-    The x-signature header format is:
-        ts=<epoch_seconds>,v1=<hex_hmac_sha256>
+    Manifest format (per MP docs):
+      - data_id is lowercased before insertion
+      - absent fields (x_request_id is None/empty) are omitted entirely
+      - "id:{data_id.lower()};[request-id:{x_request_id};]ts:{ts};"
+
+    x-signature header format: ts=<epoch_seconds>,v1=<hex_hmac_sha256>
 
     Raises InvalidWebhookSignature on any validation failure.
     Does NOT log the raw signature value or payload to avoid leaking PII.
@@ -216,7 +222,13 @@ def verify_webhook_signature(
         raise InvalidWebhookSignature("Timestamp outside replay protection window")
 
     # HMAC-SHA256 over the canonical manifest string.
-    manifest = f"id:{data_id};request-id:{x_request_id};ts:{ts_raw};"
+    # Rules (per MP docs): data_id is lowercased; absent fields are omitted
+    # entirely (not written as "field:None;").
+    manifest_parts = [f"id:{data_id.lower()}"]
+    if x_request_id:
+        manifest_parts.append(f"request-id:{x_request_id}")
+    manifest_parts.append(f"ts:{ts_raw}")
+    manifest = ";".join(manifest_parts) + ";"
     expected_digest = hmac.new(
         settings.mercadopago_webhook_secret.encode(),
         manifest.encode(),
