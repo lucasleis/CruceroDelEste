@@ -49,7 +49,7 @@ async def login(body: AdminLoginRequest, db: AsyncSession = Depends(get_db)) -> 
 
 @router.get("/bookings", response_model=list[AdminBookingRead])
 async def list_bookings(
-    status: BookingStatusEnum | None = None,
+    booking_status: BookingStatusEnum | None = None,
     trip_id: UUID | None = None,
     _admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
@@ -61,8 +61,8 @@ async def list_bookings(
         .limit(500)
         .order_by(Booking.created_at.desc())
     )
-    if status is not None:
-        query = query.where(Booking.status == status)
+    if booking_status is not None:
+        query = query.where(Booking.status == booking_status)
     if trip_id is not None:
         query = query.where(Booking.trip_id == trip_id)
 
