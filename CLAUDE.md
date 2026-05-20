@@ -191,7 +191,6 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/services/booking.py` — create_booking (validate → price sin lock → reserve con lock), confirm_booking(db, booking_id, mp_payment_id), expire_booking
 - `app/services/payment.py` — SDK oficial mercadopago (sincrónico), calls wrapped con asyncio.to_thread, timeouts (connection_timeout=30s), verify_webhook_signature, get_payment (valida external_reference como UUID, usa round() para transaction_amount), create_preference. Replay protection activa.
 - `app/routers/payments.py` — POST /webhooks/mercadopago con contrato HTTP aprobado (ver sección dedicada abajo)
-- `app/main.py` — FastAPI() mínimo + register_exception_handlers + include_router(payments.router) + include_router(bookings.router)
 - `app/services/email.py` — wrapper Resend: 3 templates transaccionales con Jinja2. Ver decisiones de diseño aprobadas abajo.
 - `templates/email/confirmation.html` + `confirmation.txt`
 - `templates/email/reminder.html` + `reminder.txt`
@@ -201,8 +200,8 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/schemas/admin.py` — AdminLoginRequest, AdminLoginResponse, PriceTrancheCreate (con validador max_sold > min_sold), PriceTrancheRead, AdminBookingRead
 - `app/routers/trips.py` — GET /trips (filtros opcionales + filtros implícitos de status/fecha, available_counts en 1 query, precios con LEFT JOIN en 1 query), GET /trips/{id}/seats (filtros opcionales, 404 con NotFoundError, docstring de contrato)
 - `app/routers/bookings.py` — POST /bookings (validación trip, reserva, preference MP, 201), GET /bookings/{id} público con selectinload
-- `app/routers/admin.py` — POST /admin/login, GET /admin/bookings, GET/POST/DELETE /admin/trips/{id}/price-tranches con auth JWT. Ver decisiones de diseño abajo.
-- `app/main.py` — todos los routers registrados: payments, bookings, trips, admin
+- `app/routers/admin.py` — POST /admin/login (bcrypt + JWT), GET /admin/bookings (filtros + LIMIT 500), GET/POST/DELETE /admin/trips/{id}/price-tranches (con validación de solapamiento)
+- `app/main.py` — FastAPI() completo + register_exception_handlers + include_router para payments, bookings, trips y admin
 
 ### Próximo a implementar (en este orden)
 
@@ -244,6 +243,8 @@ Estas limitaciones son conocidas y aceptadas. No implementar soluciones sin apro
 7. **`SeatNotAvailable` vs `SeatUnavailableError`**: dos excepciones casi homónimas — `app/services/inventory.SeatNotAvailable` (lanzada por services) y `app/errors.SeatUnavailableError` (con handler 409). El router traduce de una a otra. Unificar en pasada futura.
 
 8. **`db.refresh(booking, attribute_names=["passengers"])`**: si aparece `MissingGreenlet` en tests, reemplazar por re-select explícito con `selectinload(Booking.passengers)`.
+
+9. **`GET /admin/bookings` sin paginación**: LIMIT defensivo de 500 hardcodeado. Agregar paginación `limit`/`offset` cuando el volumen lo requiera.
 
 ---
 
@@ -352,33 +353,6 @@ Fuera de scope para el MVP. El router ignora `payment.status == "pending"` silen
 - Response: `list[SeatRead]` plano, sin wrapper
 - Docstring de contrato: "Este response refleja el estado al momento de la consulta y no garantiza disponibilidad al momento de compra. No usar como fuente de verdad para confirmar una reserva."
 
-### app/routers/admin.py — decisiones de diseño
-
-**POST /admin/login:**
-- Verificación de contraseña: `passlib.context.CryptContext(schemes=["bcrypt"])`. Instancia `_pwd_context` a nivel módulo.
-- Error unificado para email inexistente y contraseña incorrecta: 401 `invalid_credentials` — no revelar cuál falló.
-- JWT payload: `sub` = str(admin.id), `exp` = now + timedelta(minutes=settings.jwt_expiry_minutes). Algoritmo HS256, clave `settings.secret_key` — consistente con `deps.get_current_admin`.
-
-**GET /admin/bookings:**
-- Query params opcionales: `booking_status` (BookingStatusEnum), `trip_id` (UUID). Nombrado `booking_status` (no `status`) para no shadowear `fastapi.status`.
-- Carga con `selectinload(Booking.passengers)`.
-- LIMIT hardcodeado: 500. No expuesto como parámetro. Sin paginación en MVP.
-- Orden: `created_at DESC`.
-
-**GET /admin/trips/{trip_id}/price-tranches:**
-- Trip inexistente → `raise NotFoundError()`.
-- Orden: `seat_type ASC`, `min_sold ASC`.
-
-**POST /admin/trips/{trip_id}/price-tranches:**
-- Trip inexistente → `raise NotFoundError()`.
-- Validación de solapamiento en aplicación (no delegada a DB): carga tramos existentes del mismo `(trip_id, seat_type)` y verifica `new.min_sold < existing.max_sold AND new.max_sold > existing.min_sold`. Si solapa → 409 `tranche_overlap`.
-- Commit explícito + `db.refresh`. Response 201.
-
-**DELETE /admin/trips/{trip_id}/price-tranches/{tranche_id}:**
-- Trip inexistente → `raise NotFoundError()`.
-- Tranche inexistente o `tranche.trip_id != trip_id` → `raise NotFoundError()`.
-- Commit explícito. Response 204 No Content.
-
 ### app/routers/bookings.py — decisiones de diseño
 
 **POST /bookings:**
@@ -397,3 +371,30 @@ Fuera de scope para el MVP. El router ignora `payment.status == "pending"` silen
 - Cargar con `selectinload(Booking.passengers)`.
 - Booking inexistente → `NotFoundError` (404).
 - Response: `BookingRead` (sin MP IDs ni flags admin).
+
+### app/routers/admin.py — decisiones de diseño
+
+**POST /admin/login:**
+- Hash de contraseña: `passlib[bcrypt]` con `CryptContext(schemes=["bcrypt"], deprecated="auto")`.
+- Mismo error 401 `invalid_credentials` para email inexistente y password incorrecta — nunca revelar cuál falló.
+- JWT: `sub` = str(admin.id), `exp` = now + timedelta(minutes=settings.jwt_expiry_minutes). Firmado con `settings.secret_key` y HS256 — mismo atributo que usa `deps.get_current_admin`.
+
+**GET /admin/bookings:**
+- Filtros opcionales: `booking_status` (BookingStatusEnum), `trip_id` (UUID). Parámetro nombrado `booking_status` para evitar shadow de `fastapi.status`.
+- LIMIT 500 hardcodeado, no expuesto como parámetro. Comentario en código: `# MVP: sin paginación, límite defensivo de 500`.
+- Orden: `created_at DESC`.
+- `selectinload(Booking.passengers)` obligatorio.
+
+**GET /admin/trips/{trip_id}/price-tranches:**
+- Trip inexistente → `NotFoundError` (404).
+- Orden: `seat_type ASC`, `min_sold ASC`.
+
+**POST /admin/trips/{trip_id}/price-tranches:**
+- Trip inexistente → `NotFoundError` (404).
+- Validación de solapamiento explícita antes de insertar: cargar tramos existentes del mismo `(trip_id, seat_type)` y verificar `new.min_sold < existing.max_sold AND new.max_sold > existing.min_sold`. Si solapa → 409 `tranche_overlap`. No depender de UniqueConstraint de DB (no cubre solapamientos complejos).
+- Status 201 en éxito.
+
+**DELETE /admin/trips/{trip_id}/price-tranches/{tranche_id}:**
+- Trip inexistente → `NotFoundError` (404).
+- Tranche inexistente o `tranche.trip_id != trip_id` → `NotFoundError` (404).
+- Status 204 No Content.
