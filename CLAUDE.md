@@ -18,6 +18,23 @@ Sos un senior backend engineer. Priorizás correctitud sobre cleverness. No agre
 
 ---
 
+## Primera tarea al iniciar una sesión nueva
+
+El stack y la estructura ya están aprobados. Al iniciar una sesión nueva:
+
+1. Leé este archivo completo.
+2. Leé los specs en `/specs/`.
+3. Leé las skills en `/specs/skills/`.
+4. Leé todos los archivos en `app/models/` para entender el schema de base de datos.
+5. Leé todos los archivos en `app/schemas/` para entender los contratos de API.
+6. Leé `app/errors.py` y `app/exceptions.py`.
+7. Leé todos los archivos en `app/services/` para entender la lógica de negocio ya implementada.
+8. Luego continuá con el primer ítem de "Próximo a implementar" sin preguntar.
+
+No leas `app/routers/` completo al inicio — leé solo el router en el que vayas a trabajar. No leas `tests/`, `tasks/`, `pyproject.toml` ni `Dockerfile` salvo que el ítem a implementar lo requiera.
+
+---
+
 ## Alcance del MVP (backend)
 
 ### Incluido
@@ -57,7 +74,7 @@ Sos un senior backend engineer. Priorizás correctitud sobre cleverness. No agre
 - **No agregues nada fuera del alcance listado arriba**, aunque parezca obvio o útil.
 - **Después de completar cada archivo o módulo**, output: `✅ [nombre del archivo] — [descripción en una línea]`
 - **Detente y preguntá antes de**: modificar el schema de base de datos, cambiar el flujo de pago, o agregar cualquier feature no listada explícitamente.
-- **No commitees sin aprobación explícita del revisor.** El output de cada módulo debe incluir "No commiteado, para revisión" hasta recibir el ok.
+- **Commits y branches**: podés commitear y pushear libremente en tu branch de sesión. Nunca hagas merge a `main` — eso lo hace el revisor a mano. No commitees en `main` directamente bajo ninguna circunstancia.
 - **Antes de implementar cualquier módulo nuevo**: listá todas las decisiones de diseño que necesitás tomar para implementarlo (formato de datos, manejo de errores, comportamiento ante casos borde, dependencias con otros módulos). Esperá aprobación explícita antes de escribir cualquier línea de código.
 - **Durante la implementación**: si encontrás algo no especificado o ambiguo — por mínimo que parezca — detenete y consultá. No asumas. No implementes la opción que te parezca más razonable. La consulta debe incluir: qué decisión necesitás tomar, qué opciones ves, y cuál recomendás y por qué. Esperá respuesta antes de continuar.
 - **Al finalizar cada módulo**: si durante la implementación encontraste algo que podría mejorarse en módulos ya completados (bug potencial, inconsistencia, deuda técnica), reportarlo como nota separada al final del output bajo el título "⚠️ Observaciones". Sin implementar nada, sin abrir PRs, sin modificar archivos existentes.
@@ -167,7 +184,7 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/config.py` — pydantic-settings con `@model_validator`: valida `backend_url` (URL absoluta, HTTPS obligatorio en producción), `mercadopago_webhook_secret` requerido. Falla en arranque si falta variable de entorno.
 - `app/database.py` — async engine con pool_pre_ping, echo condicional al entorno, sessionmaker, Base, get_db. Sesión NO auto-commitea — el router debe hacer `await db.commit()` explícito.
 - `app/deps.py` — get_current_admin con PyJWT (HS256), re-exporta get_db
-- `app/errors.py` — SeatUnavailableError (409), ValidationError (422), 404, 500
+- `app/errors.py` — SeatUnavailableError (409), ValidationError (422), NotFoundError (404 fijo, sin parámetros), handlers genéricos 404 y 500
 - `app/exceptions.py` — InvalidWebhookSignature, PaymentProcessingError (lleva status_code), PaymentConfigError
 - `app/services/pricing.py` — get_current_price, lanza NoPriceTranche si ningún tramo cubre el sold count
 - `app/services/inventory.py` — get_available_seats, reserve_seats (SELECT FOR UPDATE), release_expired_reservations (SKIP LOCKED), mark_seats_sold
@@ -179,14 +196,16 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `templates/email/confirmation.html` + `confirmation.txt`
 - `templates/email/reminder.html` + `reminder.txt`
 - `templates/email/feedback.html` + `feedback.txt`
+- `app/schemas/trips.py` — RouteRead, SeatRead, TripRead (con available_seats_count y precios como campos manuales, no del ORM)
+- `app/schemas/bookings.py` — PassengerCreate, PassengerRead, BookingCreate (con validador de consistencia seat_ids ↔ passengers), BookingRead, BookingCreateResponse
+- `app/schemas/admin.py` — AdminLoginRequest, AdminLoginResponse, PriceTrancheCreate (con validador max_sold > min_sold), PriceTrancheRead, AdminBookingRead
+- `app/routers/trips.py` — GET /trips (filtros opcionales + filtros implícitos de status/fecha, available_counts en 1 query, precios con LEFT JOIN en 1 query), GET /trips/{id}/seats (filtros opcionales, 404 con NotFoundError, docstring de contrato)
 
 ### Próximo a implementar (en este orden)
 
-- `app/schemas/trips.py`, `bookings.py`, `admin.py`
-- `app/routers/trips.py` — GET /trips, GET /trips/{id}/seats
 - `app/routers/bookings.py` — POST /bookings, GET /bookings/{id}
 - `app/routers/admin.py` — endpoints admin con auth JWT
-- Completar `app/main.py` — registrar routers restantes cuando existan
+- Completar `app/main.py` — registrar `trips.router`, `bookings.router`, `admin.router` (hoy solo está `payments.router`)
 - `tasks/reminders.py` — APScheduler con SQLAlchemyJobStore
 - `tests/unit/` y `tests/integration/`
 - `pyproject.toml` + `Dockerfile`
@@ -311,8 +330,18 @@ El paso 12 requiere que el booking se cargue con `selectinload(Booking.passenger
 
 Fuera de scope para el MVP. El router ignora `payment.status == "pending"` silenciosamente (return 200 ok). Si en el futuro se incorporan pagos en efectivo (Rapipago, Pago Fácil), el router requiere revisión completa del manejo de estado `pending`.
 
----
+### app/routers/trips.py — decisiones de diseño
 
-## Primera tarea al iniciar una sesión nueva
+**GET /trips:**
+- Filtros opcionales: `origin`, `destination`, `departure_date`
+- Filtros implícitos (no configurables desde el cliente): `status == scheduled`, `departure_at >= now()` UTC
+- Orden fijo: `departure_at ASC`. Sin paginación.
+- `available_seats_count`: una query agregada con GROUP BY, mapeada en memoria. Sin N+1.
+- `current_price_cama` / `current_price_semi_cama`: una sola query con LEFT OUTER JOIN sobre `price_tranches`. Sin loop de queries. Si no hay tramo aplicable: `None` + log WARNING con trip_id y seat_type.
 
-El stack y la estructura ya están aprobados. Leé este archivo, los specs en `/specs/` y las skills en `/specs/skills/`. Luego continuá con el primer ítem de "Próximo a implementar" sin preguntar.
+**GET /trips/{id}/seats:**
+- Filtros opcionales: `seat_type`, `status`. Sin filtro por defecto — devuelve todos los asientos.
+- Trip inexistente → `raise NotFoundError()`
+- Trip sin asientos → lista vacía `[]`
+- Response: `list[SeatRead]` plano, sin wrapper
+- Docstring de contrato: "Este response refleja el estado al momento de la consulta y no garantiza disponibilidad al momento de compra. No usar como fuente de verdad para confirmar una reserva."
