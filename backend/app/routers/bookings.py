@@ -1,0 +1,140 @@
+import logging
+from datetime import datetime, timezone
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.deps import get_db
+from app.errors import NotFoundError, SeatUnavailableError
+from app.exceptions import PaymentProcessingError
+from app.models.booking import Booking
+from app.models.trip import Seat, SeatTypeEnum, Trip, TripStatusEnum
+from app.schemas.bookings import (
+    BookingCreate,
+    BookingCreateResponse,
+    BookingRead,
+    PassengerRead,
+)
+from app.services.booking import PassengerData, create_booking
+from app.services.inventory import SeatNotAvailable
+from app.services.payment import PreferenceItem, create_preference
+from app.services.pricing import NoPriceTranche, get_current_price
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/bookings", tags=["bookings"])
+
+
+_SEAT_TYPE_TITLES: dict[SeatTypeEnum, str] = {
+    SeatTypeEnum.cama: "Pasaje Cama",
+    SeatTypeEnum.semi_cama: "Pasaje Semi Cama",
+}
+
+
+@router.post("", response_model=BookingCreateResponse, status_code=201)
+async def create_booking_endpoint(
+    booking_in: BookingCreate,
+    db: AsyncSession = Depends(get_db),
+) -> BookingCreateResponse:
+    trip = await db.get(Trip, booking_in.trip_id)
+    if trip is None:
+        raise NotFoundError()
+
+    if (
+        trip.status != TripStatusEnum.scheduled
+        or trip.departure_at < datetime.now(timezone.utc)
+    ):
+        raise HTTPException(status_code=409, detail="trip_not_available")
+
+    passengers_data = [
+        PassengerData(
+            seat_id=p.seat_id,
+            first_name=p.first_name,
+            last_name=p.last_name,
+            dni=p.dni,
+            email=p.email,
+            phone=p.phone,
+        )
+        for p in booking_in.passengers
+    ]
+
+    try:
+        booking = await create_booking(
+            db,
+            booking_in.trip_id,
+            booking_in.seat_ids,
+            passengers_data,
+        )
+    except SeatNotAvailable as exc:
+        raise SeatUnavailableError(str(exc.seat_id)) from exc
+    except NoPriceTranche:
+        logger.error(
+            "no_price_tranche_on_booking trip_id=%s seat_ids=%s",
+            booking_in.trip_id,
+            booking_in.seat_ids,
+        )
+        raise
+
+    seats_result = await db.execute(
+        select(Seat).where(Seat.id.in_(booking_in.seat_ids))
+    )
+    counts_by_type: dict[SeatTypeEnum, int] = {}
+    for seat in seats_result.scalars().all():
+        counts_by_type[seat.seat_type] = counts_by_type.get(seat.seat_type, 0) + 1
+
+    items: list[PreferenceItem] = []
+    for seat_type, qty in counts_by_type.items():
+        unit_price = await get_current_price(db, booking_in.trip_id, seat_type)
+        items.append(
+            PreferenceItem(
+                title=_SEAT_TYPE_TITLES[seat_type],
+                quantity=qty,
+                unit_price=unit_price,
+            )
+        )
+
+    payer_email = booking_in.passengers[0].email
+
+    try:
+        preference = await create_preference(booking.id, items, payer_email)
+    except PaymentProcessingError as exc:
+        logger.error(
+            "create_preference_failed booking_id=%s trip_id=%s status_code=%s",
+            booking.id,
+            booking_in.trip_id,
+            exc.status_code,
+        )
+        raise HTTPException(status_code=502, detail="payment_gateway_error") from exc
+
+    booking.mp_preference_id = preference.preference_id
+    await db.commit()
+    await db.refresh(booking, attribute_names=["passengers"])
+
+    return BookingCreateResponse(
+        id=booking.id,
+        trip_id=booking.trip_id,
+        status=booking.status,
+        total_amount=booking.total_amount,
+        expires_at=booking.expires_at,
+        passengers=[PassengerRead.model_validate(p) for p in booking.passengers],
+        init_point=preference.init_point,
+    )
+
+
+@router.get("/{booking_id}", response_model=BookingRead)
+async def get_booking(
+    booking_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> BookingRead:
+    result = await db.execute(
+        select(Booking)
+        .options(selectinload(Booking.passengers))
+        .where(Booking.id == booking_id)
+    )
+    booking = result.scalar_one_or_none()
+    if booking is None:
+        raise NotFoundError()
+    return BookingRead.model_validate(booking)
