@@ -181,7 +181,7 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/models/trip.py` — Route, Trip, Seat, PriceTranche
 - `app/models/booking.py` — Booking, Passenger, AdminUser
 - `app/models/__init__.py`
-- `app/config.py` — pydantic-settings con `@model_validator`: valida `backend_url` (URL absoluta, HTTPS obligatorio en producción), `mercadopago_webhook_secret` requerido. Falla en arranque si falta variable de entorno.
+- `app/config.py` — pydantic-settings con `@model_validator`: valida `backend_url` (URL absoluta, HTTPS obligatorio en producción), `mercadopago_webhook_secret` requerido, `sync_database_url` para APScheduler job store. Falla en arranque si falta variable de entorno.
 - `app/database.py` — async engine con pool_pre_ping, echo condicional al entorno, sessionmaker, Base, get_db. Sesión NO auto-commitea — el router debe hacer `await db.commit()` explícito.
 - `app/deps.py` — get_current_admin con PyJWT (HS256), re-exporta get_db
 - `app/errors.py` — SeatUnavailableError (409), ValidationError (422), NotFoundError (404 fijo, sin parámetros), handlers genéricos 404 y 500
@@ -201,11 +201,12 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/routers/trips.py` — GET /trips (filtros opcionales + filtros implícitos de status/fecha, available_counts en 1 query, precios con LEFT JOIN en 1 query), GET /trips/{id}/seats (filtros opcionales, 404 con NotFoundError, docstring de contrato)
 - `app/routers/bookings.py` — POST /bookings (validación trip, reserva, preference MP, 201), GET /bookings/{id} público con selectinload
 - `app/routers/admin.py` — POST /admin/login (bcrypt + JWT), GET /admin/bookings (filtros + LIMIT 500), GET/POST/DELETE /admin/trips/{id}/price-tranches (con validación de solapamiento)
-- `app/main.py` — FastAPI() completo + register_exception_handlers + include_router para payments, bookings, trips y admin
+- `app/main.py` — FastAPI() con lifespan (scheduler.start → register_jobs → yield → scheduler.shutdown) + register_exception_handlers + include_router para payments, bookings, trips y admin
+- `tasks/__init__.py` — módulo vacío
+- `tasks/reminders.py` — AsyncIOScheduler con SQLAlchemyJobStore, tres jobs: expire_bookings (1 min), send_reminders (1 h), send_feedback (1 h). Ver decisiones de diseño abajo.
 
 ### Próximo a implementar (en este orden)
 
-- `tasks/reminders.py` — APScheduler con SQLAlchemyJobStore
 - `tests/unit/` y `tests/integration/`
 - `pyproject.toml` + `Dockerfile`
 
@@ -232,9 +233,9 @@ Estas limitaciones son conocidas y aceptadas. No implementar soluciones sin apro
 
 2. **`send_reminder_email` / `send_feedback_email` retornan `None`**: el caller no puede distinguir éxito total de éxito parcial por valor de retorno. Los fallos parciales solo quedan en el log (WARNING). Resolver en `tasks/reminders.py` — evaluar cambiar firma a `-> bool` o usar contadores.
 
-3. **`jinja2`, `resend` y `passlib[bcrypt]` no están en `pyproject.toml`**: agregar cuando se implemente `pyproject.toml + Dockerfile`.
+3. **`jinja2`, `resend`, `passlib[bcrypt]` y `apscheduler` no están en `pyproject.toml`**: agregar cuando se implemente `pyproject.toml + Dockerfile`.
 
-4. **`selectinload` obligatorio para `email.py`**: cualquier caller de `send_confirmation_email`, `send_reminder_email` o `send_feedback_email` DEBE cargar `booking.passengers`, `booking.trip`, `booking.trip.route` y `passenger.seat` con `selectinload` antes de llamar. Async SQLAlchemy lanza `MissingGreenlet` en lazy-load fuera del contexto de sesión. Verificar en `routers/payments.py` y `tasks/reminders.py` cuando se implementen.
+4. **`selectinload` obligatorio para `email.py`**: cualquier caller de `send_confirmation_email`, `send_reminder_email` o `send_feedback_email` DEBE cargar `booking.passengers`, `booking.trip`, `booking.trip.route` y `passenger.seat` con `selectinload` antes de llamar. Async SQLAlchemy lanza `MissingGreenlet` en lazy-load fuera del contexto de sesión. Verificar en `routers/payments.py` cuando se implementen los tests de integración.
 
 5. **Idempotencia de emails de confirmación**: el guard del paso 10 en el webhook (`booking.status == "confirmed"`) previene doble envío ante webhooks duplicados. Confirmar con test de integración cuando se implemente el módulo de tests.
 
@@ -398,3 +399,40 @@ Fuera de scope para el MVP. El router ignora `payment.status == "pending"` silen
 - Trip inexistente → `NotFoundError` (404).
 - Tranche inexistente o `tranche.trip_id != trip_id` → `NotFoundError` (404).
 - Status 204 No Content.
+
+### tasks/reminders.py — decisiones de diseño
+
+**Scheduler:**
+- `AsyncIOScheduler` de APScheduler 3.x — correcto para apps asyncio.
+- `SQLAlchemyJobStore` con `settings.sync_database_url` (URL sincrónica `postgresql://...`). Jobs persistidos en PostgreSQL, sobreviven reinicios.
+- `register_jobs()` es pública y se llama desde el lifespan de FastAPI, **después de `scheduler.start()`**. No se llama en tiempo de importación.
+
+**Registro en lifespan (`app/main.py`):**
+```python
+scheduler.start()
+register_jobs()   # después de start(), no antes
+yield
+scheduler.shutdown()
+```
+
+**Jobs:**
+
+| Job | Trigger | `misfire_grace_time` | `replace_existing` |
+|---|---|---|---|
+| `expire_bookings_job` | `IntervalTrigger(minutes=1)` | 60 s | True |
+| `send_reminders_job` | `IntervalTrigger(hours=1)` | 3600 s | True |
+| `send_feedback_job` | `IntervalTrigger(hours=1)` | 3600 s | True |
+
+**Ventanas de tiempo aprobadas:**
+- Reminder: viajes con `departure_at` entre `now()` y `now() + 24 h`.
+- Feedback: viajes con `arrival_at <= now() - 2 h`.
+
+**Patrón de dos sesiones (reminder y feedback):**
+Los jobs de reminder y feedback abren una primera sesión para la query con `selectinload` (carga eager de todas las relaciones requeridas por `email.py`). Luego, por cada booking, abren una segunda sesión para actualizar el flag y hacer commit. El objeto `booking` de la primera sesión ya está cerrado, pero las relaciones están cargadas en memoria — no hay `MissingGreenlet`. Rollback de la segunda sesión no afecta la primera (ya cerrada limpiamente).
+
+**Commit por booking individual:**
+Todos los jobs hacen commit por booking individual dentro de un `try/except`. Si un booking falla: log ERROR, rollback de esa sesión, continuar con el siguiente. El loop nunca se corta por un fallo individual.
+
+**Manejo de errores:**
+- `expire_bookings_job`: `expire_booking()` lanza → log ERROR + rollback + continuar.
+- `send_reminders_job` / `send_feedback_job`: `send_*_email()` ya swallows errores por pasajero (log WARNING). El job captura errores a nivel booking (ej: error de DB al buscar) con log ERROR + rollback + continuar. El flag `reminder_sent` / `feedback_sent` solo se marca `True` si `send_*_email()` no lanzó excepción.
