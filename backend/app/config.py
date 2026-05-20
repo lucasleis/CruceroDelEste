@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str
+    sync_database_url: str
 
     # Security
     secret_key: str
