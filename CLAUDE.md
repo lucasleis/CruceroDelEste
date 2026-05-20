@@ -204,11 +204,14 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/main.py` — FastAPI() con lifespan (scheduler.start → register_jobs → yield → scheduler.shutdown) + register_exception_handlers + include_router para payments, bookings, trips y admin
 - `tasks/__init__.py` — módulo vacío
 - `tasks/reminders.py` — AsyncIOScheduler con SQLAlchemyJobStore, tres jobs: expire_bookings (1 min), send_reminders (1 h), send_feedback (1 h). Ver decisiones de diseño abajo.
+- `pyproject.toml` — dependencias de producción con lower bounds, hatchling como build backend, grupo `[dev]` con pytest + testcontainers, configuración de pytest con `asyncio_mode=auto`
+- `Dockerfile` — `python:3.12-slim` single-stage, `pip install .` via hatchling, usuario no-root `appuser`, `--workers 1` con comentario explicativo del APScheduler constraint
+- `.dockerignore` — excluye `.git`, `.env*`, `tests/`, caches de herramientas, `frontend/`
+- `.env.example` — todos los campos requeridos por `app/config.py` incluyendo `SYNC_DATABASE_URL`, `BACKEND_URL`, `MERCADOPAGO_WEBHOOK_SECRET`
 
 ### Próximo a implementar (en este orden)
 
 - `tests/unit/` y `tests/integration/`
-- `pyproject.toml` + `Dockerfile`
 
 ---
 
@@ -233,19 +236,19 @@ Estas limitaciones son conocidas y aceptadas. No implementar soluciones sin apro
 
 2. **`send_reminder_email` / `send_feedback_email` retornan `None`**: el caller no puede distinguir éxito total de éxito parcial por valor de retorno. Los fallos parciales solo quedan en el log (WARNING). Resolver en `tasks/reminders.py` — evaluar cambiar firma a `-> bool` o usar contadores.
 
-3. **`jinja2`, `resend`, `passlib[bcrypt]` y `apscheduler` no están en `pyproject.toml`**: agregar cuando se implemente `pyproject.toml + Dockerfile`.
+3. **`selectinload` obligatorio para `email.py`**: cualquier caller de `send_confirmation_email`, `send_reminder_email` o `send_feedback_email` DEBE cargar `booking.passengers`, `booking.trip`, `booking.trip.route` y `passenger.seat` con `selectinload` antes de llamar. Async SQLAlchemy lanza `MissingGreenlet` en lazy-load fuera del contexto de sesión. Verificar en `routers/payments.py` cuando se implementen los tests de integración.
 
-4. **`selectinload` obligatorio para `email.py`**: cualquier caller de `send_confirmation_email`, `send_reminder_email` o `send_feedback_email` DEBE cargar `booking.passengers`, `booking.trip`, `booking.trip.route` y `passenger.seat` con `selectinload` antes de llamar. Async SQLAlchemy lanza `MissingGreenlet` en lazy-load fuera del contexto de sesión. Verificar en `routers/payments.py` cuando se implementen los tests de integración.
+4. **Idempotencia de emails de confirmación**: el guard del paso 10 en el webhook (`booking.status == "confirmed"`) previene doble envío ante webhooks duplicados. Confirmar con test de integración cuando se implemente el módulo de tests.
 
-5. **Idempotencia de emails de confirmación**: el guard del paso 10 en el webhook (`booking.status == "confirmed"`) previene doble envío ante webhooks duplicados. Confirmar con test de integración cuando se implemente el módulo de tests.
+5. **`create_booking()` no retorna desglose de precios por tipo**: el router llama a `get_current_price()` por tipo de asiento como workaround para construir los items de MercadoPago. Fix limpio: retornar `(booking, prices_by_type)` desde el service. Requiere tocar `services/booking.py`.
 
-6. **`create_booking()` no retorna desglose de precios por tipo**: el router llama a `get_current_price()` por tipo de asiento como workaround para construir los items de MercadoPago. Fix limpio: retornar `(booking, prices_by_type)` desde el service. Requiere tocar `services/booking.py`.
+6. **`SeatNotAvailable` vs `SeatUnavailableError`**: dos excepciones casi homónimas — `app/services/inventory.SeatNotAvailable` (lanzada por services) y `app/errors.SeatUnavailableError` (con handler 409). El router traduce de una a otra. Unificar en pasada futura.
 
-7. **`SeatNotAvailable` vs `SeatUnavailableError`**: dos excepciones casi homónimas — `app/services/inventory.SeatNotAvailable` (lanzada por services) y `app/errors.SeatUnavailableError` (con handler 409). El router traduce de una a otra. Unificar en pasada futura.
+7. **`db.refresh(booking, attribute_names=["passengers"])`**: si aparece `MissingGreenlet` en tests, reemplazar por re-select explícito con `selectinload(Booking.passengers)`.
 
-8. **`db.refresh(booking, attribute_names=["passengers"])`**: si aparece `MissingGreenlet` en tests, reemplazar por re-select explícito con `selectinload(Booking.passengers)`.
+8. **`GET /admin/bookings` sin paginación**: LIMIT defensivo de 500 hardcodeado. Agregar paginación `limit`/`offset` cuando el volumen lo requiera.
 
-9. **`GET /admin/bookings` sin paginación**: LIMIT defensivo de 500 hardcodeado. Agregar paginación `limit`/`offset` cuando el volumen lo requiera.
+9. **Duplicación de dependencias resuelta**: el Dockerfile usaba `pip install` con lista explícita (duplicando `pyproject.toml`). Resuelto agregando `hatchling` como build backend y usando `pip install .` en el Dockerfile.
 
 ---
 
@@ -428,11 +431,25 @@ scheduler.shutdown()
 - Feedback: viajes con `arrival_at <= now() - 2 h`.
 
 **Patrón de dos sesiones (reminder y feedback):**
-Los jobs de reminder y feedback abren una primera sesión para la query con `selectinload` (carga eager de todas las relaciones requeridas por `email.py`). Luego, por cada booking, abren una segunda sesión para actualizar el flag y hacer commit. El objeto `booking` de la primera sesión ya está cerrado, pero las relaciones están cargadas en memoria — no hay `MissingGreenlet`. Rollback de la segunda sesión no afecta la primera (ya cerrada limpiamente).
+Los jobs de reminder y feedback abren una primera sesión para la query con `selectinload`. Luego, por cada booking, abren una segunda sesión para actualizar el flag y hacer commit. El objeto `booking` de la primera sesión ya está cerrado, pero las relaciones están cargadas en memoria — no hay `MissingGreenlet`.
 
 **Commit por booking individual:**
 Todos los jobs hacen commit por booking individual dentro de un `try/except`. Si un booking falla: log ERROR, rollback de esa sesión, continuar con el siguiente. El loop nunca se corta por un fallo individual.
 
-**Manejo de errores:**
-- `expire_bookings_job`: `expire_booking()` lanza → log ERROR + rollback + continuar.
-- `send_reminders_job` / `send_feedback_job`: `send_*_email()` ya swallows errores por pasajero (log WARNING). El job captura errores a nivel booking (ej: error de DB al buscar) con log ERROR + rollback + continuar. El flag `reminder_sent` / `feedback_sent` solo se marca `True` si `send_*_email()` no lanzó excepción.
+### pyproject.toml + Dockerfile — decisiones de diseño
+
+**pyproject.toml:**
+- Build backend: `hatchling` — permite `pip install .` en el Dockerfile sin duplicar la lista de dependencias.
+- Dependencias de producción con lower bounds (no pinned) — reproducibilidad via `pip freeze` en deploy estable.
+- `apscheduler>=3.10,<4.0` — upper bound explícito porque APScheduler 4.x tiene API incompatible.
+- `psycopg2-binary>=2.9` — driver sincrónico requerido por `SQLAlchemyJobStore` de APScheduler 3.x.
+- Dependencias de dev/test bajo `[project.optional-dependencies] dev` — no se instalan en producción.
+- `pytest-env>=1.0` en dev — manejo de env vars de test sin riesgo de orden de imports.
+- `testcontainers[postgres]>=3.7` en dev — Postgres en Docker para integration tests, autosuficiente en CI y local.
+
+**Dockerfile:**
+- Imagen base: `python:3.12-slim` — balance entre tamaño y compatibilidad con wheels precompilados.
+- Single-stage con `pip install --no-cache-dir .` — hatchling resuelve deps desde `pyproject.toml`.
+- Usuario no-root `appuser` — buena práctica de seguridad, sin privilegios en runtime.
+- `--workers 1` obligatorio — APScheduler corre dentro del proceso; múltiples workers causarían jobs duplicados (N expirations, N emails por booking).
+- Variables de entorno NO incluidas en el Dockerfile — se pasan en runtime via `--env-file` o variables del orquestador.
