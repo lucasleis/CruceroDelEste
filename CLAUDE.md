@@ -201,11 +201,11 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/schemas/admin.py` — AdminLoginRequest, AdminLoginResponse, PriceTrancheCreate (con validador max_sold > min_sold), PriceTrancheRead, AdminBookingRead
 - `app/routers/trips.py` — GET /trips (filtros opcionales + filtros implícitos de status/fecha, available_counts en 1 query, precios con LEFT JOIN en 1 query), GET /trips/{id}/seats (filtros opcionales, 404 con NotFoundError, docstring de contrato)
 - `app/routers/bookings.py` — POST /bookings (validación trip, reserva, preference MP, 201), GET /bookings/{id} público con selectinload
+- `app/routers/admin.py` — POST /admin/login, GET /admin/bookings, GET/POST/DELETE /admin/trips/{id}/price-tranches con auth JWT. Ver decisiones de diseño abajo.
+- `app/main.py` — todos los routers registrados: payments, bookings, trips, admin
 
 ### Próximo a implementar (en este orden)
 
-- `app/routers/admin.py` — endpoints admin con auth JWT
-- Completar `app/main.py` — registrar `trips.router` y `admin.router` (payments y bookings ya registrados)
 - `tasks/reminders.py` — APScheduler con SQLAlchemyJobStore
 - `tests/unit/` y `tests/integration/`
 - `pyproject.toml` + `Dockerfile`
@@ -233,7 +233,7 @@ Estas limitaciones son conocidas y aceptadas. No implementar soluciones sin apro
 
 2. **`send_reminder_email` / `send_feedback_email` retornan `None`**: el caller no puede distinguir éxito total de éxito parcial por valor de retorno. Los fallos parciales solo quedan en el log (WARNING). Resolver en `tasks/reminders.py` — evaluar cambiar firma a `-> bool` o usar contadores.
 
-3. **`jinja2` y `resend` no están en `pyproject.toml`**: agregar cuando se implemente `pyproject.toml + Dockerfile`.
+3. **`jinja2`, `resend` y `passlib[bcrypt]` no están en `pyproject.toml`**: agregar cuando se implemente `pyproject.toml + Dockerfile`.
 
 4. **`selectinload` obligatorio para `email.py`**: cualquier caller de `send_confirmation_email`, `send_reminder_email` o `send_feedback_email` DEBE cargar `booking.passengers`, `booking.trip`, `booking.trip.route` y `passenger.seat` con `selectinload` antes de llamar. Async SQLAlchemy lanza `MissingGreenlet` en lazy-load fuera del contexto de sesión. Verificar en `routers/payments.py` y `tasks/reminders.py` cuando se implementen.
 
@@ -351,6 +351,33 @@ Fuera de scope para el MVP. El router ignora `payment.status == "pending"` silen
 - Trip sin asientos → lista vacía `[]`
 - Response: `list[SeatRead]` plano, sin wrapper
 - Docstring de contrato: "Este response refleja el estado al momento de la consulta y no garantiza disponibilidad al momento de compra. No usar como fuente de verdad para confirmar una reserva."
+
+### app/routers/admin.py — decisiones de diseño
+
+**POST /admin/login:**
+- Verificación de contraseña: `passlib.context.CryptContext(schemes=["bcrypt"])`. Instancia `_pwd_context` a nivel módulo.
+- Error unificado para email inexistente y contraseña incorrecta: 401 `invalid_credentials` — no revelar cuál falló.
+- JWT payload: `sub` = str(admin.id), `exp` = now + timedelta(minutes=settings.jwt_expiry_minutes). Algoritmo HS256, clave `settings.secret_key` — consistente con `deps.get_current_admin`.
+
+**GET /admin/bookings:**
+- Query params opcionales: `booking_status` (BookingStatusEnum), `trip_id` (UUID). Nombrado `booking_status` (no `status`) para no shadowear `fastapi.status`.
+- Carga con `selectinload(Booking.passengers)`.
+- LIMIT hardcodeado: 500. No expuesto como parámetro. Sin paginación en MVP.
+- Orden: `created_at DESC`.
+
+**GET /admin/trips/{trip_id}/price-tranches:**
+- Trip inexistente → `raise NotFoundError()`.
+- Orden: `seat_type ASC`, `min_sold ASC`.
+
+**POST /admin/trips/{trip_id}/price-tranches:**
+- Trip inexistente → `raise NotFoundError()`.
+- Validación de solapamiento en aplicación (no delegada a DB): carga tramos existentes del mismo `(trip_id, seat_type)` y verifica `new.min_sold < existing.max_sold AND new.max_sold > existing.min_sold`. Si solapa → 409 `tranche_overlap`.
+- Commit explícito + `db.refresh`. Response 201.
+
+**DELETE /admin/trips/{trip_id}/price-tranches/{tranche_id}:**
+- Trip inexistente → `raise NotFoundError()`.
+- Tranche inexistente o `tranche.trip_id != trip_id` → `raise NotFoundError()`.
+- Commit explícito. Response 204 No Content.
 
 ### app/routers/bookings.py — decisiones de diseño
 
