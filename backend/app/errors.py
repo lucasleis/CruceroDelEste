@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -7,6 +7,15 @@ class SeatUnavailableError(Exception):
     def __init__(self, seat_id: str) -> None:
         self.seat_id = seat_id
         super().__init__(f"Seat {seat_id} is not available")
+
+
+class NotFoundError(HTTPException):
+    def __init__(
+        self,
+        status_code: int = status.HTTP_404_NOT_FOUND,
+        detail: str = "not_found",
+    ) -> None:
+        super().__init__(status_code=status_code, detail=detail)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -26,6 +35,15 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={"detail": exc.errors()},
+        )
+
+    @app.exception_handler(NotFoundError)
+    async def not_found_error_handler(
+        request: Request, exc: NotFoundError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
         )
 
     @app.exception_handler(404)
