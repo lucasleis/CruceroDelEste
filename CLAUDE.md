@@ -191,7 +191,7 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/services/booking.py` — create_booking (validate → price sin lock → reserve con lock), confirm_booking(db, booking_id, mp_payment_id), expire_booking
 - `app/services/payment.py` — SDK oficial mercadopago (sincrónico), calls wrapped con asyncio.to_thread, timeouts (connection_timeout=30s), verify_webhook_signature, get_payment (valida external_reference como UUID, usa round() para transaction_amount), create_preference. Replay protection activa.
 - `app/routers/payments.py` — POST /webhooks/mercadopago con contrato HTTP aprobado (ver sección dedicada abajo)
-- `app/main.py` — FastAPI() mínimo + register_exception_handlers + include_router(payments.router)
+- `app/main.py` — FastAPI() mínimo + register_exception_handlers + include_router(payments.router) + include_router(bookings.router)
 - `app/services/email.py` — wrapper Resend: 3 templates transaccionales con Jinja2. Ver decisiones de diseño aprobadas abajo.
 - `templates/email/confirmation.html` + `confirmation.txt`
 - `templates/email/reminder.html` + `reminder.txt`
@@ -200,12 +200,12 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/schemas/bookings.py` — PassengerCreate, PassengerRead, BookingCreate (con validador de consistencia seat_ids ↔ passengers), BookingRead, BookingCreateResponse
 - `app/schemas/admin.py` — AdminLoginRequest, AdminLoginResponse, PriceTrancheCreate (con validador max_sold > min_sold), PriceTrancheRead, AdminBookingRead
 - `app/routers/trips.py` — GET /trips (filtros opcionales + filtros implícitos de status/fecha, available_counts en 1 query, precios con LEFT JOIN en 1 query), GET /trips/{id}/seats (filtros opcionales, 404 con NotFoundError, docstring de contrato)
+- `app/routers/bookings.py` — POST /bookings (validación trip, reserva, preference MP, 201), GET /bookings/{id} público con selectinload
 
 ### Próximo a implementar (en este orden)
 
-- `app/routers/bookings.py` — POST /bookings, GET /bookings/{id}
 - `app/routers/admin.py` — endpoints admin con auth JWT
-- Completar `app/main.py` — registrar `trips.router`, `bookings.router`, `admin.router` (hoy solo está `payments.router`)
+- Completar `app/main.py` — registrar `trips.router` y `admin.router` (payments y bookings ya registrados)
 - `tasks/reminders.py` — APScheduler con SQLAlchemyJobStore
 - `tests/unit/` y `tests/integration/`
 - `pyproject.toml` + `Dockerfile`
@@ -238,6 +238,12 @@ Estas limitaciones son conocidas y aceptadas. No implementar soluciones sin apro
 4. **`selectinload` obligatorio para `email.py`**: cualquier caller de `send_confirmation_email`, `send_reminder_email` o `send_feedback_email` DEBE cargar `booking.passengers`, `booking.trip`, `booking.trip.route` y `passenger.seat` con `selectinload` antes de llamar. Async SQLAlchemy lanza `MissingGreenlet` en lazy-load fuera del contexto de sesión. Verificar en `routers/payments.py` y `tasks/reminders.py` cuando se implementen.
 
 5. **Idempotencia de emails de confirmación**: el guard del paso 10 en el webhook (`booking.status == "confirmed"`) previene doble envío ante webhooks duplicados. Confirmar con test de integración cuando se implemente el módulo de tests.
+
+6. **`create_booking()` no retorna desglose de precios por tipo**: el router llama a `get_current_price()` por tipo de asiento como workaround para construir los items de MercadoPago. Fix limpio: retornar `(booking, prices_by_type)` desde el service. Requiere tocar `services/booking.py`.
+
+7. **`SeatNotAvailable` vs `SeatUnavailableError`**: dos excepciones casi homónimas — `app/services/inventory.SeatNotAvailable` (lanzada por services) y `app/errors.SeatUnavailableError` (con handler 409). El router traduce de una a otra. Unificar en pasada futura.
+
+8. **`db.refresh(booking, attribute_names=["passengers"])`**: si aparece `MissingGreenlet` en tests, reemplazar por re-select explícito con `selectinload(Booking.passengers)`.
 
 ---
 
@@ -345,3 +351,22 @@ Fuera de scope para el MVP. El router ignora `payment.status == "pending"` silen
 - Trip sin asientos → lista vacía `[]`
 - Response: `list[SeatRead]` plano, sin wrapper
 - Docstring de contrato: "Este response refleja el estado al momento de la consulta y no garantiza disponibilidad al momento de compra. No usar como fuente de verdad para confirmar una reserva."
+
+### app/routers/bookings.py — decisiones de diseño
+
+**POST /bookings:**
+- Trip inexistente → `NotFoundError` (404)
+- Trip con status != scheduled o departure_at en el pasado → 409 `trip_not_available`
+- `SeatNotAvailable` → re-raise como `SeatUnavailableError` (409)
+- `NoPriceTranche` → propagar como 500 + log ERROR
+- `PaymentProcessingError` en create_preference → 502 + log ERROR. Sin commit → rollback implícito por context manager de get_db → seats vuelven a available.
+- Items MP: un item por tipo de asiento (`title="Pasaje Cama"` / `"Pasaje Semi Cama"`, quantity=N, unit_price via `get_current_price()`).
+- `payer_email` = `passengers[0].email` (deuda técnica #1 — no existe buyer_email).
+- Flujo: flush → `db.get(Seat, id)` por identity map para counts_by_type → create_preference → mp_preference_id → commit → refresh → 201.
+- Rollback implícito garantizado: `get_db` usa `async with AsyncSessionLocal() as session` — context manager hace rollback si no hubo commit.
+
+**GET /bookings/{id}:**
+- Endpoint público (sin JWT) — UUID v4 como seguridad implícita.
+- Cargar con `selectinload(Booking.passengers)`.
+- Booking inexistente → `NotFoundError` (404).
+- Response: `BookingRead` (sin MP IDs ni flags admin).
