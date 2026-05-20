@@ -78,11 +78,9 @@ async def create_booking_endpoint(
         )
         raise
 
-    seats_result = await db.execute(
-        select(Seat).where(Seat.id.in_(booking_in.seat_ids))
-    )
     counts_by_type: dict[SeatTypeEnum, int] = {}
-    for seat in seats_result.scalars().all():
+    for seat_id in booking_in.seat_ids:
+        seat = await db.get(Seat, seat_id)
         counts_by_type[seat.seat_type] = counts_by_type.get(seat.seat_type, 0) + 1
 
     items: list[PreferenceItem] = []
