@@ -4,12 +4,13 @@ from fastapi import FastAPI
 
 from app.errors import register_exception_handlers
 from app.routers import admin, bookings, payments, trips
-from tasks.reminders import scheduler
+from tasks.reminders import register_jobs, scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
+    register_jobs()
     yield
     scheduler.shutdown()
 

@@ -21,7 +21,7 @@ scheduler = AsyncIOScheduler(
 )
 
 
-def _register_jobs() -> None:
+def register_jobs() -> None:
     scheduler.add_job(
         expire_bookings_job,
         trigger=IntervalTrigger(minutes=1),
@@ -45,7 +45,6 @@ def _register_jobs() -> None:
     )
 
 
-_register_jobs()
 
 
 async def expire_bookings_job() -> None:
