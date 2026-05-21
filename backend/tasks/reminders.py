@@ -78,7 +78,7 @@ async def send_reminders_job() -> None:
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
-            select(Booking)
+            select(Booking.id)
             .join(Trip, Booking.trip_id == Trip.id)
             .where(
                 Booking.status == BookingStatusEnum.confirmed,
@@ -86,27 +86,28 @@ async def send_reminders_job() -> None:
                 Trip.departure_at >= now,
                 Trip.departure_at <= window_end,
             )
-            .options(
-                selectinload(Booking.passengers).selectinload(Passenger.seat),
-                selectinload(Booking.trip).selectinload(Trip.route),
-            )
         )
-        bookings = list(result.scalars().all())
+        booking_ids = list(result.scalars().all())
 
-    for booking in bookings:
+    for booking_id in booking_ids:
         async with AsyncSessionLocal() as db:
             try:
-                await send_reminder_email(booking)
                 result = await db.execute(
-                    select(Booking).where(Booking.id == booking.id)
+                    select(Booking)
+                    .where(Booking.id == booking_id)
+                    .options(
+                        selectinload(Booking.passengers).selectinload(Passenger.seat),
+                        selectinload(Booking.trip).selectinload(Trip.route),
+                    )
                 )
                 db_booking = result.scalar_one()
+                await send_reminder_email(db_booking)
                 db_booking.reminder_sent = True
                 await db.commit()
             except Exception:
                 logger.error(
                     "send_reminders_job failed booking_id=%s",
-                    booking.id,
+                    booking_id,
                     exc_info=True,
                 )
                 await db.rollback()
@@ -118,34 +119,35 @@ async def send_feedback_job() -> None:
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
-            select(Booking)
+            select(Booking.id)
             .join(Trip, Booking.trip_id == Trip.id)
             .where(
                 Booking.status == BookingStatusEnum.confirmed,
                 Booking.feedback_sent.is_(False),
                 Trip.arrival_at <= feedback_cutoff,
             )
-            .options(
-                selectinload(Booking.passengers).selectinload(Passenger.seat),
-                selectinload(Booking.trip).selectinload(Trip.route),
-            )
         )
-        bookings = list(result.scalars().all())
+        booking_ids = list(result.scalars().all())
 
-    for booking in bookings:
+    for booking_id in booking_ids:
         async with AsyncSessionLocal() as db:
             try:
-                await send_feedback_email(booking)
                 result = await db.execute(
-                    select(Booking).where(Booking.id == booking.id)
+                    select(Booking)
+                    .where(Booking.id == booking_id)
+                    .options(
+                        selectinload(Booking.passengers).selectinload(Passenger.seat),
+                        selectinload(Booking.trip).selectinload(Trip.route),
+                    )
                 )
                 db_booking = result.scalar_one()
+                await send_feedback_email(db_booking)
                 db_booking.feedback_sent = True
                 await db.commit()
             except Exception:
                 logger.error(
                     "send_feedback_job failed booking_id=%s",
-                    booking.id,
+                    booking_id,
                     exc_info=True,
                 )
                 await db.rollback()
