@@ -155,8 +155,21 @@ CruceroDelEste/
 │   │   └── reminders.py         # APScheduler con SQLAlchemyJobStore
 │   ├── migrations/
 │   ├── tests/
+│   │   ├── conftest.py          # env vars fake + mock Resend autouse
 │   │   ├── unit/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_payment_signature.py
+│   │   │   └── test_schemas.py
 │   │   └── integration/
+│   │       ├── __init__.py
+│   │       ├── conftest.py      # Postgres container + engine + TRUNCATE + AsyncClient
+│   │       ├── test_pricing.py
+│   │       ├── test_inventory.py
+│   │       ├── test_booking_service.py
+│   │       ├── test_trips_router.py      # pendiente
+│   │       ├── test_bookings_router.py   # pendiente
+│   │       ├── test_payments_router.py   # pendiente
+│   │       └── test_admin_router.py      # pendiente
 │   ├── alembic.ini
 │   ├── pyproject.toml
 │   ├── .env.example
@@ -191,37 +204,49 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/models/trip.py` — Route, Trip, Seat, PriceTranche
 - `app/models/booking.py` — Booking, Passenger, AdminUser
 - `app/models/__init__.py`
-- `app/config.py` — pydantic-settings con `@model_validator`: valida `backend_url` (URL absoluta, HTTPS obligatorio en producción), `mercadopago_webhook_secret` requerido, `sync_database_url` para APScheduler job store. Falla en arranque si falta variable de entorno.
-- `app/database.py` — async engine con pool_pre_ping, echo condicional al entorno, sessionmaker, Base, get_db. Sesión NO auto-commitea — el router debe hacer `await db.commit()` explícito.
+- `app/config.py` — pydantic-settings con `@model_validator`
+- `app/database.py` — async engine, sessionmaker, Base, get_db
 - `app/deps.py` — get_current_admin con PyJWT (HS256), re-exporta get_db
-- `app/errors.py` — SeatUnavailableError (409), ValidationError (422), NotFoundError (404 fijo, sin parámetros), handlers genéricos 404 y 500
-- `app/exceptions.py` — InvalidWebhookSignature, PaymentProcessingError (lleva status_code), PaymentConfigError
-- `app/services/pricing.py` — get_current_price, lanza NoPriceTranche si ningún tramo cubre el sold count
-- `app/services/inventory.py` — get_available_seats, reserve_seats (SELECT FOR UPDATE), release_expired_reservations (SKIP LOCKED), mark_seats_sold
-- `app/services/booking.py` — create_booking (validate → price sin lock → reserve con lock), confirm_booking(db, booking_id, mp_payment_id), expire_booking
-- `app/services/payment.py` — SDK oficial mercadopago (sincrónico), calls wrapped con asyncio.to_thread, timeouts (connection_timeout=30s), verify_webhook_signature, get_payment (valida external_reference como UUID, usa round() para transaction_amount), create_preference. Replay protection activa.
-- `app/routers/payments.py` — POST /webhooks/mercadopago con contrato HTTP aprobado (ver sección dedicada abajo)
-- `app/services/email.py` — wrapper Resend: 3 templates transaccionales con Jinja2. Ver decisiones de diseño aprobadas abajo.
+- `app/errors.py` — SeatUnavailableError (409), ValidationError (422), NotFoundError (404), handlers 404 y 500
+- `app/exceptions.py` — InvalidWebhookSignature, PaymentProcessingError, PaymentConfigError
+- `app/services/pricing.py` — get_current_price, NoPriceTranche
+- `app/services/inventory.py` — get_available_seats, reserve_seats, release_expired_reservations, mark_seats_sold
+- `app/services/booking.py` — create_booking, confirm_booking, expire_booking
+- `app/services/payment.py` — verify_webhook_signature, get_payment, create_preference
+- `app/routers/payments.py` — POST /webhooks/mercadopago
+- `app/services/email.py` — send_confirmation_email, send_reminder_email, send_feedback_email
 - `templates/email/confirmation.html` + `confirmation.txt`
 - `templates/email/reminder.html` + `reminder.txt`
 - `templates/email/feedback.html` + `feedback.txt`
-- `app/schemas/trips.py` — RouteRead, SeatRead, TripRead (con available_seats_count y precios como campos manuales, no del ORM)
-- `app/schemas/bookings.py` — PassengerCreate, PassengerRead, BookingCreate (con validador de consistencia seat_ids ↔ passengers), BookingRead, BookingCreateResponse
-- `app/schemas/admin.py` — AdminLoginRequest, AdminLoginResponse, PriceTrancheCreate (con validador max_sold > min_sold), PriceTrancheRead, AdminBookingRead
-- `app/routers/trips.py` — GET /trips (filtros opcionales + filtros implícitos de status/fecha, available_counts en 1 query, precios con LEFT JOIN en 1 query), GET /trips/{id}/seats (filtros opcionales, 404 con NotFoundError, docstring de contrato)
-- `app/routers/bookings.py` — POST /bookings (validación trip, reserva, preference MP, 201), GET /bookings/{id} público con selectinload
-- `app/routers/admin.py` — POST /admin/login (bcrypt + JWT), GET /admin/bookings (filtros + LIMIT 500), GET/POST/DELETE /admin/trips/{id}/price-tranches (con validación de solapamiento)
-- `app/main.py` — FastAPI() con lifespan (scheduler.start → register_jobs → yield → scheduler.shutdown) + register_exception_handlers + include_router para payments, bookings, trips y admin
-- `tasks/__init__.py` — módulo vacío
-- `tasks/reminders.py` — AsyncIOScheduler con SQLAlchemyJobStore, tres jobs: expire_bookings (1 min), send_reminders (1 h), send_feedback (1 h). Ver decisiones de diseño abajo.
-- `pyproject.toml` — dependencias de producción con lower bounds, hatchling como build backend, grupo `[dev]` con pytest + testcontainers, configuración de pytest con `asyncio_mode=auto`
-- `Dockerfile` — `python:3.12-slim` single-stage, `pip install .` via hatchling, usuario no-root `appuser`, `--workers 1` con comentario explicativo del APScheduler constraint
-- `.dockerignore` — excluye `.git`, `.env*`, `tests/`, caches de herramientas, `frontend/`
-- `.env.example` — todos los campos requeridos por `app/config.py` incluyendo `SYNC_DATABASE_URL`, `BACKEND_URL`, `MERCADOPAGO_WEBHOOK_SECRET`
+- `app/schemas/trips.py` — RouteRead, SeatRead, TripRead
+- `app/schemas/bookings.py` — PassengerCreate, PassengerRead, BookingCreate, BookingRead, BookingCreateResponse
+- `app/schemas/admin.py` — AdminLoginRequest, AdminLoginResponse, PriceTrancheCreate, PriceTrancheRead, AdminBookingRead
+- `app/routers/trips.py` — GET /trips, GET /trips/{id}/seats
+- `app/routers/bookings.py` — POST /bookings, GET /bookings/{id}
+- `app/routers/admin.py` — POST /admin/login, GET /admin/bookings, GET/POST/DELETE /admin/trips/{id}/price-tranches
+- `app/main.py` — FastAPI con lifespan, exception handlers, routers
+- `tasks/__init__.py` — vacío
+- `tasks/reminders.py` — AsyncIOScheduler, SQLAlchemyJobStore, tres jobs
+- `pyproject.toml` — dependencias, hatchling, pytest config con env vars fake
+- `Dockerfile` — python:3.12-slim, single-stage, appuser, --workers 1
+- `.dockerignore`
+- `.env.example`
+- `tests/conftest.py` — mock autouse de Resend; env vars via pytest-env en pyproject.toml
+- `tests/unit/__init__.py` — vacío
+- `tests/unit/test_payment_signature.py` — 14 tests de verify_webhook_signature
+- `tests/unit/test_schemas.py` — 27 tests de BookingCreate y PriceTrancheCreate
+- `tests/integration/__init__.py` — vacío
+- `tests/integration/conftest.py` — PostgresContainer, sync engine para create_all, TRUNCATE autouse, AsyncSession, AsyncClient con override get_db, mock autouse SDK MercadoPago
+- `tests/integration/test_pricing.py` — 8 tests de get_current_price
+- `tests/integration/test_inventory.py` — 16 tests de reserve_seats, release_expired_reservations, mark_seats_sold
+- `tests/integration/test_booking_service.py` — 9 tests de create_booking, confirm_booking, expire_booking
 
 ### Próximo a implementar (en este orden)
 
-- `tests/unit/` y `tests/integration/`
+- `tests/integration/test_trips_router.py`
+- `tests/integration/test_bookings_router.py`
+- `tests/integration/test_payments_router.py`
+- `tests/integration/test_admin_router.py`
 
 ---
 
@@ -240,80 +265,73 @@ Módulos críticos:
 
 ## Deuda técnica conocida
 
-Estas limitaciones son conocidas y aceptadas. No implementar soluciones sin aprobación explícita.
-
-1. **`Booking` sin `buyer_email`**: no existe un campo para el email de quien compra. Si el comprador no es pasajero (ej: padre que compra para sus hijos), no recibe ningún email de confirmación. Resolver cuando se implemente gestión avanzada de reservas agregando `contact_email` o `buyer_email` al modelo `Booking` — requiere migración.
-
-2. **`send_reminder_email` / `send_feedback_email` retornan `None`**: el caller no puede distinguir éxito total de éxito parcial por valor de retorno. Los fallos parciales solo quedan en el log (WARNING). Resolver en `tasks/reminders.py` — evaluar cambiar firma a `-> bool` o usar contadores.
-
-3. **`selectinload` obligatorio para `email.py`**: cualquier caller de `send_confirmation_email`, `send_reminder_email` o `send_feedback_email` DEBE cargar `booking.passengers`, `booking.trip`, `booking.trip.route` y `passenger.seat` con `selectinload` antes de llamar. Async SQLAlchemy lanza `MissingGreenlet` en lazy-load fuera del contexto de sesión. Verificar en `routers/payments.py` cuando se implementen los tests de integración.
-
-4. **Idempotencia de emails de confirmación**: el guard del paso 10 en el webhook (`booking.status == "confirmed"`) previene doble envío ante webhooks duplicados. Confirmar con test de integración cuando se implemente el módulo de tests.
-
-5. **`create_booking()` no retorna desglose de precios por tipo**: el router llama a `get_current_price()` por tipo de asiento como workaround para construir los items de MercadoPago. Fix limpio: retornar `(booking, prices_by_type)` desde el service. Requiere tocar `services/booking.py`.
-
-6. **`SeatNotAvailable` vs `SeatUnavailableError`**: dos excepciones casi homónimas — `app/services/inventory.SeatNotAvailable` (lanzada por services) y `app/errors.SeatUnavailableError` (con handler 409). El router traduce de una a otra. Unificar en pasada futura.
-
-7. **`db.refresh(booking, attribute_names=["passengers"])`**: si aparece `MissingGreenlet` en tests, reemplazar por re-select explícito con `selectinload(Booking.passengers)`.
-
-8. **`GET /admin/bookings` sin paginación**: LIMIT defensivo de 500 hardcodeado. Agregar paginación `limit`/`offset` cuando el volumen lo requiera.
-
-9. **Duplicación de dependencias resuelta**: el Dockerfile usaba `pip install` con lista explícita (duplicando `pyproject.toml`). Resuelto agregando `hatchling` como build backend y usando `pip install .` en el Dockerfile.
+1. **`Booking` sin `buyer_email`**: resolver con `contact_email` al implementar gestión avanzada de reservas — requiere migración.
+2. **`send_reminder_email` / `send_feedback_email` retornan `None`**: evaluar cambiar firma a `-> bool` o usar contadores.
+3. **`selectinload` obligatorio para `email.py`**: cargar `booking.passengers`, `booking.trip`, `booking.trip.route`, `passenger.seat` antes de llamar a cualquier `send_*`.
+4. **Idempotencia de emails de confirmación**: guard en paso 10 del webhook (`booking.status == "confirmed"`). Confirmado por test de integración en `test_payments_router.py`.
+5. **`create_booking()` no retorna desglose de precios por tipo**: workaround en router via `get_current_price()`. Fix: retornar `(booking, prices_by_type)` desde el service.
+6. **`SeatNotAvailable` vs `SeatUnavailableError`**: dos excepciones casi homónimas. Unificar en pasada futura.
+7. **`db.refresh` con MissingGreenlet**: si aparece, reemplazar por re-select con `selectinload`.
+8. **`GET /admin/bookings` sin paginación**: LIMIT 500 hardcodeado. Agregar cuando el volumen lo requiera.
+9. **Known gap en tests**: desglose por tipo de asiento en `create_booking` no validado. Comentario en `test_booking_service.py`: `# KNOWN GAP: seat type breakdown not validated — see CLAUDE.md`
 
 ---
 
 ## Decisiones de diseño aprobadas
 
-### app/services/payment.py — verify_webhook_signature
+### Tests — arquitectura de la suite
 
-Algoritmo oficial MercadoPago (verificado contra doc oficial):
+**Scope split:**
+- Unit tests: funciones puras sin DB — `verify_webhook_signature` y validadores Pydantic.
+- Integration tests: todo lo que toca SQLAlchemy corre contra Postgres real via testcontainers.
+
+**DB strategy:**
+- Un contenedor Postgres por sesión de pytest (scope=`session`).
+- Tablas creadas con `Base.metadata.create_all` via sync engine.
+- Entre tests: `TRUNCATE passengers, bookings, seats, price_tranches, trips, routes, admin_users RESTART IDENTITY CASCADE`. No usar rollback — los routers hacen `await db.commit()` explícito.
+
+**conftest split:**
+- `tests/conftest.py`: solo mock autouse de Resend. Sin imports de app, sin DB.
+- `tests/integration/conftest.py`: container, engine, sesión, AsyncClient con override get_db, mock autouse SDK MercadoPago.
+
+**Mock del SDK MercadoPago:**
+- `patch("app.services.payment._sdk", mock_sdk)` en `tests/integration/conftest.py`.
+- Tests de webhook que necesiten `external_reference` específico sobreescriben `mock_mp_sdk.payment.return_value.get.return_value` antes del POST.
+
+**Casos obligatorios en test_payments_router.py:**
+- Webhook con firma inválida → 200 `{"status": "ignored", "reason": "invalid_signature"}`
+- Webhook con `payment_id` desconocido → 200 `{"status": "ignored", "reason": "booking_not_found"}`
+- Idempotencia: dos POSTs consecutivos con el mismo `payment_id` → exactamente una booking confirmada.
+
+### app/services/payment.py — verify_webhook_signature
 
 ```
 manifest = "id:{data_id.lower()};request-id:{x_request_id};ts:{ts};"
 ```
 
-Reglas obligatorias:
-- `data_id` MUST ser lowercase antes de insertar en el manifest
-- Si `x_request_id` es None o ausente, se omite del manifest (no se incluye `request-id:None;`)
-- `data_id` se extrae de `request.query_params["data.id"]` — NUNCA del JSON body
-- `x_request_id: str | None` — tipado correcto, puede no venir en el request
-- Se usa `hmac.compare_digest` (timing-safe) — no modificar
+- `data_id` lowercase antes de insertar en manifest
+- Si `x_request_id` es None: omitir del manifest
+- `data_id` de `request.query_params["data.id"]` — NUNCA del body
+- `hmac.compare_digest` (timing-safe) — no modificar
 
 ### app/services/payment.py — get_payment
 
-- `external_reference` se valida como UUID antes de retornar. Si está vacío o inválido: lanza `PaymentProcessingError` con `status_code=502`.
-- `transaction_amount` se convierte con `round()` (no `int()`). MP devuelve float; el sistema trabaja en pesos enteros sin centavos.
+- `external_reference` validado como UUID. Si inválido: `PaymentProcessingError` con `status_code=502`.
+- `transaction_amount` convertido con `round()` — no `int()`.
 
-### app/services/email.py — decisiones de diseño
+### app/services/email.py
 
 | Decisión | Valor |
 |---|---|
 | FROM | `no-reply@crucerodeleste.com` |
-| Destinatarios | Un email por pasajero en los 3 templates — iterar `booking.passengers` |
-| Templates | HTML + texto plano, archivos en `/templates/email/`, Jinja2 con `StrictUndefined` |
-| `EmailDeliveryError` | Definida en `email.py` (no en `exceptions.py`) |
+| Destinatarios | Un email por pasajero — iterar `booking.passengers` |
+| Templates | HTML + txt, Jinja2 con `StrictUndefined` |
+| `EmailDeliveryError` | Definida en `email.py` |
 
-**`send_confirmation_email`**:
-- 3 intentos por pasajero (1 original + 2 reintentos inmediatos, sin sleep entre ellos)
-- Itera TODOS los pasajeros aunque alguno falle — no corta el loop
-- Acumula emails fallidos en lista `failed`
-- Si `failed` no está vacío al final: lanza `EmailDeliveryError(failed)`
-- Caller es el webhook handler — excepción propagada causa 500 → MP reintenta (comportamiento esperado)
-
-**`send_reminder_email` / `send_feedback_email`**:
-- Fallo por pasajero: log WARNING, continúa con el siguiente
-- `reminder_sent` / `feedback_sent` solo se marcan `True` si Resend confirma envío exitoso
-- Nunca relanzar excepción
-
-**Contrato obligatorio del caller** (todos los `send_*`):
-Cargar con `selectinload` antes de llamar: `booking.passengers`, `booking.trip`, `booking.trip.route`, `passenger.seat`. De lo contrario: `MissingGreenlet` en async SQLAlchemy.
-
-**Prerequisito de deploy** (responsabilidad del cliente):
-El dominio `crucerodeleste.com` debe estar verificado en Resend con los registros DNS correspondientes antes de que los emails puedan enviarse en producción.
+- `send_confirmation_email`: 3 intentos por pasajero, itera todos aunque alguno falle, lanza `EmailDeliveryError` si hay fallos.
+- `send_reminder_email` / `send_feedback_email`: log WARNING por fallo, nunca relanzar.
 
 ### app/routers/payments.py — Contrato HTTP del webhook
-
-Contrato aprobado (no modificar sin aprobación explícita):
 
 | Caso | HTTP | Body |
 |---|---|---|
@@ -323,143 +341,41 @@ Contrato aprobado (no modificar sin aprobación explícita):
 | Booking no encontrado | 200 | `{"status": "ignored", "reason": "booking_not_found"}` |
 | Error interno | 500 | `{"status": "error"}` |
 
-**NUNCA devolver 4xx** — MercadoPago reintenta ante cualquier non-2xx, generando loops infinitos.
+**NUNCA devolver 4xx.**
 
-Orden de operaciones obligatorio (no reordenar):
+Orden obligatorio: extraer data_id → x_request_id → verify_signature → parsear body → get_payment → check approved → SELECT FOR UPDATE booking → check confirmed → confirm_booking → send_confirmation_email → return ok.
 
-```
-1. Extraer data_id de request.query_params["data.id"]
-2. Extraer x_request_id del header x-request-id (puede ser None)
-3. Extraer ts y v1 del header x-signature parseando "ts=...,v1=..."
-4. verify_webhook_signature(...) → si falla: return 200 ignored
-5. Parsear JSON body → extraer payment_id de data.id
-6. get_payment(payment_id) → verificar estado real con MercadoPago
-7. Si payment.status != "approved" → return 200 ok sin tocar BD
-8. SELECT FOR UPDATE booking WHERE id = payment.external_reference
-9. Si booking no existe → return 200 ignored booking_not_found
-10. Si booking.status == "confirmed" → return 200 ok (idempotencia)
-11. confirm_booking(db, booking_id, mp_payment_id)
-12. send_confirmation_email(booking)  ← cargar relaciones con selectinload antes de llamar
-13. return 200 ok
-```
+### app/routers/trips.py
 
-El paso 12 requiere que el booking se cargue con `selectinload(Booking.passengers, Booking.trip, ...)` en el mismo query del paso 8. Verificar esto al implementar el router completo.
+- GET /trips: filtros opcionales `origin`, `destination`, `departure_date`; implícitos `status==scheduled`, `departure_at>=now()`; orden `departure_at ASC`; counts y precios en queries únicas sin N+1.
+- GET /trips/{id}/seats: filtros opcionales `seat_type`, `status`; 404 si trip inexistente; lista vacía si sin asientos; response `list[SeatRead]` plano.
 
-**Nota sobre idempotencia:** El `SELECT FOR UPDATE` en el paso 8 garantiza que dos webhooks concurrentes para el mismo booking no pasen el check del paso 10 al mismo tiempo. `confirm_booking` también hace su propio `SELECT FOR UPDATE` internamente — están en la misma transacción, no hay conflicto.
+### app/routers/bookings.py
 
-### Pagos en efectivo
+- POST /bookings: 404 trip inexistente, 409 trip no disponible, 409 seat no disponible, 500 sin tramo, 502 error MP. Rollback implícito garantizado.
+- GET /bookings/{id}: público, selectinload passengers, 404 si inexistente.
 
-Fuera de scope para el MVP. El router ignora `payment.status == "pending"` silenciosamente (return 200 ok). Si en el futuro se incorporan pagos en efectivo (Rapipago, Pago Fácil), el router requiere revisión completa del manejo de estado `pending`.
+### app/routers/admin.py
 
-### app/routers/trips.py — decisiones de diseño
+- POST /admin/login: bcrypt, mismo 401 para email y password incorrectos.
+- GET /admin/bookings: filtros `booking_status` y `trip_id`, LIMIT 500, orden `created_at DESC`, selectinload passengers.
+- GET /admin/trips/{id}/price-tranches: 404 si trip inexistente, orden `seat_type ASC, min_sold ASC`.
+- POST /admin/trips/{id}/price-tranches: 404 trip, validación solapamiento explícita → 409 `tranche_overlap`, 201 en éxito.
+- DELETE /admin/trips/{id}/price-tranches/{tranche_id}: 404 trip o tranche, 204 en éxito.
 
-**GET /trips:**
-- Filtros opcionales: `origin`, `destination`, `departure_date`
-- Filtros implícitos (no configurables desde el cliente): `status == scheduled`, `departure_at >= now()` UTC
-- Orden fijo: `departure_at ASC`. Sin paginación.
-- `available_seats_count`: una query agregada con GROUP BY, mapeada en memoria. Sin N+1.
-- `current_price_cama` / `current_price_semi_cama`: una sola query con LEFT OUTER JOIN sobre `price_tranches`. Sin loop de queries. Si no hay tramo aplicable: `None` + log WARNING con trip_id y seat_type.
+### tasks/reminders.py
 
-**GET /trips/{id}/seats:**
-- Filtros opcionales: `seat_type`, `status`. Sin filtro por defecto — devuelve todos los asientos.
-- Trip inexistente → `raise NotFoundError()`
-- Trip sin asientos → lista vacía `[]`
-- Response: `list[SeatRead]` plano, sin wrapper
-- Docstring de contrato: "Este response refleja el estado al momento de la consulta y no garantiza disponibilidad al momento de compra. No usar como fuente de verdad para confirmar una reserva."
+- `AsyncIOScheduler` + `SQLAlchemyJobStore` con `sync_database_url`.
+- `register_jobs()` llamada después de `scheduler.start()` en lifespan.
+- expire_bookings: IntervalTrigger(minutes=1), misfire_grace_time=60s.
+- send_reminders / send_feedback: IntervalTrigger(hours=1), misfire_grace_time=3600s.
+- Ventana reminder: `departure_at` entre now y now+24h.
+- Ventana feedback: `arrival_at <= now - 2h`.
+- Patrón dos sesiones: primera para query+selectinload, segunda por booking para commit.
+- Commit por booking individual con try/except — loop nunca se corta.
 
-### app/routers/bookings.py — decisiones de diseño
+### pyproject.toml + Dockerfile
 
-**POST /bookings:**
-- Trip inexistente → `NotFoundError` (404)
-- Trip con status != scheduled o departure_at en el pasado → 409 `trip_not_available`
-- `SeatNotAvailable` → re-raise como `SeatUnavailableError` (409)
-- `NoPriceTranche` → propagar como 500 + log ERROR
-- `PaymentProcessingError` en create_preference → 502 + log ERROR. Sin commit → rollback implícito por context manager de get_db → seats vuelven a available.
-- Items MP: un item por tipo de asiento (`title="Pasaje Cama"` / `"Pasaje Semi Cama"`, quantity=N, unit_price via `get_current_price()`).
-- `payer_email` = `passengers[0].email` (deuda técnica #1 — no existe buyer_email).
-- Flujo: flush → `db.get(Seat, id)` por identity map para counts_by_type → create_preference → mp_preference_id → commit → refresh → 201.
-- Rollback implícito garantizado: `get_db` usa `async with AsyncSessionLocal() as session` — context manager hace rollback si no hubo commit.
-
-**GET /bookings/{id}:**
-- Endpoint público (sin JWT) — UUID v4 como seguridad implícita.
-- Cargar con `selectinload(Booking.passengers)`.
-- Booking inexistente → `NotFoundError` (404).
-- Response: `BookingRead` (sin MP IDs ni flags admin).
-
-### app/routers/admin.py — decisiones de diseño
-
-**POST /admin/login:**
-- Hash de contraseña: `passlib[bcrypt]` con `CryptContext(schemes=["bcrypt"], deprecated="auto")`.
-- Mismo error 401 `invalid_credentials` para email inexistente y password incorrecta — nunca revelar cuál falló.
-- JWT: `sub` = str(admin.id), `exp` = now + timedelta(minutes=settings.jwt_expiry_minutes). Firmado con `settings.secret_key` y HS256 — mismo atributo que usa `deps.get_current_admin`.
-
-**GET /admin/bookings:**
-- Filtros opcionales: `booking_status` (BookingStatusEnum), `trip_id` (UUID). Parámetro nombrado `booking_status` para evitar shadow de `fastapi.status`.
-- LIMIT 500 hardcodeado, no expuesto como parámetro. Comentario en código: `# MVP: sin paginación, límite defensivo de 500`.
-- Orden: `created_at DESC`.
-- `selectinload(Booking.passengers)` obligatorio.
-
-**GET /admin/trips/{trip_id}/price-tranches:**
-- Trip inexistente → `NotFoundError` (404).
-- Orden: `seat_type ASC`, `min_sold ASC`.
-
-**POST /admin/trips/{trip_id}/price-tranches:**
-- Trip inexistente → `NotFoundError` (404).
-- Validación de solapamiento explícita antes de insertar: cargar tramos existentes del mismo `(trip_id, seat_type)` y verificar `new.min_sold < existing.max_sold AND new.max_sold > existing.min_sold`. Si solapa → 409 `tranche_overlap`. No depender de UniqueConstraint de DB (no cubre solapamientos complejos).
-- Status 201 en éxito.
-
-**DELETE /admin/trips/{trip_id}/price-tranches/{tranche_id}:**
-- Trip inexistente → `NotFoundError` (404).
-- Tranche inexistente o `tranche.trip_id != trip_id` → `NotFoundError` (404).
-- Status 204 No Content.
-
-### tasks/reminders.py — decisiones de diseño
-
-**Scheduler:**
-- `AsyncIOScheduler` de APScheduler 3.x — correcto para apps asyncio.
-- `SQLAlchemyJobStore` con `settings.sync_database_url` (URL sincrónica `postgresql://...`). Jobs persistidos en PostgreSQL, sobreviven reinicios.
-- `register_jobs()` es pública y se llama desde el lifespan de FastAPI, **después de `scheduler.start()`**. No se llama en tiempo de importación.
-
-**Registro en lifespan (`app/main.py`):**
-```python
-scheduler.start()
-register_jobs()   # después de start(), no antes
-yield
-scheduler.shutdown()
-```
-
-**Jobs:**
-
-| Job | Trigger | `misfire_grace_time` | `replace_existing` |
-|---|---|---|---|
-| `expire_bookings_job` | `IntervalTrigger(minutes=1)` | 60 s | True |
-| `send_reminders_job` | `IntervalTrigger(hours=1)` | 3600 s | True |
-| `send_feedback_job` | `IntervalTrigger(hours=1)` | 3600 s | True |
-
-**Ventanas de tiempo aprobadas:**
-- Reminder: viajes con `departure_at` entre `now()` y `now() + 24 h`.
-- Feedback: viajes con `arrival_at <= now() - 2 h`.
-
-**Patrón de dos sesiones (reminder y feedback):**
-Los jobs de reminder y feedback abren una primera sesión para la query con `selectinload`. Luego, por cada booking, abren una segunda sesión para actualizar el flag y hacer commit. El objeto `booking` de la primera sesión ya está cerrado, pero las relaciones están cargadas en memoria — no hay `MissingGreenlet`.
-
-**Commit por booking individual:**
-Todos los jobs hacen commit por booking individual dentro de un `try/except`. Si un booking falla: log ERROR, rollback de esa sesión, continuar con el siguiente. El loop nunca se corta por un fallo individual.
-
-### pyproject.toml + Dockerfile — decisiones de diseño
-
-**pyproject.toml:**
-- Build backend: `hatchling` — permite `pip install .` en el Dockerfile sin duplicar la lista de dependencias.
-- Dependencias de producción con lower bounds (no pinned) — reproducibilidad via `pip freeze` en deploy estable.
-- `apscheduler>=3.10,<4.0` — upper bound explícito porque APScheduler 4.x tiene API incompatible.
-- `psycopg2-binary>=2.9` — driver sincrónico requerido por `SQLAlchemyJobStore` de APScheduler 3.x.
-- Dependencias de dev/test bajo `[project.optional-dependencies] dev` — no se instalan en producción.
-- `pytest-env>=1.0` en dev — manejo de env vars de test sin riesgo de orden de imports.
-- `testcontainers[postgres]>=3.7` en dev — Postgres en Docker para integration tests, autosuficiente en CI y local.
-
-**Dockerfile:**
-- Imagen base: `python:3.12-slim` — balance entre tamaño y compatibilidad con wheels precompilados.
-- Single-stage con `pip install --no-cache-dir .` — hatchling resuelve deps desde `pyproject.toml`.
-- Usuario no-root `appuser` — buena práctica de seguridad, sin privilegios en runtime.
-- `--workers 1` obligatorio — APScheduler corre dentro del proceso; múltiples workers causarían jobs duplicados (N expirations, N emails por booking).
-- Variables de entorno NO incluidas en el Dockerfile — se pasan en runtime via `--env-file` o variables del orquestador.
+- `pytest-env`: variables fake en `[tool.pytest.ini_options] env = [...]` — no en conftest.
+- `apscheduler>=3.10,<4.0` — upper bound explícito.
+- `--workers 1` obligatorio en Dockerfile — APScheduler no soporta múltiples workers.
