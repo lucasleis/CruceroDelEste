@@ -29,7 +29,17 @@ El stack y la estructura ya están aprobados. Al iniciar una sesión nueva:
 5. Leé todos los archivos en `app/schemas/` para entender los contratos de API.
 6. Leé `app/errors.py` y `app/exceptions.py`.
 7. Leé todos los archivos en `app/services/` para entender la lógica de negocio ya implementada.
-8. Luego continuá con el primer ítem de "Próximo a implementar" sin preguntar.
+8. Identificá el primer ítem de "Próximo a implementar" y ejecutá este
+   protocolo obligatorio antes de escribir cualquier línea de código:
+   a. Anunciá qué módulo vas a implementar.
+   b. Listá TODAS las decisiones de diseño que necesitás tomar:
+      formato de datos, manejo de errores, casos borde, dependencias
+      con otros módulos, archivos que vas a tocar.
+   c. Para cada decisión, indicá las opciones disponibles y cuál recomendás
+      y por qué.
+   d. Escribí al final: "Esperando aprobación explícita antes de escribir
+      cualquier línea de código."
+   No avances hasta recibir respuesta.
 
 No leas `app/routers/` completo al inicio — leé solo el router en el que vayas a trabajar. No leas `tests/`, `tasks/`, `pyproject.toml` ni `Dockerfile` salvo que el ítem a implementar lo requiera.
 
