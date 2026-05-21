@@ -166,10 +166,10 @@ CruceroDelEste/
 │   │       ├── test_pricing.py
 │   │       ├── test_inventory.py
 │   │       ├── test_booking_service.py
-│   │       ├── test_trips_router.py      # pendiente
-│   │       ├── test_bookings_router.py   # pendiente
-│   │       ├── test_payments_router.py   # pendiente
-│   │       └── test_admin_router.py      # pendiente
+│   │       ├── test_trips_router.py
+│   │       ├── test_bookings_router.py
+│   │       ├── test_payments_router.py
+│   │       └── test_admin_router.py
 │   ├── alembic.ini
 │   ├── pyproject.toml
 │   ├── .env.example
@@ -240,13 +240,16 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `tests/integration/test_pricing.py` — 8 tests de get_current_price
 - `tests/integration/test_inventory.py` — 16 tests de reserve_seats, release_expired_reservations, mark_seats_sold
 - `tests/integration/test_booking_service.py` — 9 tests de create_booking, confirm_booking, expire_booking
+- `tests/integration/test_trips_router.py` — 14 tests: GET /trips (lista vacía, shape, filtros origin/destination/fecha, exclusión pasados/cancelados, conteo disponibles) y GET /trips/{id}/seats (404, lista vacía, shape, filtros tipo/estado, orden)
+- `tests/integration/test_bookings_router.py` — 11 tests: POST /bookings (201 shape, 404 trip, 409 trip_not_available por status y fecha, 409 seat_unavailable reserved/sold/inexistente, 500 sin tramo, 502 MP) y GET /bookings/{id} (200 shape, 404)
+- `tests/integration/test_payments_router.py` — 12 tests: firma inválida, booking not found, idempotencia (con `expire_all()` antes del assert final), happy path con verificación DB, payment no-approved (pending/rejected), MP API error 500, malformed payload, firma con x-request-id
+- `tests/integration/test_admin_router.py` — 23 tests: POST /admin/login (credenciales válidas/inválidas, token), auth compartida (403 sin header, 401 token inválido), GET /admin/bookings (shape, filtros status/trip_id), GET/POST/DELETE /admin/trips/{id}/price-tranches (shape, orden, 409 overlap, adyacentes no conflictúan, seat_type diferente no conflictúa, 204 sin body, tranche de otro trip → 404)
 
-### Próximo a implementar (en este orden)
+### Próximo a implementar
 
-- `tests/integration/test_trips_router.py`
-- `tests/integration/test_bookings_router.py`
-- `tests/integration/test_payments_router.py`
-- `tests/integration/test_admin_router.py`
+**El backend MVP está completo. Toda la suite de tests está aprobada.**
+
+La siguiente fase es el **frontend** (`/frontend/`). Antes de comenzar, definir stack y estructura con el revisor.
 
 ---
 
@@ -296,9 +299,14 @@ Módulos críticos:
 
 **Mock del SDK MercadoPago:**
 - `patch("app.services.payment._sdk", mock_sdk)` en `tests/integration/conftest.py`.
-- Tests de webhook que necesiten `external_reference` específico sobreescriben `mock_mp_sdk.payment.return_value.get.return_value` antes del POST.
+- Default del mock: `preference.create` devuelve `{"status": 201, "response": {"id": "fake-preference-id", "init_point": "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=fake"}}`.
+- Default del mock: `payment.get` devuelve `{"status": 200, "response": {"id": 123456789, "status": "approved", "external_reference": None, "transaction_amount": 24500.0}}`.
+- Tests de webhook que necesiten `external_reference` específico sobreescriben `mock_mp_sdk.payment.return_value.get.return_value` completo antes del POST.
 
-**Casos obligatorios en test_payments_router.py:**
+**Patrón identity map en tests de integración:**
+- Después de cualquier POST que haga `db.commit()` en el router, agregar `await db.expire_all()` antes del `select()` final en el test. Sin esto, SQLAlchemy puede devolver el objeto cacheado en lugar del estado real post-commit.
+
+**Casos obligatorios en test_payments_router.py (ya implementados):**
 - Webhook con firma inválida → 200 `{"status": "ignored", "reason": "invalid_signature"}`
 - Webhook con `payment_id` desconocido → 200 `{"status": "ignored", "reason": "booking_not_found"}`
 - Idempotencia: dos POSTs consecutivos con el mismo `payment_id` → exactamente una booking confirmada.
@@ -306,13 +314,14 @@ Módulos críticos:
 ### app/services/payment.py — verify_webhook_signature
 
 ```
-manifest = "id:{data_id.lower()};request-id:{x_request_id};ts:{ts};"
+manifest = "id:{data_id.lower()};[request-id:{x_request_id};]ts:{ts};"
 ```
 
 - `data_id` lowercase antes de insertar en manifest
-- Si `x_request_id` es None: omitir del manifest
+- Si `x_request_id` es None o vacío: omitir del manifest
 - `data_id` de `request.query_params["data.id"]` — NUNCA del body
 - `hmac.compare_digest` (timing-safe) — no modificar
+- Ventana de replay: 120s pasado, 600s futuro
 
 ### app/services/payment.py — get_payment
 
@@ -343,25 +352,25 @@ manifest = "id:{data_id.lower()};request-id:{x_request_id};ts:{ts};"
 
 **NUNCA devolver 4xx.**
 
-Orden obligatorio: extraer data_id → x_request_id → verify_signature → parsear body → get_payment → check approved → SELECT FOR UPDATE booking → check confirmed → confirm_booking → send_confirmation_email → return ok.
+Orden obligatorio: extraer data_id → x_request_id → verify_signature → parsear body → get_payment → check approved → SELECT FOR UPDATE booking → check confirmed → confirm_booking → return ok.
 
 ### app/routers/trips.py
 
 - GET /trips: filtros opcionales `origin`, `destination`, `departure_date`; implícitos `status==scheduled`, `departure_at>=now()`; orden `departure_at ASC`; counts y precios en queries únicas sin N+1.
-- GET /trips/{id}/seats: filtros opcionales `seat_type`, `status`; 404 si trip inexistente; lista vacía si sin asientos; response `list[SeatRead]` plano.
+- GET /trips/{id}/seats: filtros opcionales `seat_type`, `status`; 404 si trip inexistente (`{"detail": "not_found"}`); lista vacía si sin asientos; response `list[SeatRead]` plano; orden `seat_number ASC`.
 
 ### app/routers/bookings.py
 
-- POST /bookings: 404 trip inexistente, 409 trip no disponible, 409 seat no disponible, 500 sin tramo, 502 error MP. Rollback implícito garantizado.
+- POST /bookings: 404 trip inexistente, 409 `trip_not_available` (cancelado o pasado), 409 `seat_unavailable` con `seat_id` (seat no disponible o no pertenece al trip), 500 sin tramo de precio, 502 `payment_gateway_error` error MP.
 - GET /bookings/{id}: público, selectinload passengers, 404 si inexistente.
 
 ### app/routers/admin.py
 
-- POST /admin/login: bcrypt, mismo 401 para email y password incorrectos.
+- POST /admin/login: bcrypt, mismo 401 `invalid_credentials` para email y password incorrectos.
 - GET /admin/bookings: filtros `booking_status` y `trip_id`, LIMIT 500, orden `created_at DESC`, selectinload passengers.
-- GET /admin/trips/{id}/price-tranches: 404 si trip inexistente, orden `seat_type ASC, min_sold ASC`.
-- POST /admin/trips/{id}/price-tranches: 404 trip, validación solapamiento explícita → 409 `tranche_overlap`, 201 en éxito.
-- DELETE /admin/trips/{id}/price-tranches/{tranche_id}: 404 trip o tranche, 204 en éxito.
+- GET /admin/trips/{id}/price-tranches: 404 si trip inexistente, orden `seat_type ASC, min_sold ASC` (orden de enum Postgres: `cama` < `semi_cama`).
+- POST /admin/trips/{id}/price-tranches: 404 trip, validación solapamiento explícita con `min_sold < existing.max_sold AND max_sold > existing.min_sold` (rangos adyacentes no solapan) → 409 `tranche_overlap`, 201 en éxito.
+- DELETE /admin/trips/{id}/price-tranches/{tranche_id}: 404 trip o tranche (incluyendo tranche de otro trip), 204 sin body en éxito.
 
 ### tasks/reminders.py
 
