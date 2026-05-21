@@ -237,6 +237,7 @@ async def test_webhook_idempotency_two_posts_confirm_booking_once(
     assert resp2.json() == {"status": "ok"}
 
     # Exactly one confirmed booking in the DB — not two.
+    await db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
     result = await db.execute(select(Booking).where(Booking.id == booking.id))
     booking_db = result.scalar_one()
     assert booking_db.status == BookingStatusEnum.confirmed
