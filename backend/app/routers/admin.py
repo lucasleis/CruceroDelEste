@@ -104,10 +104,12 @@ async def create_price_tranche(
         raise NotFoundError()
 
     result = await db.execute(
-        select(PriceTranche).where(
+        select(PriceTranche)
+        .where(
             PriceTranche.trip_id == trip_id,
             PriceTranche.seat_type == body.seat_type,
         )
+        .with_for_update()
     )
     existing = list(result.scalars().all())
 
