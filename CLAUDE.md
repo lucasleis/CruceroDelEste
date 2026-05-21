@@ -274,9 +274,8 @@ Módulos críticos:
 4. **Idempotencia de emails de confirmación**: guard en paso 10 del webhook (`booking.status == "confirmed"`). Confirmado por test de integración en `test_payments_router.py`.
 5. **`create_booking()` no retorna desglose de precios por tipo**: workaround en router via `get_current_price()`. Fix: retornar `(booking, prices_by_type)` desde el service.
 6. **`SeatNotAvailable` vs `SeatUnavailableError`**: dos excepciones casi homónimas. Unificar en pasada futura.
-7. **`db.refresh` con MissingGreenlet**: si aparece, reemplazar por re-select con `selectinload`.
-8. **`GET /admin/bookings` sin paginación**: LIMIT 500 hardcodeado. Agregar cuando el volumen lo requiera.
-9. **Known gap en tests**: desglose por tipo de asiento en `create_booking` no validado. Comentario en `test_booking_service.py`: `# KNOWN GAP: seat type breakdown not validated — see CLAUDE.md`
+7. **`GET /admin/bookings` sin paginación**: LIMIT 500 hardcodeado. Agregar cuando el volumen lo requiera.
+8. **Known gap en tests**: desglose por tipo de asiento en `create_booking` no validado. Comentario en `test_booking_service.py`: `# KNOWN GAP: seat type breakdown not validated — see CLAUDE.md`
 
 ---
 
@@ -369,7 +368,7 @@ Orden obligatorio: extraer data_id → x_request_id → verify_signature → par
 - POST /admin/login: bcrypt, mismo 401 `invalid_credentials` para email y password incorrectos.
 - GET /admin/bookings: filtros `booking_status` y `trip_id`, LIMIT 500, orden `created_at DESC`, selectinload passengers.
 - GET /admin/trips/{id}/price-tranches: 404 si trip inexistente, orden `seat_type ASC, min_sold ASC` (orden de enum Postgres: `cama` < `semi_cama`).
-- POST /admin/trips/{id}/price-tranches: 404 trip, validación solapamiento explícita con `min_sold < existing.max_sold AND max_sold > existing.min_sold` (rangos adyacentes no solapan) → 409 `tranche_overlap`, 201 en éxito.
+- POST /admin/trips/{id}/price-tranches: 404 trip, validación solapamiento explícita con `min_sold < existing.max_sold AND max_sold > existing.min_sold` (rangos adyacentes no solapan) usando `.with_for_update()` para serializar escrituras concurrentes → 409 `tranche_overlap`, 201 en éxito.
 - DELETE /admin/trips/{id}/price-tranches/{tranche_id}: 404 trip o tranche (incluyendo tranche de otro trip), 204 sin body en éxito.
 
 ### tasks/reminders.py
@@ -380,7 +379,7 @@ Orden obligatorio: extraer data_id → x_request_id → verify_signature → par
 - send_reminders / send_feedback: IntervalTrigger(hours=1), misfire_grace_time=3600s.
 - Ventana reminder: `departure_at` entre now y now+24h.
 - Ventana feedback: `arrival_at <= now - 2h`.
-- Patrón dos sesiones: primera para query+selectinload, segunda por booking para commit.
+- Patrón dos sesiones: primera sesión selecciona solo `Booking.id` (sin selectinload); segunda sesión hace refetch completo con `selectinload(Booking.passengers, Passenger.seat, Booking.trip, Trip.route)` antes de llamar al service de email, luego commit.
 - Commit por booking individual con try/except — loop nunca se corta.
 
 ### pyproject.toml + Dockerfile
