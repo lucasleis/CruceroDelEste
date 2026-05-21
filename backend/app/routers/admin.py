@@ -24,6 +24,7 @@ from app.schemas.admin import (
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+_DUMMY_HASH = _pwd_context.hash("dummy")
 
 
 @router.post("/login", response_model=AdminLoginResponse)
@@ -31,7 +32,14 @@ async def login(body: AdminLoginRequest, db: AsyncSession = Depends(get_db)) -> 
     result = await db.execute(select(AdminUser).where(AdminUser.email == body.email))
     admin = result.scalar_one_or_none()
 
-    if admin is None or not _pwd_context.verify(body.password, admin.password_hash):
+    if admin is None:
+        _pwd_context.verify(body.password, _DUMMY_HASH)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid_credentials",
+        )
+
+    if not _pwd_context.verify(body.password, admin.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid_credentials",
