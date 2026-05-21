@@ -36,3 +36,16 @@ dev = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+env = [
+    "DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test",
+    "SYNC_DATABASE_URL=postgresql://test:test@localhost:5432/test",
+    "BACKEND_URL=http://test.example.com",
+    "FRONTEND_URL=http://frontend.example.com",
+    "SECRET_KEY=test-secret-key-for-pytest-only-not-production",
+    "MERCADOPAGO_ACCESS_TOKEN=TEST-fake-access-token",
+    "MERCADOPAGO_WEBHOOK_SECRET=fake-webhook-secret",
+    "RESEND_API_KEY=re_fake_api_key",
+    "JWT_EXPIRY_MINUTES=60",
+    "BOOKING_EXPIRY_MINUTES=15",
+    "ENVIRONMENT=dev",
+]
