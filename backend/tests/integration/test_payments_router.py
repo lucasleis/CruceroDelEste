@@ -270,6 +270,7 @@ async def test_webhook_approved_payment_confirms_booking(
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
+    await db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
     result = await db.execute(select(Booking).where(Booking.id == booking.id))
     booking_db = result.scalar_one()
     assert booking_db.status == BookingStatusEnum.confirmed
@@ -308,6 +309,7 @@ async def test_webhook_pending_payment_returns_ok_booking_stays_pending(
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
+    await db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
     result = await db.execute(select(Booking).where(Booking.id == booking.id))
     booking_db = result.scalar_one()
     assert booking_db.status == BookingStatusEnum.pending_payment
@@ -340,6 +342,7 @@ async def test_webhook_rejected_payment_returns_ok_booking_stays_pending(
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
+    await db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
     result = await db.execute(select(Booking).where(Booking.id == booking.id))
     booking_db = result.scalar_one()
     assert booking_db.status == BookingStatusEnum.pending_payment
