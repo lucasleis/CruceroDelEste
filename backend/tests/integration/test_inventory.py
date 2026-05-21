@@ -101,6 +101,7 @@ async def test_reserve_seats_reserved_at_is_recent(db: AsyncSession):
     await reserve_seats(db, [seat.id], trip.id)
     after = datetime.now(timezone.utc)
 
+    await db.refresh(seat)
     assert before <= seat.reserved_at <= after
 
 
