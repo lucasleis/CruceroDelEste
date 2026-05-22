@@ -5,11 +5,14 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.deps import get_db
 from app.errors import InvalidWebhookSignature, PaymentProcessingError
-from app.models.booking import Booking, BookingStatusEnum
+from app.models.booking import Booking, BookingStatusEnum, Passenger
+from app.models.trip import Trip
 from app.services.booking import confirm_booking
+from app.services.email import EmailDeliveryError, send_confirmation_email
 from app.services.payment import get_payment, verify_webhook_signature
 
 logger = logging.getLogger(__name__)
@@ -114,8 +117,23 @@ async def mercadopago_webhook(
         await confirm_booking(db, booking_id, payment.payment_id)
         await db.commit()
 
-        # Step 12 (pending): send_confirmation_email will be added here
-        # once app/services/email.py is implemented.
+        # --- Step 12: send confirmation email to all passengers. ---
+        result = await db.execute(
+            select(Booking)
+            .where(Booking.id == booking_id)
+            .options(
+                selectinload(Booking.passengers).selectinload(Passenger.seat),
+                selectinload(Booking.trip).selectinload(Trip.route),
+            )
+        )
+        booking_full = result.scalar_one()
+        try:
+            await send_confirmation_email(booking_full)
+        except EmailDeliveryError as exc:
+            logger.warning(
+                "webhook_confirmation_email_failed booking_id=%s failed_emails=%s",
+                booking_id, exc.failed_emails,
+            )
 
         return JSONResponse(_OK)
 
