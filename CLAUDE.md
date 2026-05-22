@@ -244,16 +244,16 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `tests/integration/test_payments_router.py` — 12 tests: firma inválida, booking not found, idempotencia (con `expire_all()` antes del assert final), happy path con verificación DB, payment no-approved (pending/rejected), MP API error 500, malformed payload, firma con x-request-id
 - `tests/integration/test_admin_router.py` — 23 tests: POST /admin/login (credenciales válidas/inválidas, token), auth compartida (403 sin header, 401 token inválido), GET /admin/bookings (shape, filtros status/trip_id), GET/POST/DELETE /admin/trips/{id}/price-tranches (shape, orden, 409 overlap, adyacentes no conflictúan, seat_type diferente no conflictúa, 204 sin body, tranche de otro trip → 404)
 
+### Bugs críticos resueltos (branch `claude/vibrant-cori-71dm2`)
+
+- ✅ **Bug 1 — Race `expire_bookings_job` vs webhook** (`app/services/booking.py`) — guard en `expire_booking`: retorna early si `status != pending_payment`, dentro del lock `FOR UPDATE`.
+- ✅ **Bug 2 — Email de confirmación nunca se enviaba** (`app/routers/payments.py`) — Step 12 implementado: re-fetch post-commit con `selectinload(Booking.passengers → Passenger.seat)` y `selectinload(Booking.trip → Trip.route)`, llamada a `send_confirmation_email`, `EmailDeliveryError` capturado con WARNING.
+- ✅ **Bug 3 — `datetime.utcnow` deprecated** (`app/models/trip.py`, `app/models/booking.py`) — 7 ocurrencias reemplazadas por `default=lambda: datetime.now(timezone.utc)`.
+- ✅ **Bug 4 — JWT sin `require exp`** (`app/deps.py`) — `options={"require": ["exp", "sub"]}` agregado a `jwt.decode`. Tokens sin `exp` o sin `sub` rechazados con 401.
+
 ### Próximo a implementar
 
-**Bugs críticos pendientes (en este orden):**
-
-1. **Race `expire_bookings_job` vs webhook** (`app/services/booking.py`) — `expire_booking` no valida `status == pending_payment` dentro del lock. Si el webhook confirma la booking entre que el job lee los IDs y ejecuta el expire, pisa el status a `expired` y libera asientos ya vendidos.
-2. **Email de confirmación nunca se envía** (`app/routers/payments.py`) — el paso 12 del webhook está comentado como pendiente pero `app/services/email.py` ya está implementado. El MVP no cumple el spec de notificaciones.
-3. **`datetime.utcnow` deprecated** (`app/models/trip.py`, `app/models/booking.py`) — naive datetime inconsistente con el resto del código.
-4. **JWT sin `require: exp`** (`app/deps.py`) — `jwt.decode` no requiere `exp` ni `sub`, aceptando tokens sin expiración.
-
-**Una vez resueltos los bugs críticos**, la siguiente fase es el **frontend** (`/frontend/`). Antes de comenzar, definir stack y estructura con el revisor.
+**Frontend** (`/frontend/`). Antes de comenzar, definir stack y estructura con el revisor.
 
 ---
 
@@ -283,7 +283,7 @@ Módulos críticos:
 9. **`DELETE /admin/trips/{id}/price-tranches/{id}` sin validación de uso activo**: admin puede borrar el tramo que cubre el `sold_count` actual, dejando el trip sin precio vigente. Próximo `create_booking` lanza `NoPriceTranche` → 500 al comprador. Fix: rechazar con 409 si el tramo cubre el sold_count vigente.
 10. **CORS ausente en `app/main.py`**: agregar `CORSMiddleware` antes de conectar el frontend. Orígenes permitidos a definir con el cliente.
 11. **Índice compuesto faltante en `Trip(status, departure_at)`**: `GET /trips` filtra y ordena por ambos. Sin índice, full scan al crecer. Agregar en próxima migración.
-12. **`datetime.utcnow` deprecated en modelos**: `app/models/trip.py` y `app/models/booking.py` usan `default=datetime.utcnow` (naive). Inconsistente con el resto del código y deprecado en Python 3.12. Fix: `default=lambda: datetime.now(timezone.utc)`.
+12. **`if admin_id is None` redundante en `app/deps.py`**: con `require: ["sub"]`, PyJWT lanza `MissingRequiredClaimError` antes de llegar a ese check. Inofensivo; limpiar en pasada futura.
 
 ---
 
