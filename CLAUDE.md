@@ -257,14 +257,13 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - ✅ **Bug [1.1] — Orphan de preferencia MP cuando `db.commit()` falla** (`app/routers/bookings.py`) — `await db.commit()` movido a antes de `create_preference`; bloque `except PaymentProcessingError` extendido con `expire_booking(db, booking.id)` + `await db.commit()` para liberar seats en caso de fallo de MP; `expire_booking` agregado al import de `app.services.booking`.
 - ✅ **Bug [1.2] — Email de confirmación nunca se reenvía tras retry de MP** (`app/routers/payments.py`) — `except EmailDeliveryError` reemplazado por `except Exception` en Step 12; el mensaje de log actualizado a `error=%s`.
 - ✅ **Bug [1.3] — Webhook: `data_id` y `payment_id` no se cross-checkean** (`app/routers/payments.py`) — validación `if payment_id != data_id` agregada dentro del try de Step 5, antes de Step 6; retorna `_IGN_MALFORMED` si difieren.
+- ✅ **Bug [1.4] — Race en creación concurrente de price tranches sin filas previas** (`app/routers/admin.py`) — `pg_advisory_xact_lock(hashtext(:key))` insertado después del 404-check y antes del SELECT `with_for_update()`, serializando escrituras concurrentes por `trip_id`.
 
 ### Próximo a implementar — Segunda ronda de bugs (en orden de prioridad)
 
-1. **[1.4] Race en creación concurrente de price tranches sin filas previas** (`app/routers/admin.py`) — el `with_for_update()` no lockea cuando no hay filas; evaluar advisory lock por `trip_id` o constraint EXCLUDE en Postgres.
-4. **[1.4] Race en creación concurrente de price tranches sin filas previas** (`app/routers/admin.py`) — el `with_for_update()` no lockea cuando no hay filas; evaluar advisory lock por `trip_id` o constraint EXCLUDE en Postgres.
-5. **[1.5] `release_expired_reservations` libera seats sin marcar booking como `expired`** (`app/services/inventory.py`) — función viola el invariante de sincronía seats↔booking; eliminar o reescribir para operar solo a través de `expire_booking`.
-6. **[1.6] `confirm_booking` no valida estado previo** (`app/services/booking.py`) — agregar guard `if booking.status != pending_payment: return booking` simétrico al de `expire_booking`.
-7. **[1.7] `reserve_seats` reporta `seat_ids[0]` en contención de lock** (`app/services/inventory.py`) — filtrar `OperationalError` por `pgcode == '55P03'` antes de reinterpretar como `SeatNotAvailable`.
+1. **[1.5] `release_expired_reservations` libera seats sin marcar booking como `expired`** (`app/services/inventory.py`) — función viola el invariante de sincronía seats↔booking; eliminar o reescribir para operar solo a través de `expire_booking`.
+2. **[1.6] `confirm_booking` no valida estado previo** (`app/services/booking.py`) — agregar guard `if booking.status != pending_payment: return booking` simétrico al de `expire_booking`.
+3. **[1.7] `reserve_seats` reporta `seat_ids[0]` en contención de lock** (`app/services/inventory.py`) — filtrar `OperationalError` por `pgcode == '55P03'` antes de reinterpretar como `SeatNotAvailable`.
 
 ---
 
