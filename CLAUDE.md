@@ -362,6 +362,7 @@ Orden obligatorio: extraer data_id → x_request_id → verify_signature → par
 
 - POST /bookings: 404 trip inexistente, 409 `trip_not_available` (cancelado o pasado), 409 `seat_unavailable` con `seat_id` (seat no disponible o no pertenece al trip), 500 sin tramo de precio, 502 `payment_gateway_error` error MP.
 - GET /bookings/{id}: público, selectinload passengers, 404 si inexistente.
+- `_SEAT_TYPE_TITLES` tiene assert de cobertura al nivel de módulo: falla en startup si el dict no cubre todos los valores de `SeatTypeEnum`, evitando KeyError silencioso en producción.
 
 ### app/routers/admin.py
 
