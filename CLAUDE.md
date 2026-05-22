@@ -258,12 +258,12 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - ✅ **Bug [1.2] — Email de confirmación nunca se reenvía tras retry de MP** (`app/routers/payments.py`) — `except EmailDeliveryError` reemplazado por `except Exception` en Step 12; el mensaje de log actualizado a `error=%s`.
 - ✅ **Bug [1.3] — Webhook: `data_id` y `payment_id` no se cross-checkean** (`app/routers/payments.py`) — validación `if payment_id != data_id` agregada dentro del try de Step 5, antes de Step 6; retorna `_IGN_MALFORMED` si difieren.
 - ✅ **Bug [1.4] — Race en creación concurrente de price tranches sin filas previas** (`app/routers/admin.py`) — `pg_advisory_xact_lock(hashtext(:key))` insertado después del 404-check y antes del SELECT `with_for_update()`, serializando escrituras concurrentes por `trip_id`.
+- ✅ **Bug [1.5] — `release_expired_reservations` libera seats sin marcar booking como `expired`** (`app/services/inventory.py`) — función eliminada completamente; imports `timedelta` y `settings` también eliminados.
+- ✅ **Bug [1.7] — `reserve_seats` reporta `seat_ids[0]` en contención de lock** (`app/services/inventory.py`) — `except OperationalError` ahora filtra por `pgcode == '55P03'`; cualquier otro `OperationalError` se propaga con `raise` desnudo.
 
 ### Próximo a implementar — Segunda ronda de bugs (en orden de prioridad)
 
-1. **[1.5] `release_expired_reservations` libera seats sin marcar booking como `expired`** (`app/services/inventory.py`) — función viola el invariante de sincronía seats↔booking; eliminar o reescribir para operar solo a través de `expire_booking`.
-2. **[1.6] `confirm_booking` no valida estado previo** (`app/services/booking.py`) — agregar guard `if booking.status != pending_payment: return booking` simétrico al de `expire_booking`.
-3. **[1.7] `reserve_seats` reporta `seat_ids[0]` en contención de lock** (`app/services/inventory.py`) — filtrar `OperationalError` por `pgcode == '55P03'` antes de reinterpretar como `SeatNotAvailable`.
+1. **[1.6] `confirm_booking` no valida estado previo** (`app/services/booking.py`) — agregar guard `if booking.status != pending_payment: return booking` simétrico al de `expire_booking`.
 
 ---
 
@@ -301,7 +301,7 @@ Módulos críticos:
 17. **`Trip` sin índice en `route_id`** (`app/models/trip.py`): Postgres no crea índice automático en FK. Agregar `Index("idx_trips_route_id", "route_id")` en próxima migración.
 18. **`GET /bookings/{booking_id}` expone PII sin autenticación** (`app/routers/bookings.py`): retorna DNI/email/teléfono de pasajeros. Posible incumplimiento Ley 25.326. Evaluar vista mínima o verificación por email/DNI.
 19. **`POST /admin/login` sin rate limiting** (`app/routers/admin.py`): sin throttling, vulnerable a brute force online. Agregar slowapi/limits antes de salir a producción.
-20. **`release_expired_reservations` es código muerto** (`app/services/inventory.py`): nadie la invoca; viola el invariante seats↔booking (ver bug 1.5). Eliminar tras resolver bug 1.5.
+20. ~~**`release_expired_reservations` es código muerto**~~ — eliminada (bug 1.5 resuelto).
 
 ---
 
