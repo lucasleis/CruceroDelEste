@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.deps import get_db
 from app.errors import NotFoundError, SeatUnavailableError
-from app.exceptions import PaymentProcessingError
+from app.errors import PaymentProcessingError
 from app.models.booking import Booking
 from app.models.trip import Seat, SeatTypeEnum, Trip, TripStatusEnum
 from app.schemas.bookings import (

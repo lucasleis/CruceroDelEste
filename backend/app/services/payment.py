@@ -30,7 +30,7 @@ import mercadopago
 from mercadopago.config import RequestOptions
 
 from app.config import settings
-from app.exceptions import InvalidWebhookSignature, PaymentProcessingError
+from app.errors import InvalidWebhookSignature, PaymentProcessingError
 
 logger = logging.getLogger(__name__)
 
