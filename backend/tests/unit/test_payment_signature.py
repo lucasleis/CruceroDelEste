@@ -12,7 +12,7 @@ import time
 
 import pytest
 
-from app.exceptions import InvalidWebhookSignature
+from app.errors import InvalidWebhookSignature
 from app.services.payment import verify_webhook_signature
 
 # Must match MERCADOPAGO_WEBHOOK_SECRET set in pyproject.toml [tool.pytest.ini_options].

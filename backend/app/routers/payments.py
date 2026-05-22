@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db
-from app.exceptions import InvalidWebhookSignature, PaymentProcessingError
+from app.errors import InvalidWebhookSignature, PaymentProcessingError
 from app.models.booking import Booking, BookingStatusEnum
 from app.services.booking import confirm_booking
 from app.services.payment import get_payment, verify_webhook_signature
