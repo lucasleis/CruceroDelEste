@@ -28,8 +28,8 @@ _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _DUMMY_HASH = _pwd_context.hash("dummy")
 
 
-@limiter.limit("10/minute")
 @router.post("/login", response_model=AdminLoginResponse)
+@limiter.limit("10/minute")
 async def login(request: Request, body: AdminLoginRequest, db: AsyncSession = Depends(get_db)) -> AdminLoginResponse:
     result = await db.execute(select(AdminUser).where(AdminUser.email == body.email))
     admin = result.scalar_one_or_none()
