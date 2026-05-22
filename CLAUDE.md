@@ -119,6 +119,7 @@ Estos módulos están documentados en `/specs/Crucero del Este - Modulos Extras.
 | Config | pydantic-settings |
 | Testing | pytest + pytest-asyncio |
 | Scheduler | APScheduler + SQLAlchemyJobStore — jobs persistidos en PostgreSQL, sobreviven reinicios |
+| Rate limiting | slowapi>=0.1.9 |
 
 ---
 
@@ -131,6 +132,7 @@ CruceroDelEste/
 │   │   ├── main.py
 │   │   ├── config.py
 │   │   ├── database.py
+│   │   ├── limiter.py           # Instancia global de slowapi Limiter
 │   │   ├── models/
 │   │   │   ├── trip.py          # Route, Trip, Seat, PriceTranche
 │   │   │   ├── booking.py       # Booking, Passenger, AdminUser
@@ -207,7 +209,8 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/models/__init__.py`
 - `app/config.py` — pydantic-settings con `@model_validator`
 - `app/database.py` — async engine, sessionmaker, Base, get_db
-- `app/deps.py` — get_current_admin con PyJWT (HS256), re-exporta get_db
+- `app/limiter.py` — instancia global de `slowapi.Limiter` con `get_remote_address`
+- `app/deps.py` — get_current_admin con PyJWT (HS256, iss+aud), re-exporta get_db
 - `app/errors.py` — todas las excepciones del proyecto (SeatUnavailableError, NotFoundError, InvalidWebhookSignature, PaymentProcessingError, PaymentConfigError) y register_exception_handlers. `app/exceptions.py` eliminado.
 - `app/services/pricing.py` — get_current_price, NoPriceTranche
 - `app/services/inventory.py` — get_available_seats, reserve_seats, mark_seats_sold
@@ -223,11 +226,11 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/schemas/admin.py` — AdminLoginRequest, AdminLoginResponse, PriceTrancheCreate, PriceTrancheRead, AdminBookingRead
 - `app/routers/trips.py` — GET /trips, GET /trips/{id}/seats
 - `app/routers/bookings.py` — POST /bookings, GET /bookings/{id}
-- `app/routers/admin.py` — POST /admin/login, GET /admin/bookings, GET/POST/DELETE /admin/trips/{id}/price-tranches
-- `app/main.py` — FastAPI con lifespan, exception handlers, routers
+- `app/routers/admin.py` — POST /admin/login (con rate limiting 10/min), GET /admin/bookings, GET/POST/DELETE /admin/trips/{id}/price-tranches
+- `app/main.py` — FastAPI con lifespan, slowapi middleware, exception handlers, routers
 - `tasks/__init__.py` — vacío
 - `tasks/reminders.py` — AsyncIOScheduler, SQLAlchemyJobStore, tres jobs
-- `pyproject.toml` — dependencias, hatchling, pytest config con env vars fake
+- `pyproject.toml` — dependencias (incluye slowapi>=0.1.9), hatchling, pytest config con env vars fake
 - `Dockerfile` — python:3.12-slim, single-stage, appuser, --workers 1
 - `.dockerignore`
 - `.env.example`
@@ -243,7 +246,7 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `tests/integration/test_trips_router.py` — 14 tests: GET /trips (lista vacía, shape, filtros origin/destination/fecha, exclusión pasados/cancelados, conteo disponibles) y GET /trips/{id}/seats (404, lista vacía, shape, filtros tipo/estado, orden)
 - `tests/integration/test_bookings_router.py` — 11 tests: POST /bookings (201 shape, 404 trip, 409 trip_not_available por status y fecha, 409 seat_unavailable reserved/sold/inexistente, 500 sin tramo, 502 MP) y GET /bookings/{id} (200 shape, 404)
 - `tests/integration/test_payments_router.py` — 12 tests: firma inválida, booking not found, idempotencia (con `expire_all()` antes del assert final), happy path con verificación DB, payment no-approved (pending/rejected), MP API error 500, malformed payload, firma con x-request-id
-- `tests/integration/test_admin_router.py` — 23 tests: POST /admin/login (credenciales válidas/inválidas, token), auth compartida (403 sin header, 401 token inválido), GET /admin/bookings (shape, filtros status/trip_id), GET/POST/DELETE /admin/trips/{id}/price-tranches (shape, orden, 409 overlap, adyacentes no conflictúan, seat_type diferente no conflictúa, 204 sin body, tranche de otro trip → 404)
+- `tests/integration/test_admin_router.py` — 24 tests: POST /admin/login (credenciales válidas/inválidas, token, rate limit 429), auth compartida (403 sin header, 401 token inválido), GET /admin/bookings (shape, filtros status/trip_id), GET/POST/DELETE /admin/trips/{id}/price-tranches (shape, orden, 409 overlap, adyacentes no conflictúan, seat_type diferente no conflictúa, 204 sin body, tranche de otro trip → 404)
 
 ### Bugs críticos resueltos (branch `claude/vibrant-cori-71dm2`)
 
@@ -261,6 +264,11 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - ✅ **Bug [1.5] — `release_expired_reservations` libera seats sin marcar booking como `expired`** (`app/services/inventory.py`) — función eliminada completamente; imports `timedelta` y `settings` también eliminados.
 - ✅ **Bug [1.6] — `confirm_booking` no valida estado previo** (`app/services/booking.py`) — guard `if booking.status != pending_payment: return booking` agregado después de `_get_booking`, simétrico al de `expire_booking`.
 - ✅ **Bug [1.7] — `reserve_seats` reporta `seat_ids[0]` en contención de lock** (`app/services/inventory.py`) — `except OperationalError` ahora filtra por `pgcode == '55P03'`; cualquier otro `OperationalError` se propaga con `raise` desnudo.
+
+### Fixes de seguridad resueltos (branch `claude/determined-bardeen-xTt1N`)
+
+- ✅ **[2.2] — Rate limiting en `POST /admin/login`** (`app/routers/admin.py`, `app/main.py`, `app/limiter.py`, `pyproject.toml`) — slowapi agregado como dependencia; `app/limiter.py` creado como módulo independiente para evitar import circular; endpoint decorado con `@limiter.limit("10/minute")`; handler `RateLimitExceeded` registrado en `main.py`; test `test_login_rate_limit_blocks_after_10_attempts` agregado a `test_admin_router.py`.
+- ✅ **[2.3] — JWT sin `iss`/`aud`** (`app/routers/admin.py`, `app/deps.py`) — payload de `jwt.encode` incluye `iss="crucero-admin"` y `aud="crucero-admin-api"`; `jwt.decode` valida `audience`, `issuer` y requiere `["exp", "sub", "iss", "aud"]`.
 
 ### Próximo a implementar
 
@@ -299,7 +307,8 @@ Módulos críticos:
 16. **`expire_bookings_job` carga objetos Booking completos** (`tasks/reminders.py`): solo usa `booking.id`. Cambiar a `select(Booking.id)` como los otros dos jobs.
 17. **`Trip` sin índice en `route_id`** (`app/models/trip.py`): Postgres no crea índice automático en FK. Agregar `Index("idx_trips_route_id", "route_id")` en próxima migración.
 18. **`GET /bookings/{booking_id}` expone PII sin autenticación** (`app/routers/bookings.py`): retorna DNI/email/teléfono de pasajeros. Posible incumplimiento Ley 25.326. Evaluar vista mínima o verificación por email/DNI.
-19. **`POST /admin/login` sin rate limiting** (`app/routers/admin.py`): sin throttling, vulnerable a brute force online. Agregar slowapi/limits antes de salir a producción.
+19. **`test_login_rate_limit_blocks_after_10_attempts` es frágil ante orden de ejecución** (`tests/integration/test_admin_router.py`): slowapi usa contadores en memoria compartida por proceso. Si se agregan tests de login antes de este en el mismo módulo, el contador puede acumularse y disparar el 429 antes de los 10 intentos previstos. El test debe permanecer al final del archivo y ser el único que dispara 10+ requests a `/admin/login`.
+20. **`BookingCreate._passengers_match_seats` valida orden pero `create_booking` también** — verificación duplicada entre schema y service. Inofensivo; unificar en pasada futura dejando la validación solo en el service.
 
 ---
 
@@ -390,11 +399,22 @@ Orden obligatorio: extraer data_id → x_request_id → verify_signature → par
 
 ### app/routers/admin.py
 
-- POST /admin/login: bcrypt, mismo 401 `invalid_credentials` para email y password incorrectos. `_DUMMY_HASH` calculado al nivel de módulo; cuando el email no existe se ejecuta `_pwd_context.verify` contra el dummy antes de lanzar 401, eliminando timing attack por short-circuit.
+- POST /admin/login: bcrypt, mismo 401 `invalid_credentials` para email y password incorrectos. `_DUMMY_HASH` calculado al nivel de módulo; cuando el email no existe se ejecuta `_pwd_context.verify` contra el dummy antes de lanzar 401, eliminando timing attack por short-circuit. Rate limit: 10 requests/minuto por IP vía slowapi.
 - GET /admin/bookings: filtros `booking_status` y `trip_id`, LIMIT 500, orden `created_at DESC`, selectinload passengers.
 - GET /admin/trips/{id}/price-tranches: 404 si trip inexistente, orden `seat_type ASC, min_sold ASC` (orden de enum Postgres: `cama` < `semi_cama`).
 - POST /admin/trips/{id}/price-tranches: 404 trip, validación solapamiento explícita con `min_sold < existing.max_sold AND max_sold > existing.min_sold` (rangos adyacentes no solapan) usando `.with_for_update()` para serializar escrituras concurrentes → 409 `tranche_overlap`, 201 en éxito.
 - DELETE /admin/trips/{id}/price-tranches/{tranche_id}: 404 trip o tranche (incluyendo tranche de otro trip), 204 sin body en éxito.
+
+### app/limiter.py
+
+- Módulo independiente sin dependencias del resto de la app — evita import circular entre `main.py` y `admin.py`.
+- `limiter = Limiter(key_func=get_remote_address)` — instancia global importada por `main.py` y `admin.py`.
+- `main.py` registra `app.state.limiter = limiter` y el handler `RateLimitExceeded`.
+
+### app/deps.py — JWT con iss/aud
+
+- Tokens emitidos con `iss="crucero-admin"` y `aud="crucero-admin-api"`.
+- `jwt.decode` valida `audience="crucero-admin-api"`, `issuer="crucero-admin"` y requiere `["exp", "sub", "iss", "aud"]`.
 
 ### tasks/reminders.py
 
