@@ -27,7 +27,7 @@ El stack y la estructura ya están aprobados. Al iniciar una sesión nueva:
 3. Leé las skills en `/specs/skills/`.
 4. Leé todos los archivos en `app/models/` para entender el schema de base de datos.
 5. Leé todos los archivos en `app/schemas/` para entender los contratos de API.
-6. Leé `app/errors.py` y `app/exceptions.py`.
+6. Leé `app/errors.py`.
 7. Leé todos los archivos en `app/services/` para entender la lógica de negocio ya implementada.
 8. Identificá el primer ítem de "Próximo a implementar" y ejecutá este
    protocolo obligatorio antes de escribir cualquier línea de código:
@@ -207,8 +207,7 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/config.py` — pydantic-settings con `@model_validator`
 - `app/database.py` — async engine, sessionmaker, Base, get_db
 - `app/deps.py` — get_current_admin con PyJWT (HS256), re-exporta get_db
-- `app/errors.py` — SeatUnavailableError (409), ValidationError (422), NotFoundError (404), handlers 404 y 500
-- `app/exceptions.py` — InvalidWebhookSignature, PaymentProcessingError, PaymentConfigError
+- `app/errors.py` — todas las excepciones del proyecto (SeatUnavailableError, NotFoundError, InvalidWebhookSignature, PaymentProcessingError, PaymentConfigError) y register_exception_handlers. `app/exceptions.py` eliminado.
 - `app/services/pricing.py` — get_current_price, NoPriceTranche
 - `app/services/inventory.py` — get_available_seats, reserve_seats, release_expired_reservations, mark_seats_sold
 - `app/services/booking.py` — create_booking, confirm_booking, expire_booking
