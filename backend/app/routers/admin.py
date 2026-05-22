@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from passlib.context import CryptContext
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.deps import get_current_admin, get_db
+from app.limiter import limiter
 from app.errors import NotFoundError
 from app.models.booking import AdminUser, Booking, BookingStatusEnum
 from app.models.trip import PriceTranche, Trip
@@ -28,7 +29,8 @@ _DUMMY_HASH = _pwd_context.hash("dummy")
 
 
 @router.post("/login", response_model=AdminLoginResponse)
-async def login(body: AdminLoginRequest, db: AsyncSession = Depends(get_db)) -> AdminLoginResponse:
+@limiter.limit("10/minute")
+async def login(request: Request, body: AdminLoginRequest, db: AsyncSession = Depends(get_db)) -> AdminLoginResponse:
     result = await db.execute(select(AdminUser).where(AdminUser.email == body.email))
     admin = result.scalar_one_or_none()
 
@@ -49,6 +51,8 @@ async def login(body: AdminLoginRequest, db: AsyncSession = Depends(get_db)) -> 
     payload = {
         "sub": str(admin.id),
         "exp": now + timedelta(minutes=settings.jwt_expiry_minutes),
+        "iss": "crucero-admin",
+        "aud": "crucero-admin-api",
     }
     token = jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
