@@ -80,6 +80,9 @@ async def confirm_booking(
 ) -> Booking:
     booking = await _get_booking(db, booking_id)
 
+    if booking.status != BookingStatusEnum.pending_payment:
+        return booking
+
     seat_ids = await _seat_ids_for_booking(db, booking_id)
     await mark_seats_sold(db, seat_ids)
 

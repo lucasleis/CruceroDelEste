@@ -4,7 +4,7 @@ from uuid import UUID
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
 from passlib.context import CryptContext
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -110,6 +110,11 @@ async def create_price_tranche(
     trip = await db.get(Trip, trip_id)
     if trip is None:
         raise NotFoundError()
+
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+        {"key": f"price_tranche_{trip_id}"},
+    )
 
     result = await db.execute(
         select(PriceTranche)

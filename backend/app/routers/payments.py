@@ -12,7 +12,7 @@ from app.errors import InvalidWebhookSignature, PaymentProcessingError
 from app.models.booking import Booking, BookingStatusEnum, Passenger
 from app.models.trip import Trip
 from app.services.booking import confirm_booking
-from app.services.email import EmailDeliveryError, send_confirmation_email
+from app.services.email import send_confirmation_email
 from app.services.payment import get_payment, verify_webhook_signature
 
 logger = logging.getLogger(__name__)
@@ -63,6 +63,14 @@ async def mercadopago_webhook(
         try:
             body = await request.json()
             payment_id = str(body["data"]["id"])
+            if payment_id != data_id:
+                logger.warning(
+                    "webhook_malformed: data_id mismatch query=%r body=%r request_id=%s",
+                    data_id,
+                    payment_id,
+                    x_request_id,
+                )
+                return JSONResponse(_IGN_MALFORMED)
         except Exception:
             logger.warning(
                 "webhook_malformed: bad JSON or missing body.data.id request_id=%s",
@@ -129,10 +137,11 @@ async def mercadopago_webhook(
         booking_full = result.scalar_one()
         try:
             await send_confirmation_email(booking_full)
-        except EmailDeliveryError as exc:
+        except Exception as exc:
             logger.warning(
-                "webhook_confirmation_email_failed booking_id=%s failed_emails=%s",
-                booking_id, exc.failed_emails,
+                "webhook_confirmation_email_failed booking_id=%s error=%s",
+                booking_id,
+                exc,
             )
 
         return JSONResponse(_OK)

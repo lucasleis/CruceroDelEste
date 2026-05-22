@@ -17,7 +17,7 @@ from app.schemas.bookings import (
     BookingRead,
     PassengerRead,
 )
-from app.services.booking import PassengerData, create_booking
+from app.services.booking import PassengerData, create_booking, expire_booking
 from app.services.inventory import SeatNotAvailable
 from app.services.payment import PreferenceItem, create_preference
 from app.services.pricing import NoPriceTranche, get_current_price
@@ -81,6 +81,8 @@ async def create_booking_endpoint(
         )
         raise
 
+    await db.commit()
+
     counts_by_type: dict[SeatTypeEnum, int] = {}
     for seat_id in booking_in.seat_ids:
         seat = await db.get(Seat, seat_id)
@@ -108,6 +110,11 @@ async def create_booking_endpoint(
             booking_in.trip_id,
             exc.status_code,
         )
+        try:
+            await expire_booking(db, booking.id)
+            await db.commit()
+        except Exception:
+            logger.error("cleanup_failed booking_id=%s", booking.id)
         raise HTTPException(status_code=502, detail="payment_gateway_error") from exc
 
     booking.mp_preference_id = preference.preference_id
