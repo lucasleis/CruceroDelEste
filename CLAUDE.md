@@ -88,6 +88,7 @@ No leas `app/routers/` completo al inicio — leé solo el router en el que vaya
 - **Antes de implementar cualquier módulo nuevo**: listá todas las decisiones de diseño que necesitás tomar para implementarlo (formato de datos, manejo de errores, comportamiento ante casos borde, dependencias con otros módulos). Esperá aprobación explícita antes de escribir cualquier línea de código.
 - **Durante la implementación**: si encontrás algo no especificado o ambiguo — por mínimo que parezca — detenete y consultá. No asumas. No implementes la opción que te parezca más razonable. La consulta debe incluir: qué decisión necesitás tomar, qué opciones ves, y cuál recomendás y por qué. Esperá respuesta antes de continuar.
 - **Al finalizar cada módulo**: si durante la implementación encontraste algo que podría mejorarse en módulos ya completados (bug potencial, inconsistencia, deuda técnica), reportarlo como nota separada al final del output bajo el título "⚠️ Observaciones". Sin implementar nada, sin abrir PRs, sin modificar archivos existentes.
+- **Después de cada commit aprobado por el revisor**: actualizá CLAUDE.md — mové el ítem resuelto de "Próximo a implementar" a la sección "Bugs críticos resueltos" con una línea que describa el cambio aplicado y el archivo modificado. Commitear el CLAUDE.md actualizado en el mismo branch.
 - **No des explicaciones** salvo que se te pidan.
 
 ---
@@ -251,9 +252,15 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - ✅ **Bug 3 — `datetime.utcnow` deprecated** (`app/models/trip.py`, `app/models/booking.py`) — 7 ocurrencias reemplazadas por `default=lambda: datetime.now(timezone.utc)`.
 - ✅ **Bug 4 — JWT sin `require exp`** (`app/deps.py`) — `options={"require": ["exp", "sub"]}` agregado a `jwt.decode`. Tokens sin `exp` o sin `sub` rechazados con 401.
 
-### Próximo a implementar
+### Próximo a implementar — Segunda ronda de bugs (en orden de prioridad)
 
-**Frontend** (`/frontend/`). Antes de comenzar, definir stack y estructura con el revisor.
+1. **[1.1] Orphan de preferencia MP cuando `db.commit()` falla** (`app/routers/bookings.py`) — commitear booking en `pending_payment` ANTES de llamar a MP; si `create_preference` falla, marcar como `expired` y liberar seats.
+2. **[1.2] Email de confirmación nunca se reenvía tras retry de MP** (`app/routers/payments.py`) — el bloque de email en Step 12 debe capturar `Exception` genérica (no solo `EmailDeliveryError`) y devolver 200 OK para evitar que el guard de idempotencia bloquee el reenvío en reintentos.
+3. **[1.3] Webhook: `data_id` y `payment_id` no se cross-checkean** (`app/routers/payments.py`) — validar `body["data"]["id"] == data_id`; descartar como `malformed_payload` si difieren.
+4. **[1.4] Race en creación concurrente de price tranches sin filas previas** (`app/routers/admin.py`) — el `with_for_update()` no lockea cuando no hay filas; evaluar advisory lock por `trip_id` o constraint EXCLUDE en Postgres.
+5. **[1.5] `release_expired_reservations` libera seats sin marcar booking como `expired`** (`app/services/inventory.py`) — función viola el invariante de sincronía seats↔booking; eliminar o reescribir para operar solo a través de `expire_booking`.
+6. **[1.6] `confirm_booking` no valida estado previo** (`app/services/booking.py`) — agregar guard `if booking.status != pending_payment: return booking` simétrico al de `expire_booking`.
+7. **[1.7] `reserve_seats` reporta `seat_ids[0]` en contención de lock** (`app/services/inventory.py`) — filtrar `OperationalError` por `pgcode == '55P03'` antes de reinterpretar como `SeatNotAvailable`.
 
 ---
 
@@ -273,17 +280,25 @@ Módulos críticos:
 ## Deuda técnica conocida
 
 1. **`Booking` sin `buyer_email`**: resolver con `contact_email` al implementar gestión avanzada de reservas — requiere migración.
-2. **`send_reminder_email` / `send_feedback_email` retornan `None`**: evaluar cambiar firma a `-> bool` o usar contadores.
+2. **`send_reminder_email` / `send_feedback_email` retornan `None`**: cambiar firma a `-> bool`; solo flaggear `sent=True` cuando el envío fue exitoso (hoy se marca `True` aunque todos los envíos fallen).
 3. **`selectinload` obligatorio para `email.py`**: cargar `booking.passengers`, `booking.trip`, `booking.trip.route`, `passenger.seat` antes de llamar a cualquier `send_*`.
 4. **Idempotencia de emails de confirmación**: guard en paso 10 del webhook (`booking.status == "confirmed"`). Confirmado por test de integración en `test_payments_router.py`.
-5. **`create_booking()` no retorna desglose de precios por tipo**: workaround en router via `get_current_price()`. Fix: retornar `(booking, prices_by_type)` desde el service.
+5. **`create_booking()` no retorna desglose de precios por tipo**: workaround en router via `get_current_price()` — genera N+1 queries. Fix: retornar `(booking, prices_by_type)` desde el service.
 6. **`SeatNotAvailable` vs `SeatUnavailableError`**: dos excepciones casi homónimas. Unificar en pasada futura.
 7. **`GET /admin/bookings` sin paginación**: LIMIT 500 hardcodeado. Agregar cuando el volumen lo requiera.
 8. **Known gap en tests**: desglose por tipo de asiento en `create_booking` no validado. Comentario en `test_booking_service.py`: `# KNOWN GAP: seat type breakdown not validated — see CLAUDE.md`
-9. **`DELETE /admin/trips/{id}/price-tranches/{id}` sin validación de uso activo**: admin puede borrar el tramo que cubre el `sold_count` actual, dejando el trip sin precio vigente. Próximo `create_booking` lanza `NoPriceTranche` → 500 al comprador. Fix: rechazar con 409 si el tramo cubre el sold_count vigente.
+9. **`DELETE /admin/trips/{id}/price-tranches/{id}` sin validación de uso activo**: admin puede borrar el tramo que cubre el `sold_count` actual, dejando el trip sin precio vigente. Fix: rechazar con 409 si el tramo cubre el sold_count vigente.
 10. **CORS ausente en `app/main.py`**: agregar `CORSMiddleware` antes de conectar el frontend. Orígenes permitidos a definir con el cliente.
 11. **Índice compuesto faltante en `Trip(status, departure_at)`**: `GET /trips` filtra y ordena por ambos. Sin índice, full scan al crecer. Agregar en próxima migración.
 12. **`if admin_id is None` redundante en `app/deps.py`**: con `require: ["sub"]`, PyJWT lanza `MissingRequiredClaimError` antes de llegar a ese check. Inofensivo; limpiar en pasada futura.
+13. **`_DUMMY_HASH` se computa en cada import** (`app/routers/admin.py`): bcrypt con cost factor 12 tarda ~250ms en import-time. Hardcodear un hash pre-computado como constante.
+14. **`NoPriceTranche`, `BookingNotFound`, `SeatNotAvailable` sin handlers registrados** (`app/errors.py`): propagan como 500 genérico. Agregar handlers explícitos con códigos y `detail` semánticos.
+15. **Doble lógica de resolución de tramo activo** (`app/services/pricing.py` y `app/routers/trips.py`): predicado `min_sold <= sold_count < max_sold` duplicado. Extraer función compartida.
+16. **`expire_bookings_job` carga objetos Booking completos** (`tasks/reminders.py`): solo usa `booking.id`. Cambiar a `select(Booking.id)` como los otros dos jobs.
+17. **`Trip` sin índice en `route_id`** (`app/models/trip.py`): Postgres no crea índice automático en FK. Agregar `Index("idx_trips_route_id", "route_id")` en próxima migración.
+18. **`GET /bookings/{booking_id}` expone PII sin autenticación** (`app/routers/bookings.py`): retorna DNI/email/teléfono de pasajeros. Posible incumplimiento Ley 25.326. Evaluar vista mínima o verificación por email/DNI.
+19. **`POST /admin/login` sin rate limiting** (`app/routers/admin.py`): sin throttling, vulnerable a brute force online. Agregar slowapi/limits antes de salir a producción.
+20. **`release_expired_reservations` es código muerto** (`app/services/inventory.py`): nadie la invoca; viola el invariante seats↔booking (ver bug 1.5). Eliminar tras resolver bug 1.5.
 
 ---
 
