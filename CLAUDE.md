@@ -387,3 +387,8 @@ Orden obligatorio: extraer data_id → x_request_id → verify_signature → par
 - `pytest-env`: variables fake en `[tool.pytest.ini_options] env = [...]` — no en conftest.
 - `apscheduler>=3.10,<4.0` — upper bound explícito.
 - `--workers 1` obligatorio en Dockerfile — APScheduler no soporta múltiples workers.
+
+### app/services/inventory.py
+
+- `reserve_seats`: `.with_for_update(nowait=True)` — si el lock no está disponible, SQLAlchemy lanza `OperationalError` que se captura y relanza como `SeatNotAvailable(seat_ids[0])`, resultando en 409 inmediato para el segundo comprador en vez de bloqueo por timeout.
+- `mark_seats_sold` conserva `.with_for_update()` sin nowait — semántica distinta: el webhook ya tiene el booking, no hay contención entre compradores.
