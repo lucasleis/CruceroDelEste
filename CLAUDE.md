@@ -260,10 +260,11 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - ✅ **Bug [1.4] — Race en creación concurrente de price tranches sin filas previas** (`app/routers/admin.py`) — `pg_advisory_xact_lock(hashtext(:key))` insertado después del 404-check y antes del SELECT `with_for_update()`, serializando escrituras concurrentes por `trip_id`.
 - ✅ **Bug [1.5] — `release_expired_reservations` libera seats sin marcar booking como `expired`** (`app/services/inventory.py`) — función eliminada completamente; imports `timedelta` y `settings` también eliminados.
 - ✅ **Bug [1.7] — `reserve_seats` reporta `seat_ids[0]` en contención de lock** (`app/services/inventory.py`) — `except OperationalError` ahora filtra por `pgcode == '55P03'`; cualquier otro `OperationalError` se propaga con `raise` desnudo.
+- ✅ **Bug [1.6] `confirm_booking` no valida estado previo** (`app/services/booking.py`) — guard `if booking.status != pending_payment: return booking` agregado después de `_get_booking`, simétrico al de `expire_booking`.
 
 ### Próximo a implementar — Segunda ronda de bugs (en orden de prioridad)
 
-1. **[1.6] `confirm_booking` no valida estado previo** (`app/services/booking.py`) — agregar guard `if booking.status != pending_payment: return booking` simétrico al de `expire_booking`.
+
 
 ---
 
