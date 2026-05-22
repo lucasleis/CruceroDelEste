@@ -628,3 +628,22 @@ async def test_delete_price_tranche_wrong_trip_returns_404(
 
     assert resp.status_code == 404
     assert resp.json()["detail"] == "not_found"
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting — POST /admin/login
+# ---------------------------------------------------------------------------
+
+async def test_login_rate_limit_blocks_after_10_attempts(client: AsyncClient):
+    for _ in range(10):
+        await client.post(
+            "/admin/login",
+            json={"email": "nobody@test.com", "password": "wrong"},
+        )
+
+    resp = await client.post(
+        "/admin/login",
+        json={"email": "nobody@test.com", "password": "wrong"},
+    )
+
+    assert resp.status_code == 429
