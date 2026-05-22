@@ -246,9 +246,14 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 
 ### Próximo a implementar
 
-**El backend MVP está completo. Toda la suite de tests está aprobada.**
+**Bugs críticos pendientes (en este orden):**
 
-La siguiente fase es el **frontend** (`/frontend/`). Antes de comenzar, definir stack y estructura con el revisor.
+1. **Race `expire_bookings_job` vs webhook** (`app/services/booking.py`) — `expire_booking` no valida `status == pending_payment` dentro del lock. Si el webhook confirma la booking entre que el job lee los IDs y ejecuta el expire, pisa el status a `expired` y libera asientos ya vendidos.
+2. **Email de confirmación nunca se envía** (`app/routers/payments.py`) — el paso 12 del webhook está comentado como pendiente pero `app/services/email.py` ya está implementado. El MVP no cumple el spec de notificaciones.
+3. **`datetime.utcnow` deprecated** (`app/models/trip.py`, `app/models/booking.py`) — naive datetime inconsistente con el resto del código.
+4. **JWT sin `require: exp`** (`app/deps.py`) — `jwt.decode` no requiere `exp` ni `sub`, aceptando tokens sin expiración.
+
+**Una vez resueltos los bugs críticos**, la siguiente fase es el **frontend** (`/frontend/`). Antes de comenzar, definir stack y estructura con el revisor.
 
 ---
 
@@ -275,6 +280,10 @@ Módulos críticos:
 6. **`SeatNotAvailable` vs `SeatUnavailableError`**: dos excepciones casi homónimas. Unificar en pasada futura.
 7. **`GET /admin/bookings` sin paginación**: LIMIT 500 hardcodeado. Agregar cuando el volumen lo requiera.
 8. **Known gap en tests**: desglose por tipo de asiento en `create_booking` no validado. Comentario en `test_booking_service.py`: `# KNOWN GAP: seat type breakdown not validated — see CLAUDE.md`
+9. **`DELETE /admin/trips/{id}/price-tranches/{id}` sin validación de uso activo**: admin puede borrar el tramo que cubre el `sold_count` actual, dejando el trip sin precio vigente. Próximo `create_booking` lanza `NoPriceTranche` → 500 al comprador. Fix: rechazar con 409 si el tramo cubre el sold_count vigente.
+10. **CORS ausente en `app/main.py`**: agregar `CORSMiddleware` antes de conectar el frontend. Orígenes permitidos a definir con el cliente.
+11. **Índice compuesto faltante en `Trip(status, departure_at)`**: `GET /trips` filtra y ordena por ambos. Sin índice, full scan al crecer. Agregar en próxima migración.
+12. **`datetime.utcnow` deprecated en modelos**: `app/models/trip.py` y `app/models/booking.py` usan `default=datetime.utcnow` (naive). Inconsistente con el resto del código y deprecado en Python 3.12. Fix: `default=lambda: datetime.now(timezone.utc)`.
 
 ---
 
