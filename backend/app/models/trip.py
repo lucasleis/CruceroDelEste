@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     CheckConstraint,
@@ -43,7 +43,7 @@ class Route(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     origin = Column(String(100), nullable=False)
     destination = Column(String(100), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (UniqueConstraint("origin", "destination"),)
 
@@ -62,7 +62,7 @@ class Trip(Base):
         nullable=False,
         default=TripStatusEnum.scheduled,
     )
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     route = relationship("Route", back_populates="trips")
     seats = relationship("Seat", back_populates="trip")
@@ -83,7 +83,7 @@ class Seat(Base):
         default=SeatStatusEnum.available,
     )
     reserved_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         UniqueConstraint("trip_id", "seat_number"),
@@ -108,7 +108,7 @@ class PriceTranche(Base):
     min_sold = Column(Integer, nullable=False)
     max_sold = Column(Integer, nullable=False)
     price = Column(Integer, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         CheckConstraint("min_sold >= 0", name="ck_price_tranches_min_sold"),

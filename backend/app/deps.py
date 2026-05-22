@@ -27,6 +27,7 @@ async def get_current_admin(
             credentials.credentials,
             settings.secret_key,
             algorithms=["HS256"],
+            options={"require": ["exp", "sub"]},
         )
         admin_id: str | None = payload.get("sub")
         if admin_id is None:
