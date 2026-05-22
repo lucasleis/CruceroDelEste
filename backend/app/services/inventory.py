@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -39,12 +40,15 @@ async def reserve_seats(
     that is not in 'available' status or does not belong to the trip.
     Caller must commit the session.
     """
-    result = await db.execute(
-        select(Seat).where(
-            Seat.id.in_(seat_ids),
-            Seat.trip_id == trip_id,
-        ).with_for_update()
-    )
+    try:
+        result = await db.execute(
+            select(Seat).where(
+                Seat.id.in_(seat_ids),
+                Seat.trip_id == trip_id,
+            ).with_for_update(nowait=True)
+        )
+    except OperationalError:
+        raise SeatNotAvailable(seat_ids[0])
     seats = list(result.scalars().all())
 
     found_ids = {seat.id for seat in seats}
