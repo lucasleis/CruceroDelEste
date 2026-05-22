@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -47,7 +47,7 @@ class Booking(Base):
     confirmed_at = Column(DateTime(timezone=True), nullable=True)
     reminder_sent = Column(Boolean, nullable=False, default=False)
     feedback_sent = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         CheckConstraint("total_amount > 0", name="ck_bookings_total_amount"),
@@ -75,7 +75,7 @@ class Passenger(Base):
     dni = Column(String(20), nullable=False)
     email = Column(String(255), nullable=False)
     phone = Column(String(30), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         UniqueConstraint("seat_id"),
@@ -93,4 +93,4 @@ class AdminUser(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
