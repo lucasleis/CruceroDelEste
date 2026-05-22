@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.deps import get_current_admin, get_db
-from app.main import limiter
+from app.limiter import limiter
 from app.errors import NotFoundError
 from app.models.booking import AdminUser, Booking, BookingStatusEnum
 from app.models.trip import PriceTranche, Trip

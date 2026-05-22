@@ -1,15 +1,13 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 from app.errors import register_exception_handlers
+from app.limiter import limiter
 from app.routers import admin, bookings, payments, trips
 from tasks.reminders import register_jobs, scheduler
-
-limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
