@@ -12,7 +12,7 @@ from app.errors import InvalidWebhookSignature, PaymentProcessingError
 from app.models.booking import Booking, BookingStatusEnum, Passenger
 from app.models.trip import Trip
 from app.services.booking import confirm_booking
-from app.services.email import EmailDeliveryError, send_confirmation_email
+from app.services.email import send_confirmation_email
 from app.services.payment import get_payment, verify_webhook_signature
 
 logger = logging.getLogger(__name__)
