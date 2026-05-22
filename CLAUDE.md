@@ -252,10 +252,13 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - ✅ **Bug 3 — `datetime.utcnow` deprecated** (`app/models/trip.py`, `app/models/booking.py`) — 7 ocurrencias reemplazadas por `default=lambda: datetime.now(timezone.utc)`.
 - ✅ **Bug 4 — JWT sin `require exp`** (`app/deps.py`) — `options={"require": ["exp", "sub"]}` agregado a `jwt.decode`. Tokens sin `exp` o sin `sub` rechazados con 401.
 
+### Bugs críticos resueltos (branch `claude/inspiring-edison-WJqep`)
+
+- ✅ **Bug [1.1] — Orphan de preferencia MP cuando `db.commit()` falla** (`app/routers/bookings.py`) — `await db.commit()` movido a antes de `create_preference`; bloque `except PaymentProcessingError` extendido con `expire_booking(db, booking.id)` + `await db.commit()` para liberar seats en caso de fallo de MP; `expire_booking` agregado al import de `app.services.booking`.
+
 ### Próximo a implementar — Segunda ronda de bugs (en orden de prioridad)
 
-1. **[1.1] Orphan de preferencia MP cuando `db.commit()` falla** (`app/routers/bookings.py`) — commitear booking en `pending_payment` ANTES de llamar a MP; si `create_preference` falla, marcar como `expired` y liberar seats.
-2. **[1.2] Email de confirmación nunca se reenvía tras retry de MP** (`app/routers/payments.py`) — el bloque de email en Step 12 debe capturar `Exception` genérica (no solo `EmailDeliveryError`) y devolver 200 OK para evitar que el guard de idempotencia bloquee el reenvío en reintentos.
+1. **[1.2] Email de confirmación nunca se reenvía tras retry de MP** (`app/routers/payments.py`) — el bloque de email en Step 12 debe capturar `Exception` genérica (no solo `EmailDeliveryError`) y devolver 200 OK para evitar que el guard de idempotencia bloquee el reenvío en reintentos.
 3. **[1.3] Webhook: `data_id` y `payment_id` no se cross-checkean** (`app/routers/payments.py`) — validar `body["data"]["id"] == data_id`; descartar como `malformed_payload` si difieren.
 4. **[1.4] Race en creación concurrente de price tranches sin filas previas** (`app/routers/admin.py`) — el `with_for_update()` no lockea cuando no hay filas; evaluar advisory lock por `trip_id` o constraint EXCLUDE en Postgres.
 5. **[1.5] `release_expired_reservations` libera seats sin marcar booking como `expired`** (`app/services/inventory.py`) — función viola el invariante de sincronía seats↔booking; eliminar o reescribir para operar solo a través de `expire_booking`.
