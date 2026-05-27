@@ -53,7 +53,7 @@ async def create_booking(
     if missing:
         raise ValueError(f"Missing passenger data for seat(s): {missing}")
 
-    seats = await _fetch_seats_for_pricing(db, seat_ids, trip_id)
+    seats = await reserve_seats(db, seat_ids, trip_id)
     total_amount, items = await _calculate_total_and_items(db, trip_id, seats)
 
     # Integrity check: items must sum to exactly total_amount.
@@ -64,8 +64,6 @@ async def create_booking(
         raise ValueError(
             f"total_amount mismatch: booking total={total_amount}, items sum={computed}"
         )
-
-    seats = await reserve_seats(db, seat_ids, trip_id)
 
     now = datetime.now(timezone.utc)
     booking = Booking(
@@ -128,21 +126,6 @@ async def expire_booking(db: AsyncSession, booking_id: UUID) -> Booking:
 
 
 # --- helpers -----------------------------------------------------------------
-
-async def _fetch_seats_for_pricing(
-    db: AsyncSession,
-    seat_ids: list[UUID],
-    trip_id: UUID,
-) -> list[Seat]:
-    """Read seats without locking — used only to determine seat_type for pricing."""
-    result = await db.execute(
-        select(Seat).where(
-            Seat.id.in_(seat_ids),
-            Seat.trip_id == trip_id,
-        )
-    )
-    return list(result.scalars().all())
-
 
 async def _calculate_total_and_items(
     db: AsyncSession,
