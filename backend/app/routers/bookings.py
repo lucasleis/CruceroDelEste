@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.deps import get_db
 from app.errors import NotFoundError, PaymentProcessingError, SeatUnavailableError
 from app.models.booking import Booking
-from app.models.trip import Seat, SeatTypeEnum, Trip, TripStatusEnum
+from app.models.trip import Trip, TripStatusEnum
 from app.schemas.bookings import (
     BookingCreate,
     BookingCreateResponse,
@@ -19,22 +19,13 @@ from app.schemas.bookings import (
 )
 from app.services.booking import PassengerData, create_booking, expire_booking
 from app.services.inventory import SeatNotAvailable
-from app.services.payment import PreferenceItem, create_preference
-from app.services.pricing import NoPriceTranche, get_current_price
+from app.services.payment import create_preference
+from app.services.pricing import NoPriceTranche
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
-
-_SEAT_TYPE_TITLES: dict[SeatTypeEnum, str] = {
-    SeatTypeEnum.cama: "Pasaje Cama",
-    SeatTypeEnum.semi_cama: "Pasaje Semi Cama",
-}
-assert set(_SEAT_TYPE_TITLES) == set(SeatTypeEnum), (
-    f"_SEAT_TYPE_TITLES no cubre todos los SeatTypeEnum: "
-    f"faltan {set(SeatTypeEnum) - set(_SEAT_TYPE_TITLES)}"
-)
 
 
 @router.post("", response_model=BookingCreateResponse, status_code=201)
@@ -65,7 +56,7 @@ async def create_booking_endpoint(
     ]
 
     try:
-        booking = await create_booking(
+        booking, items = await create_booking(
             db,
             booking_in.trip_id,
             booking_in.seat_ids,
@@ -82,22 +73,6 @@ async def create_booking_endpoint(
         raise
 
     await db.commit()
-
-    counts_by_type: dict[SeatTypeEnum, int] = {}
-    for seat_id in booking_in.seat_ids:
-        seat = await db.get(Seat, seat_id)
-        counts_by_type[seat.seat_type] = counts_by_type.get(seat.seat_type, 0) + 1
-
-    items: list[PreferenceItem] = []
-    for seat_type, qty in counts_by_type.items():
-        unit_price = await get_current_price(db, booking_in.trip_id, seat_type)
-        items.append(
-            PreferenceItem(
-                title=_SEAT_TYPE_TITLES[seat_type],
-                quantity=qty,
-                unit_price=unit_price,
-            )
-        )
 
     payer_email = booking_in.passengers[0].email
 

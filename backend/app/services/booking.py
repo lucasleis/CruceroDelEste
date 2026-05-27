@@ -18,7 +18,18 @@ from app.config import settings
 from app.models.booking import Booking, BookingStatusEnum, Passenger
 from app.models.trip import Seat, SeatStatusEnum, SeatTypeEnum
 from app.services.inventory import mark_seats_sold, reserve_seats
+from app.services.payment import PreferenceItem
 from app.services.pricing import get_current_price
+
+
+_SEAT_TYPE_TITLES: dict[SeatTypeEnum, str] = {
+    SeatTypeEnum.cama: "Pasaje Cama",
+    SeatTypeEnum.semi_cama: "Pasaje Semi Cama",
+}
+assert set(_SEAT_TYPE_TITLES) == set(SeatTypeEnum), (
+    f"_SEAT_TYPE_TITLES no cubre todos los SeatTypeEnum: "
+    f"faltan {set(SeatTypeEnum) - set(_SEAT_TYPE_TITLES)}"
+)
 
 
 @dataclass
@@ -36,16 +47,23 @@ async def create_booking(
     trip_id: UUID,
     seat_ids: list[UUID],
     passengers_data: list[PassengerData],
-) -> Booking:
+) -> tuple[Booking, list[PreferenceItem]]:
     provided = {p.seat_id for p in passengers_data}
     missing = set(seat_ids) - provided
     if missing:
         raise ValueError(f"Missing passenger data for seat(s): {missing}")
 
-    seats = await _fetch_seats_for_pricing(db, seat_ids, trip_id)
-    total_amount = await _calculate_total(db, trip_id, seats)
-
     seats = await reserve_seats(db, seat_ids, trip_id)
+    total_amount, items = await _calculate_total_and_items(db, trip_id, seats)
+
+    # Integrity check: items must sum to exactly total_amount.
+    # Both are derived from the same data in the same transaction, so a mismatch
+    # indicates a programming error — fail loudly before persisting anything.
+    computed = sum(item.unit_price * item.quantity for item in items)
+    if computed != total_amount:
+        raise ValueError(
+            f"total_amount mismatch: booking total={total_amount}, items sum={computed}"
+        )
 
     now = datetime.now(timezone.utc)
     booking = Booking(
@@ -70,7 +88,7 @@ async def create_booking(
             phone=data.phone,
         ))
 
-    return booking
+    return booking, items
 
 
 async def confirm_booking(
@@ -109,27 +127,12 @@ async def expire_booking(db: AsyncSession, booking_id: UUID) -> Booking:
 
 # --- helpers -----------------------------------------------------------------
 
-async def _fetch_seats_for_pricing(
-    db: AsyncSession,
-    seat_ids: list[UUID],
-    trip_id: UUID,
-) -> list[Seat]:
-    """Read seats without locking — used only to determine seat_type for pricing."""
-    result = await db.execute(
-        select(Seat).where(
-            Seat.id.in_(seat_ids),
-            Seat.trip_id == trip_id,
-        )
-    )
-    return list(result.scalars().all())
-
-
-async def _calculate_total(
+async def _calculate_total_and_items(
     db: AsyncSession,
     trip_id: UUID,
     seats: list[Seat],
-) -> int:
-    # Group seat IDs by type, then price each group at the current tranche.
+) -> tuple[int, list[PreferenceItem]]:
+    # Group seats by type, then price each group at the current tranche.
     # get_current_price reflects sold count before this reservation, which is
     # correct: tranches are evaluated at the moment of purchase.
     by_type: dict[SeatTypeEnum, int] = {}
@@ -137,11 +140,19 @@ async def _calculate_total(
         by_type[seat.seat_type] = by_type.get(seat.seat_type, 0) + 1
 
     total = 0
+    items: list[PreferenceItem] = []
     for seat_type, count in by_type.items():
         unit_price = await get_current_price(db, trip_id, seat_type)
         total += unit_price * count
+        items.append(
+            PreferenceItem(
+                title=_SEAT_TYPE_TITLES[seat_type],
+                quantity=count,
+                unit_price=unit_price,
+            )
+        )
 
-    return total
+    return total, items
 
 
 async def _get_booking(db: AsyncSession, booking_id: UUID) -> Booking:
