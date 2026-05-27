@@ -98,7 +98,7 @@ async def create_preference(
         "payer": {"email": payer_email},
         "external_reference": str(booking_id),
         # MP will POST to this URL on every payment status change.
-        "notification_url": f"{settings.backend_url}/payments/webhook",
+        "notification_url": f"{settings.backend_url}/webhooks/mercadopago",
         "back_urls": {
             "success": f"{settings.frontend_url}/bookings/{booking_id}/success",
             "failure": f"{settings.frontend_url}/bookings/{booking_id}/failure",
