@@ -1,4 +1,4 @@
-# CLAUDE.md — Crucero Del Este · Sistema de Venta de Pasajes Online
+# CLAUDE.md — Expreso Río Paraná · Sistema de Venta de Pasajes Online
 
 > Este archivo es el briefing permanente del proyecto. Leelo completo antes de escribir cualquier línea de código o proponer cualquier estructura.
 
@@ -6,7 +6,9 @@
 
 ## Qué es este proyecto
 
-Sistema de venta de pasajes online para **Crucero Del Este**, empresa argentina de transporte de larga distancia. El objetivo es una plataforma propia que complemente los canales actuales (Plataforma 10, Central de Pasajes), permitiendo venta directa con control total sobre precios, datos y experiencia de usuario.
+Sistema de venta de pasajes online para **Expreso Río Paraná**, empresa argentina de transporte internacional con más de 50 años operando rutas a Paraguay. El objetivo es una plataforma propia que complemente los canales actuales (Plataforma 10, Central de Pasajes), permitiendo venta directa con control total sobre precios, datos y experiencia de usuario.
+
+> ⚠️ El proyecto fue originalmente presupuestado para **Crucero del Este** (BA–Rosario). A partir de la segunda reunión el cliente confirmó que el proyecto es para **Expreso Río Paraná** (BA–Asunción, servicio internacional). El presupuesto fue aceptado con este cambio implícito. Toda referencia a Crucero del Este en código, variables o comentarios debe ser reemplazada por Expreso Río Paraná.
 
 Las especificaciones completas están en `/specs/Crucero Del Este - Presupuesto.pdf` y `/specs/Crucero del Este - Modulos Extras.txt`. Leelos antes de trabajar en cualquier módulo.
 
@@ -50,20 +52,25 @@ No leas `app/routers/` completo al inicio — leé solo el router en el que vaya
 ### Incluido
 
 - **Inventario de asientos**: rutas con dos tipos de asiento (Cama / Semi Cama), cada uno con hasta 5 tramos de precio dinámico definidos por pasajes vendidos (no por tiempo). Cama y Semi Cama tienen tramos independientes.
-- **Flujo de compra**: selección de asientos → datos del pasajero → pago → confirmación.
+- **Lógica de multi-paradas internacional (regla AR↔PY)**: cada parada está etiquetada con su país (`AR` o `PY`). Si el origen es Argentina, el destino solo puede ser Paraguay, y viceversa. No se puede vender un tramo interno dentro del mismo país (cabotaje extranjero prohibido). El selector de destino filtra dinámicamente según el país del origen seleccionado.
+- **Flujo de compra**: selección de origen/destino → selección de asientos → datos del pasajero → pago → confirmación.
 - **Integración MercadoPago**: tarjetas de crédito, débito y billeteras virtuales. Las comisiones (0,8%–6,6%) corren por cuenta del cliente, el sistema NO las calcula ni las aplica.
 - **Notificaciones por email**: 3 templates transaccionales — confirmación de compra (inmediata), recordatorio de viaje (antes de la fecha), feedback post-viaje. Usar Resend en plan gratuito.
-- **API del panel de administración**: endpoints con autenticación para configurar tramos de precio y listar ventas (solo lectura).
+- **API del panel de administración**: endpoints con autenticación para configurar tramos de precio, gestionar trayectos/paradas/orígenes/destinos, y listar ventas (solo lectura).
+- **Botón de arrepentimiento**: obligación legal argentina (Ley de Defensa del Consumidor). Debe estar implementado y visible. No es opcional.
+- **Reembolso vía redirección**: botón que redirige al usuario a MercadoPago o Modo para gestionar la devolución desde esas plataformas. No es un sistema de reembolso propio.
+- **Datos obligatorios del pasajero**: mail y teléfono son campos obligatorios en el formulario de compra.
 
 ### Explícitamente fuera del alcance de este MVP
 
 - Generación y validación de QR
 - Tracking GPS
-- Sistema multi-paradas
 - Reserva sin pago inmediato
-- Cancelaciones y reembolsos
+- Cancelaciones y reembolsos gestionados internamente
 - Módulo antifraude
 - Pagos en efectivo (Rapipago, Pago Fácil) — solo tarjetas y billeteras virtuales
+- Integración con SOR / Plataforma 10 / Central de Pasajes (ver riesgos)
+- Notificaciones por WhatsApp (requiere WhatsApp Business API — módulo futuro)
 
 ---
 
@@ -71,10 +78,26 @@ No leas `app/routers/` completo al inicio — leé solo el router en el que vaya
 
 | Campo | Valor |
 |---|---|
-| Ruta inicial | Buenos Aires ↔ Rosario |
-| Precio base Cama | $24.500 ARS |
-| Precio base Semi Cama | $23.300 ARS |
+| Ruta inicial | Buenos Aires ↔ Asunción (Paraguay) |
+| Duración del viaje | 15 a 17 horas |
+| Tipo de servicio | Internacional |
+| Precio base Cama | A confirmar con el cliente |
+| Precio base Semi Cama | A confirmar con el cliente |
 | Tramos de precio | Hasta 5 por tipo de asiento, definidos por `[min_vendidos, max_vendidos, precio]` |
+
+### Paradas de la ruta principal (ejemplo orientativo — confirmar con el cliente)
+
+| Parada | País |
+|---|---|
+| La Plata | AR |
+| Retiro (Buenos Aires) | AR |
+| Liniers | AR |
+| Posadas | AR |
+| Encarnación | PY |
+| [pueblos intermedios] | PY |
+| Asunción | PY |
+
+> ⚠️ La regla de negocio obliga a que origen y destino sean de países distintos. Implementar validación tanto en frontend (filtro dinámico del selector) como en backend (validación al crear booking).
 
 ---
 
@@ -97,12 +120,15 @@ No leas `app/routers/` completo al inicio — leé solo el router en el que vaya
 
 Estos módulos están documentados en `/specs/Crucero del Este - Modulos Extras.txt` y se cotizarán e implementarán como módulos independientes post-MVP:
 
-- Control de pasajeros con QR (generación, validación, estados: válido / reembolsado / abordado)
-- Tracking GPS en tiempo real — Opción A: app en celular del chofer ($500.000), Opción B: dispositivo GPS dedicado con SIM propia ($310.000, recomendada)
-- Gestión avanzada de ventas (cancelaciones, reembolsos)
-- Sistema multi-paradas
+- Control de pasajeros con QR (generación, validación, estados: válido / reembolsado / abordado) — **$450.000 — 5 días estimados**
+- Tracking GPS en tiempo real — Opción A: app en celular del chofer ($500.000), Opción B: dispositivo GPS dedicado con SIM propia ($310.000, recomendada). **Cliente inclinado por Opción B — confirmación pendiente con el dueño.**
+- Gestión avanzada de ventas (cancelaciones, reembolsos con lógica de porcentajes)
+- Sistema multi-paradas avanzado (hoy está la regla AR↔PY básica en el MVP)
 - Seguridad y antifraude
 - Pagos en efectivo — si se incorpora en el futuro, el router `app/routers/payments.py` requiere revisión porque hoy ignora `payment.status == "pending"` silenciosamente
+- Notificaciones por WhatsApp (requiere WhatsApp Business API)
+- Sistema de puntos / millas para pasajeros frecuentes
+- Integración con SOR / Plataforma 10 (sincronización de asientos en tiempo real — ver riesgos)
 
 ---
 
@@ -126,7 +152,7 @@ Estos módulos están documentados en `/specs/Crucero del Este - Modulos Extras.
 ## Estructura de carpetas aprobada
 
 ```
-CruceroDelEste/
+ExpresRioParana/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py
@@ -270,6 +296,8 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - ✅ **[2.2] — Rate limiting en `POST /admin/login`** (`app/routers/admin.py`, `app/main.py`, `app/limiter.py`, `pyproject.toml`) — slowapi agregado como dependencia; `app/limiter.py` creado como módulo independiente para evitar import circular; endpoint decorado con `@limiter.limit("10/minute")`; handler `RateLimitExceeded` registrado en `main.py`; test `test_login_rate_limit_blocks_after_10_attempts` agregado a `test_admin_router.py`.
 - ✅ **[2.3] — JWT sin `iss`/`aud`** (`app/routers/admin.py`, `app/deps.py`) — payload de `jwt.encode` incluye `iss="crucero-admin"` y `aud="crucero-admin-api"`; `jwt.decode` valida `audience`, `issuer` y requiere `["exp", "sub", "iss", "aud"]`.
 
+> ⚠️ Los valores `"crucero-admin"` y `"crucero-admin-api"` en los claims JWT deberán actualizarse a los valores correspondientes de Expreso Río Paraná cuando se defina el nombre final del sistema.
+
 ### Próximo a implementar
 
 ---
@@ -284,6 +312,26 @@ Módulos críticos:
 - `app/services/payment.py` — integración MercadoPago
 - `app/routers/payments.py` — webhook MercadoPago
 - Cualquier cambio al schema de base de datos
+- Lógica de validación AR↔PY (regla de negocio crítica con implicancias legales)
+
+---
+
+## Riesgos activos del proyecto
+
+### 🔴 Riesgo alto — Doble venta de asientos
+El cliente vende simultáneamente por su sistema SOR, Plataforma 10 y Central de Pasajes. Si la nueva web no está sincronizada con SOR, puede venderse el mismo asiento dos veces.
+
+- No está definido si SOR tiene API.
+- No está presupuestada ninguna integración.
+- **Acción requerida antes del lanzamiento:** investigar capacidades técnicas de SOR.
+
+### 🔴 Riesgo alto — Validación AR↔PY sin integración con SOR
+La regla que impide vender tramos internos dentro de un mismo país puede ser bypasseada si los asientos no están sincronizados con SOR. Un pasajero podría comprar en la web un tramo que SOR ya vendió como parte de un servicio interno.
+
+### 🟡 Riesgo medio — Norma de trazabilidad de equipaje
+Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipaje al pasaje del pasajero nominalmente. Por ahora aplica solo al control físico, pero podría impactar el módulo de QR.
+
+- El modelo de datos del pasaje debería contemplar un campo para vinculación de equipaje desde el inicio para evitar refactoring posterior.
 
 ---
 
@@ -309,6 +357,8 @@ Módulos críticos:
 18. **`GET /bookings/{booking_id}` expone PII sin autenticación** (`app/routers/bookings.py`): retorna DNI/email/teléfono de pasajeros. Posible incumplimiento Ley 25.326. Evaluar vista mínima o verificación por email/DNI.
 19. **`test_login_rate_limit_blocks_after_10_attempts` es frágil ante orden de ejecución** (`tests/integration/test_admin_router.py`): slowapi usa contadores en memoria compartida por proceso. Si se agregan tests de login antes de este en el mismo módulo, el contador puede acumularse y disparar el 429 antes de los 10 intentos previstos. El test debe permanecer al final del archivo y ser el único que dispara 10+ requests a `/admin/login`.
 20. **`BookingCreate._passengers_match_seats` valida orden pero `create_booking` también** — verificación duplicada entre schema y service. Inofensivo; unificar en pasada futura dejando la validación solo en el service.
+21. **Validación AR↔PY no cubierta por tests**: la lógica de filtrado de paradas por país necesita tests de integración específicos una vez implementada en el router/service correspondiente.
+22. **Claims JWT con nombre "crucero-admin"**: los valores `iss` y `aud` en los tokens JWT todavía usan el nombre del proyecto anterior. Actualizar cuando se defina el nombre final del sistema.
 
 ---
 
@@ -364,7 +414,7 @@ manifest = "id:{data_id.lower()};[request-id:{x_request_id};]ts:{ts};"
 
 | Decisión | Valor |
 |---|---|
-| FROM | `no-reply@crucerodeleste.com` |
+| FROM | `no-reply@expresorioparana.com` |
 | Destinatarios | Un email por pasajero — iterar `booking.passengers` |
 | Templates | HTML + txt, Jinja2 con `StrictUndefined` |
 | `EmailDeliveryError` | Definida en `email.py` |
@@ -394,6 +444,7 @@ Orden obligatorio: extraer data_id → x_request_id → verify_signature → par
 ### app/routers/bookings.py
 
 - POST /bookings: 404 trip inexistente, 409 `trip_not_available` (cancelado o pasado), 409 `seat_unavailable` con `seat_id` (seat no disponible o no pertenece al trip), 500 sin tramo de precio, 502 `payment_gateway_error` error MP.
+- POST /bookings: validar que origen y destino del booking sean de países distintos (regla AR↔PY) — 422 `international_route_required` si origen y destino son del mismo país.
 - GET /bookings/{id}: público, selectinload passengers, 404 si inexistente.
 - `_SEAT_TYPE_TITLES` tiene assert de cobertura al nivel de módulo: falla en startup si el dict no cubre todos los valores de `SeatTypeEnum`, evitando KeyError silencioso en producción.
 
@@ -404,6 +455,7 @@ Orden obligatorio: extraer data_id → x_request_id → verify_signature → par
 - GET /admin/trips/{id}/price-tranches: 404 si trip inexistente, orden `seat_type ASC, min_sold ASC` (orden de enum Postgres: `cama` < `semi_cama`).
 - POST /admin/trips/{id}/price-tranches: 404 trip, validación solapamiento explícita con `min_sold < existing.max_sold AND max_sold > existing.min_sold` (rangos adyacentes no solapan) usando `.with_for_update()` para serializar escrituras concurrentes → 409 `tranche_overlap`, 201 en éxito.
 - DELETE /admin/trips/{id}/price-tranches/{tranche_id}: 404 trip o tranche (incluyendo tranche de otro trip), 204 sin body en éxito.
+- Panel admin debe permitir gestión autónoma de trayectos, paradas, orígenes y destinos (sin depender del desarrollador para cada cambio). Endpoints a definir antes de implementar.
 
 ### app/limiter.py
 
