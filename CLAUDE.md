@@ -393,6 +393,10 @@ Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipa
 - Webhook con `payment_id` desconocido → 200 `{"status": "ignored", "reason": "booking_not_found"}`
 - Idempotencia: dos POSTs consecutivos con el mismo `payment_id` → exactamente una booking confirmada.
 
+**Pricing — confirmación de alcance (14/06)**
+- El ajuste manual de precios por parte del cliente ("a mano, según demanda/competencia") se resuelve completamente con el modelo y endpoints ya implementados: el admin edita los PriceTranche de un trip puntual vía POST/DELETE /admin/trips/{id}/price-tranches. No se requiere override de precio fijo por trip ni cambios al schema.
+- Si en el futuro el cliente pide reglas automáticas (ej. ajuste por proximidad a la fecha del viaje independiente del sold_count), se evalúa como módulo nuevo extendiendo estos endpoints — no implementar preventivamente.
+
 ### app/services/payment.py — verify_webhook_signature
 
 ```
