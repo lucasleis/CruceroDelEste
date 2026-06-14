@@ -57,8 +57,7 @@ No leas `app/routers/` completo al inicio — leé solo el router en el que vaya
 - **Integración MercadoPago**: tarjetas de crédito, débito y billeteras virtuales. Las comisiones (0,8%–6,6%) corren por cuenta del cliente, el sistema NO las calcula ni las aplica.
 - **Notificaciones por email**: 3 templates transaccionales — confirmación de compra (inmediata), recordatorio de viaje (antes de la fecha), feedback post-viaje. Usar Resend en plan gratuito.
 - **API del panel de administración**: endpoints con autenticación para configurar tramos de precio, gestionar trayectos/paradas/orígenes/destinos, y listar ventas (solo lectura).
-- **Botón de arrepentimiento**: obligación legal argentina (Ley de Defensa del Consumidor). Debe estar implementado y visible. No es opcional.
-- **Reembolso vía redirección**: botón que redirige al usuario a MercadoPago o Modo para gestionar la devolución desde esas plataformas. No es un sistema de reembolso propio.
+- **Botón de arrepentimiento + reembolso propio**: pantalla propia (sin login) que valida la ventana legal (Resolución 424/2020: 10 días desde la compra Y más de 24hs antes de la salida — ambas condiciones deben cumplirse). Si la solicitud es válida, el sistema ejecuta el reembolso vía API de MercadoPago (`create_refund`) y libera los asientos. Toda solicitud (válida o no) queda registrada en `refund_requests`, devolviendo su `id` como código de trámite en la respuesta. Casos fuera de ventana se exponen vía `GET /admin/refund-requests` para seguimiento manual.
 - **Datos obligatorios del pasajero**: mail y teléfono son campos obligatorios en el formulario de compra.
 
 ### Explícitamente fuera del alcance de este MVP
@@ -161,7 +160,7 @@ ExpresRioParana/
 │   │   ├── limiter.py           # Instancia global de slowapi Limiter
 │   │   ├── models/
 │   │   │   ├── trip.py          # Route, Trip, Seat, PriceTranche
-│   │   │   ├── booking.py       # Booking, Passenger, AdminUser
+│   │   │   ├── booking.py       # Booking, Passenger, AdminUser, RefundRequest
 │   │   │   └── __init__.py
 │   │   ├── schemas/
 │   │   │   ├── trips.py
@@ -198,7 +197,8 @@ ExpresRioParana/
 │   │       ├── test_trips_router.py
 │   │       ├── test_bookings_router.py
 │   │       ├── test_payments_router.py
-│   │       └── test_admin_router.py
+│   │       ├── test_admin_router.py
+│   │       └── test_refund_requests.py
 │   ├── alembic.ini
 │   ├── pyproject.toml
 │   ├── .env.example
@@ -273,6 +273,16 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `tests/integration/test_bookings_router.py` — 11 tests: POST /bookings (201 shape, 404 trip, 409 trip_not_available por status y fecha, 409 seat_unavailable reserved/sold/inexistente, 500 sin tramo, 502 MP) y GET /bookings/{id} (200 shape, 404)
 - `tests/integration/test_payments_router.py` — 12 tests: firma inválida, booking not found, idempotencia (con `expire_all()` antes del assert final), happy path con verificación DB, payment no-approved (pending/rejected), MP API error 500, malformed payload, firma con x-request-id
 - `tests/integration/test_admin_router.py` — 24 tests: POST /admin/login (credenciales válidas/inválidas, token, rate limit 429), auth compartida (403 sin header, 401 token inválido), GET /admin/bookings (shape, filtros status/trip_id), GET/POST/DELETE /admin/trips/{id}/price-tranches (shape, orden, 409 overlap, adyacentes no conflictúan, seat_type diferente no conflictúa, 204 sin body, tranche de otro trip → 404)
+- `migrations/versions/c9d4e2f1_add_refunded_and_refund_requests.py` — `ALTER TYPE booking_status ADD VALUE IF NOT EXISTS 'refunded'`; tabla `refund_requests` con FK a bookings, índice en booking_id
+- `app/models/booking.py` — `refunded` agregado a `BookingStatusEnum`; modelo `RefundRequest`; relación `refund_requests` en `Booking`
+- `app/models/__init__.py` — exporta `RefundRequest`
+- `app/schemas/bookings.py` — `RefundRequestCreate` (email), `RefundRequestRead`
+- `app/errors.py` — `RefundWindowExpiredError` con `refund_request_id`; handler → 422 `{detail, refund_request_id}`
+- `app/services/booking.py` — `create_refund_request` (flush para obtener ID), `mark_booking_refunded` (guard idempotente)
+- `app/services/payment.py` — `create_refund`: llama `sdk.payment().refunds()`, `PaymentProcessingError` si no 200/201
+- `app/routers/bookings.py` — `POST /bookings/{id}/refund-request`: persist-first (commit #1), valida ventana legal (10 días desde `confirmed_at` Y >24hs antes de `departure_at`), 422 si expirada o llama a MercadoPago + commit #2
+- `tests/integration/conftest.py` — `refund_requests` en `_TABLES` (primero, hija de bookings), mock default `payment().refunds()` → 201
+- `tests/integration/test_refund_requests.py` — 9 tests: happy path, window expired por 10 días, window expired por <24hs a la salida, 404, 409 × 3 estados, 422 email, 502 MP
 
 ### Bugs críticos resueltos (branch `claude/vibrant-cori-71dm2`)
 
@@ -359,6 +369,7 @@ Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipa
 20. **`BookingCreate._passengers_match_seats` valida orden pero `create_booking` también** — verificación duplicada entre schema y service. Inofensivo; unificar en pasada futura dejando la validación solo en el service.
 21. **Validación AR↔PY no cubierta por tests**: la lógica de filtrado de paradas por país necesita tests de integración específicos una vez implementada en el router/service correspondiente.
 22. **Claims JWT con nombre "crucero-admin"**: los valores `iss` y `aud` en los tokens JWT todavía usan el nombre del proyecto anterior. Actualizar cuando se defina el nombre final del sistema.
+23. **Race condition en `create_refund_request_endpoint`**: si dos requests concurrentes llegan para el mismo `booking_id`, ambos pasan la validación `status == confirmed` y persisten su propio `RefundRequest` (ambos con `window_valid=True`) antes de que `mark_booking_refunded` tome el lock `FOR UPDATE`. El primero en tomar el lock ejecuta `create_refund` contra MercadoPago; el segundo encuentra `status != confirmed` en el guard y no llama a `create_refund`. Resultado: dos filas en `refund_requests` (ambas válidas), pero un solo reembolso real ejecutado. Aceptable para el MVP — bajo volumen y bajísima probabilidad de dos solicitudes simultáneas para la misma booking. Si se quiere prevenir el doble registro, habría que mover el lock `FOR UPDATE` a *antes* del primer commit (persist del `RefundRequest`), lo cual requiere repensar la transacción (hoy son dos commits separados).
 
 ---
 
@@ -383,6 +394,7 @@ Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipa
 - `patch("app.services.payment._sdk", mock_sdk)` en `tests/integration/conftest.py`.
 - Default del mock: `preference.create` devuelve `{"status": 201, "response": {"id": "fake-preference-id", "init_point": "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=fake"}}`.
 - Default del mock: `payment.get` devuelve `{"status": 200, "response": {"id": 123456789, "status": "approved", "external_reference": None, "transaction_amount": 24500.0}}`.
+- Default del mock: `payment().refunds` devuelve `{"status": 201, "response": {"id": 12345678}}`.
 - Tests de webhook que necesiten `external_reference` específico sobreescriben `mock_mp_sdk.payment.return_value.get.return_value` completo antes del POST.
 
 **Patrón identity map en tests de integración:**
@@ -413,6 +425,11 @@ manifest = "id:{data_id.lower()};[request-id:{x_request_id};]ts:{ts};"
 
 - `external_reference` validado como UUID. Si inválido: `PaymentProcessingError` con `status_code=502`.
 - `transaction_amount` convertido con `round()` — no `int()`.
+
+### app/services/payment.py — create_refund
+
+- `create_refund(mp_payment_id)`: llama a `sdk.payment().refunds(mp_payment_id, {}, _REQUEST_OPTIONS)`. Si `status` no está en `(200, 201)`, levanta `PaymentProcessingError`.
+- El caller (`app/routers/bookings.py`) es responsable de actualizar el estado de la booking después de un retorno exitoso.
 
 ### app/services/email.py
 
@@ -452,6 +469,23 @@ Orden obligatorio: extraer data_id → x_request_id → verify_signature → par
 - GET /bookings/{id}: público, selectinload passengers, 404 si inexistente.
 - `_SEAT_TYPE_TITLES` tiene assert de cobertura al nivel de módulo: falla en startup si el dict no cubre todos los valores de `SeatTypeEnum`, evitando KeyError silencioso en producción.
 
+### app/routers/bookings.py — POST /{booking_id}/refund-request
+
+- Endpoint público, sin autenticación. Body: `{"email": "..."}` (`RefundRequestCreate`).
+- Identificación del solicitante: el email enviado debe coincidir (case-insensitive) con el de **cualquiera** de los pasajeros de la booking (`Passenger.email`). No hay distinción comprador/acompañante en el modelo actual (ver deuda técnica #1, `buyer_email`).
+- Precondiciones: 404 si booking inexistente; 409 `booking_not_refundable` si `status != confirmed`; 422 `email_not_found` si el email no coincide con ningún pasajero.
+- **Cálculo de `window_valid`** — requiere **ambas** condiciones (Resolución 424/2020):
+  1. `now <= booking.confirmed_at + timedelta(days=10)`
+  2. `now <= booking.trip.departure_at - timedelta(hours=24)`
+
+  Si `confirmed_at` es `None`, o cualquiera de las dos condiciones falla, `window_valid = False`.
+- **Flujo persist-first** (dos commits):
+  1. Se crea y persiste `RefundRequest` (commit #1) con `window_valid` ya calculado — esto ocurre **siempre**, sea válida o no la solicitud, para garantizar que toda solicitud tenga un `id` recuperable como código de trámite (cumplimiento del requisito de informar el trámite dentro de 24hs, satisfecho en el mismo ciclo request/response).
+  2. Si `window_valid == False` → `RefundWindowExpiredError(refund_req.id)` → handler devuelve 422 `{"detail": "refund_window_expired", "refund_request_id": "..."}`.
+  3. Si `window_valid == True` → valida `mp_payment_id` no nulo (500 si lo es, caso de corrupción de datos) → `mark_booking_refunded` (libera asientos vía `_release_booking_seats`, marca `status = refunded`) → `create_refund(mp_payment_id)` → 502 `payment_gateway_error` si MP falla → commit #2.
+- Response 201 en éxito: `RefundRequestRead` (incluye `id` como código de trámite).
+- `_REFUND_WINDOW_DAYS = 10` hardcodeado a nivel de módulo — consistente con el patrón del proyecto; mover a `settings` si el cliente necesita ajustarlo en el futuro.
+
 ### app/routers/admin.py
 
 - POST /admin/login: bcrypt, mismo 401 `invalid_credentials` para email y password incorrectos. `_DUMMY_HASH` calculado al nivel de módulo; cuando el email no existe se ejecuta `_pwd_context.verify` contra el dummy antes de lanzar 401, eliminando timing attack por short-circuit. Rate limit: 10 requests/minuto por IP vía slowapi.
@@ -459,6 +493,7 @@ Orden obligatorio: extraer data_id → x_request_id → verify_signature → par
 - GET /admin/trips/{id}/price-tranches: 404 si trip inexistente, orden `seat_type ASC, min_sold ASC` (orden de enum Postgres: `cama` < `semi_cama`).
 - POST /admin/trips/{id}/price-tranches: 404 trip, validación solapamiento explícita con `min_sold < existing.max_sold AND max_sold > existing.min_sold` (rangos adyacentes no solapan) usando `.with_for_update()` para serializar escrituras concurrentes → 409 `tranche_overlap`, 201 en éxito.
 - DELETE /admin/trips/{id}/price-tranches/{tranche_id}: 404 trip o tranche (incluyendo tranche de otro trip), 204 sin body en éxito.
+- GET /admin/refund-requests: lista **todas** las solicitudes de reembolso (válidas y rechazadas — `window_valid` distingue el resultado, no filtra qué se persiste). Filtros opcionales `window_valid` y `booking_id`, LIMIT 500, orden `requested_at DESC`.
 - Panel admin debe permitir gestión autónoma de trayectos, paradas, orígenes y destinos (sin depender del desarrollador para cada cambio). Endpoints a definir antes de implementar.
 
 ### app/limiter.py
@@ -475,7 +510,7 @@ Orden obligatorio: extraer data_id → x_request_id → verify_signature → par
 ### tasks/reminders.py
 
 - `AsyncIOScheduler` + `SQLAlchemyJobStore` con `sync_database_url`.
-- `register_jobs()` llamada después de `scheduler.start()` en lifespan.
+- `register_jobs()` llamada después de `scheduler.start()` en lifecycle.
 - expire_bookings: IntervalTrigger(minutes=1), misfire_grace_time=60s.
 - send_reminders / send_feedback: IntervalTrigger(hours=1), misfire_grace_time=3600s.
 - Ventana reminder: `departure_at` entre now y now+24h.
@@ -493,3 +528,8 @@ Orden obligatorio: extraer data_id → x_request_id → verify_signature → par
 
 - `reserve_seats`: `.with_for_update(nowait=True)` — si el lock no está disponible, SQLAlchemy lanza `OperationalError` que se captura y relanza como `SeatNotAvailable(seat_ids[0])`, resultando en 409 inmediato para el segundo comprador en vez de bloqueo por timeout.
 - `mark_seats_sold` conserva `.with_for_update()` sin nowait — semántica distinta: el webhook ya tiene el booking, no hay contención entre compradores.
+
+### app/services/booking.py — refunds
+
+- `create_refund_request(db, booking_id, email_used, window_valid)`: crea y `flush()`ea un `RefundRequest` (necesario para obtener el `id` antes del commit). No hace commit — responsabilidad del caller.
+- `mark_booking_refunded(db, booking_id)`: guard idempotente — si `booking.status != confirmed`, retorna sin modificar. Si es `confirmed`, lo pasa a `refunded` y libera los asientos vía `_release_booking_seats` (mismo mecanismo que el resto del flujo de liberación, sin decremento explícito de `sold_count` — se deriva en tiempo real del estado de `seats`).
