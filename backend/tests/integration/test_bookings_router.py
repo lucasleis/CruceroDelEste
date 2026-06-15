@@ -301,7 +301,7 @@ async def test_get_booking_returns_200_with_correct_shape(
 
     assert len(data["passengers"]) == 1
     pax = data["passengers"][0]
-    assert set(pax.keys()) == {"id", "seat_id", "first_name", "last_name", "dni", "email", "phone"}
+    assert set(pax.keys()) == {"id", "seat_id", "first_name", "last_name", "dni", "email", "phone", "luggage_count"}
     assert pax["first_name"] == "Ana"
     assert pax["email"] == "ana@example.com"
 

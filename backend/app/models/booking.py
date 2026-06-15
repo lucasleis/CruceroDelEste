@@ -77,6 +77,7 @@ class Passenger(Base):
     dni = Column(String(20), nullable=False)
     email = Column(String(255), nullable=False)
     phone = Column(String(30), nullable=True)
+    luggage_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (

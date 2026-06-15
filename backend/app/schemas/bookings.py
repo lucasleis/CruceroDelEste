@@ -13,6 +13,7 @@ class PassengerCreate(BaseModel):
     dni: str = Field(min_length=1, max_length=20)
     email: EmailStr = Field(max_length=255)
     phone: str | None = Field(default=None, max_length=30)
+    luggage_count: int = Field(default=0, ge=0)
 
 
 class PassengerRead(BaseModel):
@@ -25,6 +26,7 @@ class PassengerRead(BaseModel):
     dni: str
     email: EmailStr
     phone: str | None
+    luggage_count: int
 
 
 class BookingCreate(BaseModel):
