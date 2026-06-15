@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models.booking import Booking, BookingStatusEnum, Passenger
+from app.models.booking import Booking, BookingStatusEnum, Passenger, RefundRequest
 from app.models.trip import Seat, SeatStatusEnum, SeatTypeEnum
 from app.services.inventory import mark_seats_sold, reserve_seats
 from app.services.payment import PreferenceItem
@@ -179,6 +179,30 @@ async def _release_booking_seats(db: AsyncSession, seat_ids: list[UUID]) -> None
     for seat in result.scalars().all():
         seat.status = SeatStatusEnum.available
         seat.reserved_at = None
+
+
+async def create_refund_request(
+    db: AsyncSession,
+    booking_id: UUID,
+    email_used: str,
+    window_valid: bool,
+) -> RefundRequest:
+    refund_request = RefundRequest(
+        booking_id=booking_id,
+        email_used=email_used,
+        window_valid=window_valid,
+    )
+    db.add(refund_request)
+    await db.flush()
+    return refund_request
+
+
+async def mark_booking_refunded(db: AsyncSession, booking_id: UUID) -> Booking:
+    booking = await _get_booking(db, booking_id)
+    if booking.status != BookingStatusEnum.confirmed:
+        return booking
+    booking.status = BookingStatusEnum.refunded
+    return booking
 
 
 class BookingNotFound(Exception):

@@ -25,6 +25,7 @@ class BookingStatusEnum(str, enum.Enum):
     pending_payment = "pending_payment"
     confirmed = "confirmed"
     expired = "expired"
+    refunded = "refunded"
 
 
 class Booking(Base):
@@ -62,6 +63,7 @@ class Booking(Base):
 
     trip = relationship("Trip", back_populates="bookings")
     passengers = relationship("Passenger", back_populates="booking")
+    refund_requests = relationship("RefundRequest", back_populates="booking")
 
 
 class Passenger(Base):
@@ -85,6 +87,26 @@ class Passenger(Base):
 
     booking = relationship("Booking", back_populates="passengers")
     seat = relationship("Seat", back_populates="passenger")
+
+
+class RefundRequest(Base):
+    __tablename__ = "refund_requests"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=False)
+    requested_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    email_used = Column(String(255), nullable=False)
+    window_valid = Column(Boolean, nullable=False)
+
+    __table_args__ = (
+        Index("idx_refund_requests_booking", "booking_id"),
+    )
+
+    booking = relationship("Booking", back_populates="refund_requests")
 
 
 class AdminUser(Base):

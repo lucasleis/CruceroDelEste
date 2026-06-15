@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -35,6 +37,18 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={"detail": exc.errors()},
+        )
+
+    @app.exception_handler(RefundWindowExpiredError)
+    async def refund_window_expired_handler(
+        request: Request, exc: RefundWindowExpiredError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={
+                "detail": "refund_window_expired",
+                "refund_request_id": str(exc.refund_request_id),
+            },
         )
 
     @app.exception_handler(NotFoundError)
@@ -78,6 +92,18 @@ class PaymentProcessingError(Exception):
     def __init__(self, message: str, status_code: int | None = None) -> None:
         self.status_code = status_code
         super().__init__(message)
+
+
+class RefundWindowExpiredError(Exception):
+    """Raised when a refund request arrives outside the legal 10-day window.
+
+    The RefundRequest row is already committed before this is raised; its id
+    is surfaced in the 422 response body as a tracking code for the consumer.
+    """
+
+    def __init__(self, refund_request_id: UUID) -> None:
+        self.refund_request_id = refund_request_id
+        super().__init__(f"Refund window expired for request {refund_request_id}")
 
 
 class PaymentConfigError(Exception):

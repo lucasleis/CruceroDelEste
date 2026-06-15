@@ -59,6 +59,20 @@ class BookingRead(BaseModel):
     passengers: list[PassengerRead]
 
 
+class RefundRequestCreate(BaseModel):
+    email: EmailStr
+
+
+class RefundRequestRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    booking_id: UUID
+    requested_at: datetime
+    email_used: str
+    window_valid: bool
+
+
 class BookingCreateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

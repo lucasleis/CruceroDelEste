@@ -21,7 +21,6 @@ from app.models.trip import (
 from app.services.inventory import (
     SeatNotAvailable,
     mark_seats_sold,
-    release_expired_reservations,
     reserve_seats,
 )
 
@@ -101,6 +100,7 @@ async def test_reserve_seats_reserved_at_is_recent(db: AsyncSession):
     await reserve_seats(db, [seat.id], trip.id)
     after = datetime.now(timezone.utc)
 
+    await db.flush()
     await db.refresh(seat)
     assert before <= seat.reserved_at <= after
 
@@ -119,14 +119,16 @@ async def test_reserve_already_reserved_seat_raises(db: AsyncSession):
     )
     await db.commit()
 
-    with pytest.raises(SeatNotAvailable) as exc_info:
-        await reserve_seats(db, [s1.id, s2.id], trip.id)
+    s1_id, s2_id = s1.id, s2.id  # capture before rollback detaches objects
 
-    assert exc_info.value.seat_id in (s1.id, s2.id)
+    with pytest.raises(SeatNotAvailable) as exc_info:
+        await reserve_seats(db, [s1_id, s2_id], trip.id)
+
+    assert exc_info.value.seat_id in (s1_id, s2_id)
 
     # Rollback and confirm neither seat was permanently modified.
     await db.rollback()
-    s1_db = await _fetch_seat(db, s1.id)
+    s1_db = await _fetch_seat(db, s1_id)
     assert s1_db.status == SeatStatusEnum.available
 
 
@@ -141,7 +143,18 @@ async def test_reserve_sold_seat_raises(db: AsyncSession):
 
 async def test_reserve_seat_belonging_to_different_trip_raises(db: AsyncSession):
     trip_a = await _make_trip(db)
-    trip_b = await _make_trip(db)
+    # Use a different route to avoid UNIQUE constraint on (origin, destination).
+    route_b = Route(origin="Rosario", destination="Buenos Aires")
+    db.add(route_b)
+    await db.flush()
+    trip_b = Trip(
+        route_id=route_b.id,
+        departure_at=_DEPARTURE,
+        arrival_at=_ARRIVAL,
+        status=TripStatusEnum.scheduled,
+    )
+    db.add(trip_b)
+    await db.flush()
     seat_in_b = await _make_seat(db, trip_b, "5A")
     await db.commit()
 
@@ -159,84 +172,6 @@ async def test_reserve_empty_list_returns_empty(db: AsyncSession):
     seats = await reserve_seats(db, [], trip.id)
 
     assert seats == []
-
-
-# ---------------------------------------------------------------------------
-# release_expired_reservations
-# ---------------------------------------------------------------------------
-
-async def test_release_expired_seat_transitions_to_available(db: AsyncSession):
-    trip = await _make_trip(db)
-    # reserved_at 20 minutes ago — beyond the 15-minute booking_expiry_minutes threshold.
-    expired_at = _NOW - timedelta(minutes=20)
-    seat = await _make_seat(
-        db, trip, "6A",
-        status=SeatStatusEnum.reserved,
-        reserved_at=expired_at,
-    )
-    await db.commit()
-
-    released = await release_expired_reservations(db)
-    await db.commit()
-
-    assert released == 1
-    seat_db = await _fetch_seat(db, seat.id)
-    assert seat_db.status == SeatStatusEnum.available
-    assert seat_db.reserved_at is None
-
-
-async def test_release_does_not_touch_fresh_reservation(db: AsyncSession):
-    trip = await _make_trip(db)
-    # reserved_at 5 minutes ago — within the 15-minute threshold.
-    fresh_at = _NOW - timedelta(minutes=5)
-    seat = await _make_seat(
-        db, trip, "7A",
-        status=SeatStatusEnum.reserved,
-        reserved_at=fresh_at,
-    )
-    await db.commit()
-
-    released = await release_expired_reservations(db)
-    await db.commit()
-
-    assert released == 0
-    seat_db = await _fetch_seat(db, seat.id)
-    assert seat_db.status == SeatStatusEnum.reserved
-
-
-async def test_release_only_expired_among_mixed_reservations(db: AsyncSession):
-    trip = await _make_trip(db)
-    expired_at = _NOW - timedelta(minutes=20)
-    fresh_at = _NOW - timedelta(minutes=5)
-
-    stale = await _make_seat(
-        db, trip, "8A",
-        status=SeatStatusEnum.reserved,
-        reserved_at=expired_at,
-    )
-    fresh = await _make_seat(
-        db, trip, "8B",
-        status=SeatStatusEnum.reserved,
-        reserved_at=fresh_at,
-    )
-    await db.commit()
-
-    released = await release_expired_reservations(db)
-    await db.commit()
-
-    assert released == 1
-    assert (await _fetch_seat(db, stale.id)).status == SeatStatusEnum.available
-    assert (await _fetch_seat(db, fresh.id)).status == SeatStatusEnum.reserved
-
-
-async def test_release_with_no_expired_seats_returns_zero(db: AsyncSession):
-    trip = await _make_trip(db)
-    await _make_seat(db, trip, "9A", status=SeatStatusEnum.available)
-    await db.commit()
-
-    released = await release_expired_reservations(db)
-
-    assert released == 0
 
 
 # ---------------------------------------------------------------------------

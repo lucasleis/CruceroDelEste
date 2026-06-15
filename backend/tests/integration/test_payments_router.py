@@ -237,8 +237,9 @@ async def test_webhook_idempotency_two_posts_confirm_booking_once(
     assert resp2.json() == {"status": "ok"}
 
     # Exactly one confirmed booking in the DB — not two.
-    await db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
-    result = await db.execute(select(Booking).where(Booking.id == booking.id))
+    booking_id = booking.id
+    db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
+    result = await db.execute(select(Booking).where(Booking.id == booking_id))
     booking_db = result.scalar_one()
     assert booking_db.status == BookingStatusEnum.confirmed
     assert booking_db.mp_payment_id == "123456789"
@@ -270,8 +271,9 @@ async def test_webhook_approved_payment_confirms_booking(
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
-    await db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
-    result = await db.execute(select(Booking).where(Booking.id == booking.id))
+    booking_id = booking.id
+    db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
+    result = await db.execute(select(Booking).where(Booking.id == booking_id))
     booking_db = result.scalar_one()
     assert booking_db.status == BookingStatusEnum.confirmed
     assert booking_db.confirmed_at is not None
@@ -309,8 +311,9 @@ async def test_webhook_pending_payment_returns_ok_booking_stays_pending(
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
-    await db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
-    result = await db.execute(select(Booking).where(Booking.id == booking.id))
+    booking_id = booking.id
+    db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
+    result = await db.execute(select(Booking).where(Booking.id == booking_id))
     booking_db = result.scalar_one()
     assert booking_db.status == BookingStatusEnum.pending_payment
 
@@ -342,8 +345,9 @@ async def test_webhook_rejected_payment_returns_ok_booking_stays_pending(
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
 
-    await db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
-    result = await db.execute(select(Booking).where(Booking.id == booking.id))
+    booking_id = booking.id
+    db.expire_all()  # fuerza re-fetch desde DB, evita identity map cacheada
+    result = await db.execute(select(Booking).where(Booking.id == booking_id))
     booking_db = result.scalar_one()
     assert booking_db.status == BookingStatusEnum.pending_payment
 

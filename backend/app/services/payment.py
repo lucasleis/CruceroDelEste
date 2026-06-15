@@ -163,6 +163,24 @@ async def get_payment(payment_id: str) -> PaymentDetails:
     )
 
 
+async def create_refund(mp_payment_id: str) -> None:
+    """Initiate a full refund for a MercadoPago payment.
+
+    Raises PaymentProcessingError on any non-2xx response.
+    The caller is responsible for updating the booking status after this returns.
+    """
+    result = await asyncio.to_thread(
+        _sdk.payment().refunds, mp_payment_id, {}, _REQUEST_OPTIONS,
+    )
+
+    status_code = result.get("status")
+    if status_code not in (200, 201):
+        raise PaymentProcessingError(
+            f"Refund creation failed: payment_id={mp_payment_id}, HTTP {status_code}",
+            status_code=status_code or 500,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Webhook signature verification (pure computation, sync)
 # ---------------------------------------------------------------------------

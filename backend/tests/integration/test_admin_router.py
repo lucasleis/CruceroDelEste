@@ -178,11 +178,11 @@ async def test_login_token_grants_access_to_protected_endpoint(
 # Authentication — shared behaviour across all protected endpoints
 # ---------------------------------------------------------------------------
 
-async def test_protected_endpoint_no_auth_returns_403(client: AsyncClient):
-    # HTTPBearer raises 403 when the Authorization header is absent.
+async def test_protected_endpoint_no_auth_returns_401(client: AsyncClient):
+    # HTTPBearer raises 401 when the Authorization header is absent.
     resp = await client.get("/admin/bookings")
 
-    assert resp.status_code == 403
+    assert resp.status_code == 401
     assert resp.json()["detail"] == "Not authenticated"
 
 
@@ -245,10 +245,10 @@ async def test_list_bookings_returns_correct_shape(
     assert pax["email"] == "ana@example.com"
 
 
-async def test_list_bookings_no_auth_returns_403(client: AsyncClient):
+async def test_list_bookings_no_auth_returns_401(client: AsyncClient):
     resp = await client.get("/admin/bookings")
 
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
 
 async def test_list_bookings_filter_by_status(
@@ -341,10 +341,10 @@ async def test_list_bookings_filter_by_trip_id(
 # GET /admin/trips/{trip_id}/price-tranches
 # ---------------------------------------------------------------------------
 
-async def test_list_price_tranches_no_auth_returns_403(client: AsyncClient):
+async def test_list_price_tranches_no_auth_returns_401(client: AsyncClient):
     resp = await client.get(f"/admin/trips/{uuid.uuid4()}/price-tranches")
 
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
 
 async def test_list_price_tranches_trip_not_found_returns_404(
@@ -433,13 +433,13 @@ async def test_list_price_tranches_ordered_by_seat_type_then_min_sold(
 # POST /admin/trips/{trip_id}/price-tranches
 # ---------------------------------------------------------------------------
 
-async def test_create_price_tranche_no_auth_returns_403(client: AsyncClient):
+async def test_create_price_tranche_no_auth_returns_401(client: AsyncClient):
     resp = await client.post(
         f"/admin/trips/{uuid.uuid4()}/price-tranches",
         json={"seat_type": "cama", "min_sold": 0, "max_sold": 100, "price": 24500},
     )
 
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
 
 async def test_create_price_tranche_trip_not_found_returns_404(
@@ -542,12 +542,12 @@ async def test_create_price_tranche_different_seat_type_does_not_conflict(
 # DELETE /admin/trips/{trip_id}/price-tranches/{tranche_id}
 # ---------------------------------------------------------------------------
 
-async def test_delete_price_tranche_no_auth_returns_403(client: AsyncClient):
+async def test_delete_price_tranche_no_auth_returns_401(client: AsyncClient):
     resp = await client.delete(
         f"/admin/trips/{uuid.uuid4()}/price-tranches/{uuid.uuid4()}"
     )
 
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
 
 async def test_delete_price_tranche_trip_not_found_returns_404(

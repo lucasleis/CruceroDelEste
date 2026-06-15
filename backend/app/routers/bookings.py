@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,19 +8,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.deps import get_db
-from app.errors import NotFoundError, PaymentProcessingError, SeatUnavailableError
-from app.models.booking import Booking
+from app.errors import NotFoundError, PaymentProcessingError, RefundWindowExpiredError, SeatUnavailableError
+from app.models.booking import Booking, BookingStatusEnum
 from app.models.trip import Trip, TripStatusEnum
 from app.schemas.bookings import (
     BookingCreate,
     BookingCreateResponse,
     BookingRead,
     PassengerRead,
+    RefundRequestCreate,
+    RefundRequestRead,
 )
-from app.services.booking import PassengerData, create_booking, expire_booking
+from app.services.booking import (
+    PassengerData,
+    create_booking,
+    create_refund_request,
+    expire_booking,
+    mark_booking_refunded,
+)
 from app.services.inventory import SeatNotAvailable
-from app.services.payment import create_preference
+from app.services.payment import create_preference, create_refund
 from app.services.pricing import NoPriceTranche
+
+_REFUND_WINDOW_DAYS = 10
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +115,67 @@ async def create_booking_endpoint(
         passengers=[PassengerRead.model_validate(p) for p in booking.passengers],
         init_point=preference.init_point,
     )
+
+
+@router.post("/{booking_id}/refund-request", response_model=RefundRequestRead, status_code=201)
+async def create_refund_request_endpoint(
+    booking_id: UUID,
+    body: RefundRequestCreate,
+    db: AsyncSession = Depends(get_db),
+) -> RefundRequestRead:
+    result = await db.execute(
+        select(Booking)
+        .options(selectinload(Booking.passengers), selectinload(Booking.trip))
+        .where(Booking.id == booking_id)
+    )
+    booking = result.scalar_one_or_none()
+    if booking is None:
+        raise NotFoundError()
+
+    if booking.status != BookingStatusEnum.confirmed:
+        raise HTTPException(status_code=409, detail="booking_not_refundable")
+
+    passenger_emails = {p.email.lower() for p in booking.passengers}
+    if body.email.lower() not in passenger_emails:
+        raise HTTPException(status_code=422, detail="email_not_found")
+
+    now = datetime.now(timezone.utc)
+    # Resolución 424/2020: window is valid only when BOTH conditions hold:
+    #   1. within 10 calendar days of purchase (confirmed_at)
+    #   2. more than 24 hours before departure
+    window_valid = (
+        booking.confirmed_at is not None
+        and now <= booking.confirmed_at + timedelta(days=_REFUND_WINDOW_DAYS)
+        and now <= booking.trip.departure_at - timedelta(hours=24)
+    )
+
+    # Always persist — even when window_valid=False — so every request has a tracking id.
+    refund_req = await create_refund_request(db, booking.id, body.email, window_valid)
+    await db.commit()
+
+    if not window_valid:
+        raise RefundWindowExpiredError(refund_req.id)
+
+    if not booking.mp_payment_id:
+        logger.error("refund_no_mp_payment_id booking_id=%s", booking.id)
+        raise HTTPException(status_code=500, detail="internal_server_error")
+
+    await mark_booking_refunded(db, booking.id)
+
+    try:
+        await create_refund(booking.mp_payment_id)
+    except PaymentProcessingError as exc:
+        logger.error(
+            "create_refund_failed booking_id=%s mp_payment_id=%s status_code=%s",
+            booking.id,
+            booking.mp_payment_id,
+            exc.status_code,
+        )
+        raise HTTPException(status_code=502, detail="payment_gateway_error") from exc
+
+    await db.commit()
+
+    return RefundRequestRead.model_validate(refund_req)
 
 
 @router.get("/{booking_id}", response_model=BookingRead)

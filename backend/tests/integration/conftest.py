@@ -14,6 +14,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine as _create_sync_engine
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 from testcontainers.postgres import PostgresContainer
 
 # Import models so their tables are registered with Base before create_all.
@@ -24,6 +25,7 @@ from app.main import app
 
 # Dependency order: children before parents so CASCADE works correctly.
 _TABLES = [
+    "refund_requests",
     "passengers",
     "bookings",
     "seats",
@@ -58,7 +60,7 @@ def test_engine(pg_container):
     Base.metadata.create_all(sync_engine)
     sync_engine.dispose()
 
-    engine = create_async_engine(async_url, echo=False)
+    engine = create_async_engine(async_url, echo=False, poolclass=NullPool)
     yield engine
     # engine.dispose() is a coroutine in SQLAlchemy 2 async; use the underlying
     # sync pool dispose so we stay in a sync fixture.
@@ -143,6 +145,11 @@ def mock_mp_sdk():
             "external_reference": None,  # override per-test in webhook tests
             "transaction_amount": 24500.0,
         },
+    }
+
+    mock_sdk.payment.return_value.refunds.return_value = {
+        "status": 201,
+        "response": {"id": 12345678},
     }
 
     with patch("app.services.payment._sdk", mock_sdk):

@@ -117,7 +117,7 @@ async def test_create_booking_happy_path(db: AsyncSession):
     await _add_tranche(db, trip)
     await db.commit()
 
-    booking = await create_booking(
+    booking, _ = await create_booking(
         db,
         trip_id=trip.id,
         seat_ids=[seat.id],
@@ -237,8 +237,10 @@ async def test_confirm_booking_happy_path(db: AsyncSession):
     assert result.scalar_one().status == SeatStatusEnum.sold
 
 
-async def test_confirm_already_confirmed_booking_overwrites_confirmed_at(db: AsyncSession):
-    # confirm_booking has no status guard — it overwrites unconditionally.
+async def test_confirm_already_confirmed_booking_is_idempotent(db: AsyncSession):
+    # confirm_booking has a status guard: if status != pending_payment it returns early
+    # without modifying the booking (Bug 1.6 fix). A second call on an already-confirmed
+    # booking must leave mp_payment_id and confirmed_at unchanged.
     trip = await _make_trip(db)
     seat = await _make_seat(db, trip, "5A", status=SeatStatusEnum.sold)
     await _add_tranche(db, trip)
@@ -266,17 +268,18 @@ async def test_confirm_already_confirmed_booking_overwrites_confirmed_at(db: Asy
     ))
     await db.commit()
 
-    # Must not raise; confirmed_at is updated.
+    # Must not raise; booking returned unchanged (guard returns early).
     result = await confirm_booking(db, booking.id, mp_payment_id="mp-new")
     await db.commit()
 
     assert result.status == BookingStatusEnum.confirmed
-    assert result.mp_payment_id == "mp-new"
-    assert result.confirmed_at > original_confirmed_at
+    assert result.mp_payment_id == "mp-old"
+    assert result.confirmed_at == original_confirmed_at
 
 
-async def test_confirm_expired_booking_overwrites_status(db: AsyncSession):
-    # confirm_booking does not reject expired bookings — it overwrites the status.
+async def test_confirm_expired_booking_is_not_reactivated(db: AsyncSession):
+    # confirm_booking has a status guard: if status != pending_payment it returns early.
+    # An expired booking must remain expired — the guard prevents reactivation (Bug 1.6 fix).
     trip = await _make_trip(db)
     seat = await _make_seat(db, trip, "6A", status=SeatStatusEnum.available)
     await _add_tranche(db, trip)
@@ -304,7 +307,7 @@ async def test_confirm_expired_booking_overwrites_status(db: AsyncSession):
     result = await confirm_booking(db, booking.id, mp_payment_id="mp-99")
     await db.commit()
 
-    assert result.status == BookingStatusEnum.confirmed
+    assert result.status == BookingStatusEnum.expired
 
 
 # ---------------------------------------------------------------------------

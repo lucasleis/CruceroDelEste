@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/integration/test_booking_service.py -v)",
+      "Bash(python3 -m pytest tests/integration/test_booking_service.py -v)",
+      "Bash(pip3 show *)",
+      "Bash(pip show *)",
+      "Read(//usr/local/bin/**)",
+      "Bash(command -v uv)",
+      "Bash(command -v poetry)",
+      "Bash(command -v hatch)",
+      "Bash(uv run *)",
+      "Bash(.venv/bin/pytest *)",
+      "Bash(/mnt/c/Users/lucas/Codigos/CruceroDelEste/backend/.venv/bin/python3 -m pip install -e \".[dev]\" -q)",
+      "Bash(uv pip *)",
+      "Bash(command -v docker)",
+      "Bash(docker info *)",
+      "Bash(uv python *)",
+      "Bash(uv venv *)",
+      "Bash(.venv312/bin/pytest *)",
+      "Bash(.venv312/bin/python *)",
+      "Bash(tee /tmp/suite_output.txt)",
+      "Bash(echo \"EXIT:$?\")"
+    ]
+  }
+}

@@ -273,6 +273,16 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `tests/integration/test_bookings_router.py` — 11 tests: POST /bookings (201 shape, 404 trip, 409 trip_not_available por status y fecha, 409 seat_unavailable reserved/sold/inexistente, 500 sin tramo, 502 MP) y GET /bookings/{id} (200 shape, 404)
 - `tests/integration/test_payments_router.py` — 12 tests: firma inválida, booking not found, idempotencia (con `expire_all()` antes del assert final), happy path con verificación DB, payment no-approved (pending/rejected), MP API error 500, malformed payload, firma con x-request-id
 - `tests/integration/test_admin_router.py` — 24 tests: POST /admin/login (credenciales válidas/inválidas, token, rate limit 429), auth compartida (403 sin header, 401 token inválido), GET /admin/bookings (shape, filtros status/trip_id), GET/POST/DELETE /admin/trips/{id}/price-tranches (shape, orden, 409 overlap, adyacentes no conflictúan, seat_type diferente no conflictúa, 204 sin body, tranche de otro trip → 404)
+- `migrations/versions/c9d4e2f1_add_refunded_and_refund_requests.py` — `ALTER TYPE booking_status ADD VALUE IF NOT EXISTS 'refunded'`; tabla `refund_requests` con FK a bookings, índice en booking_id
+- `app/models/booking.py` — `refunded` a BookingStatusEnum; modelo RefundRequest; relación `refund_requests` en Booking
+- `app/models/__init__.py` — exporta RefundRequest
+- `app/schemas/bookings.py` — RefundRequestCreate (email), RefundRequestRead
+- `app/errors.py` — RefundWindowExpiredError con refund_request_id; handler → 422 `{detail, refund_request_id}`
+- `app/services/booking.py` — create_refund_request (flush para obtener ID), mark_booking_refunded (guard idempotente)
+- `app/services/payment.py` — create_refund: llama sdk.payment().refunds(), PaymentProcessingError si no 200/201
+- `app/routers/bookings.py` — POST /bookings/{id}/refund-request: persist-first (commit #1), luego 422 si window expirado o MP refund + commit #2
+- `tests/integration/conftest.py` — refund_requests en _TABLES (primero), default mock payment().refunds() → 201
+- `tests/integration/test_refund_requests.py` — 8 tests: happy path, window expired (verifica row + id en body), 404, 409 × 3 estados, 422 email, 502 MP (booking stays confirmed, RefundRequest persisted)
 
 ### Bugs críticos resueltos (branch `claude/vibrant-cori-71dm2`)
 
@@ -301,6 +311,7 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 ### Próximo a implementar
 
 ---
+
 
 ## Módulos críticos — requieren atención especial
 
