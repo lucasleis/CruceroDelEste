@@ -114,6 +114,22 @@ async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
 
 # ---------------------------------------------------------------------------
+# Rate limiter reset (autouse — prevents counter bleed across tests)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Reset slowapi MemoryStorage before each test.
+
+    Without this, POST /admin/login calls from earlier tests accumulate in the
+    shared in-memory counter and exhaust the 10/min limit before price-tranche
+    tests can authenticate. reset() is public API on limits.storage.MemoryStorage.
+    """
+    from app.limiter import limiter
+    limiter._storage.reset()
+
+
+# ---------------------------------------------------------------------------
 # MercadoPago SDK mock (autouse — no real HTTP calls from any integration test)
 # ---------------------------------------------------------------------------
 
