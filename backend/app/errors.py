@@ -20,6 +20,48 @@ class NotFoundError(HTTPException):
         super().__init__(status_code=status_code, detail=detail)
 
 
+class InvalidWebhookSignature(Exception):
+    """x-signature header from MercadoPago failed validation.
+
+    Reasons: missing header, malformed format, timestamp outside replay window,
+    or HMAC digest mismatch.
+    """
+
+
+class PaymentProcessingError(Exception):
+    """MercadoPago API returned a non-success HTTP status.
+
+    Carries the original status code and a human-readable reason for logging.
+    """
+
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        self.status_code = status_code
+        super().__init__(message)
+
+
+class RefundWindowExpiredError(Exception):
+    """Raised when a refund request fails either condition of the legal window
+    (Resolución 424/2020). Both conditions must hold simultaneously:
+      1. Within 10 calendar days of confirmed_at (purchase date).
+      2. More than 24 hours before the trip's departure_at.
+
+    The RefundRequest row is already committed before this is raised; its id
+    is surfaced in the 422 response body as a tracking code for the consumer.
+    """
+
+    def __init__(self, refund_request_id: UUID) -> None:
+        self.refund_request_id = refund_request_id
+        super().__init__(f"Refund window expired for request {refund_request_id}")
+
+
+class PaymentConfigError(Exception):
+    """Payment configuration is missing or invalid.
+
+    Raised at startup by pydantic validators when required payment settings
+    (e.g. mercadopago_access_token, backend_url) are absent or malformed.
+    """
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(SeatUnavailableError)
     async def seat_unavailable_handler(
@@ -73,45 +115,3 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"detail": "internal_server_error"},
         )
-
-
-class InvalidWebhookSignature(Exception):
-    """x-signature header from MercadoPago failed validation.
-
-    Reasons: missing header, malformed format, timestamp outside replay window,
-    or HMAC digest mismatch.
-    """
-
-
-class PaymentProcessingError(Exception):
-    """MercadoPago API returned a non-success HTTP status.
-
-    Carries the original status code and a human-readable reason for logging.
-    """
-
-    def __init__(self, message: str, status_code: int | None = None) -> None:
-        self.status_code = status_code
-        super().__init__(message)
-
-
-class RefundWindowExpiredError(Exception):
-    """Raised when a refund request fails either condition of the legal window
-    (Resolución 424/2020). Both conditions must hold simultaneously:
-      1. Within 10 calendar days of confirmed_at (purchase date).
-      2. More than 24 hours before the trip's departure_at.
-
-    The RefundRequest row is already committed before this is raised; its id
-    is surfaced in the 422 response body as a tracking code for the consumer.
-    """
-
-    def __init__(self, refund_request_id: UUID) -> None:
-        self.refund_request_id = refund_request_id
-        super().__init__(f"Refund window expired for request {refund_request_id}")
-
-
-class PaymentConfigError(Exception):
-    """Payment configuration is missing or invalid.
-
-    Raised at startup by pydantic validators when required payment settings
-    (e.g. mercadopago_access_token, backend_url) are absent or malformed.
-    """
