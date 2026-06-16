@@ -95,7 +95,10 @@ class PaymentProcessingError(Exception):
 
 
 class RefundWindowExpiredError(Exception):
-    """Raised when a refund request arrives outside the legal 10-day window.
+    """Raised when a refund request fails either condition of the legal window
+    (Resolución 424/2020). Both conditions must hold simultaneously:
+      1. Within 10 calendar days of confirmed_at (purchase date).
+      2. More than 24 hours before the trip's departure_at.
 
     The RefundRequest row is already committed before this is raised; its id
     is surfaced in the 422 response body as a tracking code for the consumer.
