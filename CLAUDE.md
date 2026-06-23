@@ -274,17 +274,6 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `tests/integration/test_payments_router.py` — 12 tests: firma inválida, booking not found, idempotencia (con `expire_all()` antes del assert final), happy path con verificación DB, payment no-approved (pending/rejected), MP API error 500, malformed payload, firma con x-request-id
 - `tests/integration/test_admin_router.py` — 24 tests: POST /admin/login (credenciales válidas/inválidas, token, rate limit 429), auth compartida (403 sin header, 401 token inválido), GET /admin/bookings (shape, filtros status/trip_id), GET/POST/DELETE /admin/trips/{id}/price-tranches (shape, orden, 409 overlap, adyacentes no conflictúan, seat_type diferente no conflictúa, 204 sin body, tranche de otro trip → 404)
 - `migrations/versions/c9d4e2f1_add_refunded_and_refund_requests.py` — `ALTER TYPE booking_status ADD VALUE IF NOT EXISTS 'refunded'`; tabla `refund_requests` con FK a bookings, índice en booking_id
-<<<<<<< HEAD
-- `app/models/booking.py` — `refunded` a BookingStatusEnum; modelo RefundRequest; relación `refund_requests` en Booking
-- `app/models/__init__.py` — exporta RefundRequest
-- `app/schemas/bookings.py` — RefundRequestCreate (email), RefundRequestRead
-- `app/errors.py` — RefundWindowExpiredError con refund_request_id; handler → 422 `{detail, refund_request_id}`
-- `app/services/booking.py` — create_refund_request (flush para obtener ID), mark_booking_refunded (guard idempotente)
-- `app/services/payment.py` — create_refund: llama sdk.payment().refunds(), PaymentProcessingError si no 200/201
-- `app/routers/bookings.py` — POST /bookings/{id}/refund-request: persist-first (commit #1), luego 422 si window expirado o MP refund + commit #2
-- `tests/integration/conftest.py` — refund_requests en _TABLES (primero), default mock payment().refunds() → 201
-- `tests/integration/test_refund_requests.py` — 8 tests: happy path, window expired (verifica row + id en body), 404, 409 × 3 estados, 422 email, 502 MP (booking stays confirmed, RefundRequest persisted)
-=======
 - `app/models/booking.py` — `refunded` agregado a `BookingStatusEnum`; modelo `RefundRequest`; relación `refund_requests` en `Booking`
 - `app/models/__init__.py` — exporta `RefundRequest`
 - `app/schemas/bookings.py` — `RefundRequestCreate` (email), `RefundRequestRead`
@@ -294,7 +283,6 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/routers/bookings.py` — `POST /bookings/{id}/refund-request`: persist-first (commit #1), valida ventana legal (10 días desde `confirmed_at` Y >24hs antes de `departure_at`), 422 si expirada o llama a MercadoPago + commit #2
 - `tests/integration/conftest.py` — `refund_requests` en `_TABLES` (primero, hija de bookings), mock default `payment().refunds()` → 201
 - `tests/integration/test_refund_requests.py` — 9 tests: happy path, window expired por 10 días, window expired por <24hs a la salida, 404, 409 × 3 estados, 422 email, 502 MP
->>>>>>> d5f89d47a66ecc3ec40df1c7726a5937ec293a2b
 
 ### Bugs críticos resueltos (branch `claude/vibrant-cori-71dm2`)
 
@@ -322,8 +310,20 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 
 ### Próximo a implementar
 
----
+**#012 — Tabla `stops` + validación AR↔PY completa**
 
+Implementar el modelo de paradas internacionales y la validación de cabotaje en backend. Este es un módulo crítico con implicancias legales — seguir el protocolo de módulos críticos antes de escribir cualquier código.
+
+Contexto para la implementación:
+
+- La tabla `stops` va **separada** de `Route` (decisión confirmada 14/06). No agregar campo `country` a `Route`. La tabla `stops` es más escalable y soporta el sistema de multi-paradas futuro.
+- Cada `Stop` tiene: `id`, `name`, `country` (enum: `AR` / `PY`), y relación con `Route`. La relación exacta entre `Stop`, `Route` y `Trip` debe ser propuesta y aprobada antes de implementar.
+- La validación en `app/routers/bookings.py` debe rechazar con 422 `international_route_required` si origen y destino son del mismo país. Esta validación existe **tanto en la query de destinos disponibles como al crear el booking**.
+- ⚠️ Los fixtures de tests existentes usan `Route(origin="Buenos Aires", destination="Rosario")` — una ruta doméstica AR→AR que se vuelve **inválida** con la nueva validación. Al implementar, actualizar todos los fixtures afectados a rutas AR↔PY válidas (ej. `origin="Retiro"` con `country=AR`, `destination="Asunción"` con `country=PY`).
+- La migración de Alembic es obligatoria. Seguir el patrón de las migraciones existentes.
+- Tests requeridos: al menos un test de integración que valide que una booking con origen y destino del mismo país es rechazada con 422, y otro que confirme que una ruta AR↔PY válida es aceptada.
+
+---
 
 ## Módulos críticos — requieren atención especial
 
@@ -383,12 +383,19 @@ Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipa
 21. **Validación AR↔PY no cubierta por tests**: la lógica de filtrado de paradas por país necesita tests de integración específicos una vez implementada en el router/service correspondiente.
 22. **Claims JWT con nombre "crucero-admin"**: los valores `iss` y `aud` en los tokens JWT todavía usan el nombre del proyecto anterior. Actualizar cuando se defina el nombre final del sistema.
 23. **`RefundRequest.id` — asimetría entre default Python y server_default DB** (`app/models/booking.py:96`, `migrations/versions/c9d4e2f1`): el modelo declara `default=uuid.uuid4` (sin `server_default`); la migración crea la columna con `server_default=gen_random_uuid()`. Fuente de verdad: Python. El `server_default` en la DB es letra muerta en todos los flujos conocidos — el único camino de creación es `create_refund_request()` en `app/services/booking.py` vía ORM. No remover el `server_default` de la DB para no generar una migración innecesaria. **Restricción**: cualquier INSERT directo futuro en `refund_requests` (scripts de seed, migraciones de datos) debe generar el `id` explícitamente — no puede depender del `server_default` como fallback porque el modelo ORM no lo declara y SQLAlchemy no lo usará.
-
 24. **Race condition en `create_refund_request_endpoint`**: si dos requests concurrentes llegan para el mismo `booking_id`, ambos pasan la validación `status == confirmed` y persisten su propio `RefundRequest` (ambos con `window_valid=True`) antes de que `mark_booking_refunded` tome el lock `FOR UPDATE`. El primero en tomar el lock ejecuta `create_refund` contra MercadoPago; el segundo encuentra `status != confirmed` en el guard y no llama a `create_refund`. Resultado: dos filas en `refund_requests` (ambas válidas), pero un solo reembolso real ejecutado. Aceptable para el MVP — bajo volumen y bajísima probabilidad de dos solicitudes simultáneas para la misma booking. Si se quiere prevenir el doble registro, habría que mover el lock `FOR UPDATE` a *antes* del primer commit (persist del `RefundRequest`), lo cual requiere repensar la transacción (hoy son dos commits separados).
 
 ---
 
 ## Decisiones de diseño aprobadas
+
+### #012 — Tabla `stops` y lógica AR↔PY
+
+- **Tabla `stops` separada de `Route`** (confirmado 14/06): no agregar campo `country` a `Route`. La entidad `Stop` es independiente y soporta el sistema de multi-paradas futuro.
+- **La relación exacta entre `Stop`, `Route` y `Trip`** debe ser propuesta por Claude Code en el protocolo de decisiones y aprobada antes de implementar. No asumir el diseño.
+- **Validación en backend obligatoria**: `POST /bookings` debe rechazar con 422 `international_route_required` si origen y destino son del mismo país. Esta es la única validación que cuenta desde el punto de vista legal — la validación de frontend es solo UX.
+- **Fixtures de tests afectados**: `test_bookings_router.py`, `test_booking_service.py` y `test_payments_router.py` usan `Route(origin="Buenos Aires", destination="Rosario")` — ruta doméstica AR→AR que se vuelve inválida. Actualizar todos a rutas AR↔PY válidas al implementar este módulo.
+- **Migración Alembic obligatoria** siguiendo el patrón de `migrations/versions/`.
 
 ### Tests — arquitectura de la suite
 
