@@ -35,7 +35,7 @@ from app.models.booking import Booking, Passenger
 
 logger = logging.getLogger(__name__)
 
-_FROM_EMAIL = "no-reply@crucerodeleste.com"
+_FROM_EMAIL = "no-reply@expresorioparana.com"
 _TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "templates" / "email"
 
 _env = Environment(
@@ -109,7 +109,7 @@ async def send_confirmation_email(booking: Booking) -> None:
     failed: list[str] = []
     for passenger in booking.passengers:
         ctx = _context_for(booking, passenger)
-        subject = f"Confirmación de compra — Crucero Del Este #{ctx['booking_id'][:8]}"
+        subject = f"Confirmación de compra — Expreso Río Paraná #{ctx['booking_id'][:8]}"
         html = _render("confirmation.html", ctx)
         text = _render("confirmation.txt", ctx)
 
@@ -149,7 +149,7 @@ async def send_reminder_email(booking: Booking) -> None:
     """
     for passenger in booking.passengers:
         ctx = _context_for(booking, passenger)
-        subject = "Recordatorio de viaje — Crucero Del Este"
+        subject = "Recordatorio de viaje — Expreso Río Paraná"
         try:
             html = _render("reminder.html", ctx)
             text = _render("reminder.txt", ctx)
@@ -175,7 +175,7 @@ async def send_feedback_email(booking: Booking) -> None:
     """
     for passenger in booking.passengers:
         ctx = _context_for(booking, passenger)
-        subject = "¿Cómo fue tu viaje? — Crucero Del Este"
+        subject = "¿Cómo fue tu viaje? — Expreso Río Paraná"
         try:
             html = _render("feedback.html", ctx)
             text = _render("feedback.txt", ctx)
