@@ -4,14 +4,17 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.trip import (
+    CountryEnum,
     PriceTranche,
     Route,
     Seat,
     SeatStatusEnum,
     SeatTypeEnum,
+    Stop,
     Trip,
     TripStatusEnum,
 )
@@ -21,12 +24,33 @@ from app.models.trip import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+async def _make_stop(
+    db: AsyncSession,
+    name: str,
+    country: CountryEnum = CountryEnum.AR,
+) -> Stop:
+    # get-or-create: reuse stops with the same name within a test
+    result = await db.execute(select(Stop).where(Stop.name == name))
+    existing = result.scalar_one_or_none()
+    if existing is not None:
+        return existing
+    stop = Stop(name=name, country=country)
+    db.add(stop)
+    await db.flush()
+    return stop
+
+
 async def _make_route(
     db: AsyncSession,
-    origin: str = "Buenos Aires",
-    destination: str = "Rosario",
+    origin: str = "Retiro",
+    destination: str = "Asunción",
+    *,
+    origin_country: CountryEnum = CountryEnum.AR,
+    destination_country: CountryEnum = CountryEnum.PY,
 ) -> Route:
-    route = Route(origin=origin, destination=destination)
+    origin_stop = await _make_stop(db, origin, origin_country)
+    destination_stop = await _make_stop(db, destination, destination_country)
+    route = Route(origin_stop_id=origin_stop.id, destination_stop_id=destination_stop.id)
     db.add(route)
     await db.flush()
     return route
@@ -113,8 +137,10 @@ async def test_list_trips_one_trip_shape(client: AsyncClient, db: AsyncSession):
     assert len(data) == 1
 
     t = data[0]
-    assert t["route"]["origin"] == "Buenos Aires"
-    assert t["route"]["destination"] == "Rosario"
+    assert t["route"]["origin_stop"]["name"] == "Retiro"
+    assert t["route"]["origin_stop"]["country"] == "AR"
+    assert t["route"]["destination_stop"]["name"] == "Asunción"
+    assert t["route"]["destination_stop"]["country"] == "PY"
     assert t["status"] == "scheduled"
     assert t["available_seats_count"] == 1
     assert t["current_price_cama"] == 24500
@@ -169,8 +195,8 @@ async def test_list_trips_available_count_excludes_non_available_seats(
 
 
 async def test_list_trips_filter_by_origin(client: AsyncClient, db: AsyncSession):
-    route_ba = await _make_route(db, origin="Buenos Aires", destination="Rosario")
-    route_mza = await _make_route(db, origin="Mendoza", destination="Rosario")
+    route_ba = await _make_route(db, origin="Buenos Aires", destination="Asunción")
+    route_mza = await _make_route(db, origin="Mendoza", destination="Encarnación", destination_country=CountryEnum.PY)
 
     trip_ba = await _make_trip(db, route_ba)
     trip_mza = await _make_trip(db, route_mza)
@@ -181,23 +207,23 @@ async def test_list_trips_filter_by_origin(client: AsyncClient, db: AsyncSession
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
-    assert data[0]["route"]["origin"] == "Buenos Aires"
+    assert data[0]["route"]["origin_stop"]["name"] == "Buenos Aires"
 
 
 async def test_list_trips_filter_by_destination(client: AsyncClient, db: AsyncSession):
-    route_to_rosario = await _make_route(db, origin="Buenos Aires", destination="Rosario")
-    route_to_cordoba = await _make_route(db, origin="Buenos Aires", destination="Córdoba")
+    route_to_asuncion = await _make_route(db, origin="Buenos Aires", destination="Asunción")
+    route_to_encarnacion = await _make_route(db, origin="Retiro", destination="Encarnación", destination_country=CountryEnum.PY)
 
-    trip_rosario = await _make_trip(db, route_to_rosario)
-    trip_cordoba = await _make_trip(db, route_to_cordoba)
-    await _add_tranche(db, trip_rosario, SeatTypeEnum.cama)
-    await _add_tranche(db, trip_cordoba, SeatTypeEnum.cama)
+    trip_asuncion = await _make_trip(db, route_to_asuncion)
+    trip_encarnacion = await _make_trip(db, route_to_encarnacion)
+    await _add_tranche(db, trip_asuncion, SeatTypeEnum.cama)
+    await _add_tranche(db, trip_encarnacion, SeatTypeEnum.cama)
 
-    resp = await client.get("/trips", params={"destination": "Rosario"})
+    resp = await client.get("/trips", params={"destination": "Asunción"})
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
-    assert data[0]["route"]["destination"] == "Rosario"
+    assert data[0]["route"]["destination_stop"]["name"] == "Asunción"
 
 
 async def test_list_trips_filter_by_departure_date(client: AsyncClient, db: AsyncSession):
@@ -289,3 +315,83 @@ async def test_get_trip_seats_ordered_by_seat_number(client: AsyncClient, db: As
     assert resp.status_code == 200
     numbers = [s["seat_number"] for s in resp.json()]
     assert numbers == ["1A", "2A", "3A"]
+
+
+# ---------------------------------------------------------------------------
+# GET /stops
+# ---------------------------------------------------------------------------
+
+async def test_get_stops_empty(client: AsyncClient):
+    resp = await client.get("/stops")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+async def test_get_stops_returns_correct_shape(client: AsyncClient, db: AsyncSession):
+    stop_ar = await _make_stop(db, "Retiro", CountryEnum.AR)
+    stop_py = await _make_stop(db, "Asunción", CountryEnum.PY)
+
+    resp = await client.get("/stops")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2
+
+    # Ordered by name: Asunción before Retiro
+    assert data[0]["name"] == "Asunción"
+    assert data[0]["country"] == "PY"
+    assert data[1]["name"] == "Retiro"
+    assert data[1]["country"] == "AR"
+    assert set(data[0].keys()) == {"id", "name", "country"}
+
+
+# ---------------------------------------------------------------------------
+# GET /stops/{stop_id}/valid-destinations
+# ---------------------------------------------------------------------------
+
+async def test_get_valid_destinations_filters_to_opposite_country(
+    client: AsyncClient, db: AsyncSession
+):
+    stop_ar = await _make_stop(db, "Retiro", CountryEnum.AR)
+    stop_ar2 = await _make_stop(db, "Liniers", CountryEnum.AR)
+    stop_py1 = await _make_stop(db, "Asunción", CountryEnum.PY)
+    stop_py2 = await _make_stop(db, "Encarnación", CountryEnum.PY)
+
+    resp = await client.get(f"/stops/{stop_ar.id}/valid-destinations")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2
+    countries = {s["country"] for s in data}
+    assert countries == {"PY"}
+    names = [s["name"] for s in data]
+    assert names == ["Asunción", "Encarnación"]  # alphabetical
+
+
+async def test_get_valid_destinations_py_origin_returns_ar_stops(
+    client: AsyncClient, db: AsyncSession
+):
+    stop_py = await _make_stop(db, "Asunción", CountryEnum.PY)
+    stop_ar = await _make_stop(db, "Retiro", CountryEnum.AR)
+
+    resp = await client.get(f"/stops/{stop_py.id}/valid-destinations")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["country"] == "AR"
+    assert data[0]["name"] == "Retiro"
+
+
+async def test_get_valid_destinations_no_opposite_country_returns_empty(
+    client: AsyncClient, db: AsyncSession
+):
+    stop_ar = await _make_stop(db, "Retiro", CountryEnum.AR)
+    # No PY stops in DB
+
+    resp = await client.get(f"/stops/{stop_ar.id}/valid-destinations")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+async def test_get_valid_destinations_stop_not_found(client: AsyncClient):
+    resp = await client.get(f"/stops/{uuid.uuid4()}/valid-destinations")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "not_found"

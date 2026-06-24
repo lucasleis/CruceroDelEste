@@ -284,6 +284,26 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `tests/integration/conftest.py` — `refund_requests` en `_TABLES` (primero, hija de bookings), mock default `payment().refunds()` → 201
 - `tests/integration/test_refund_requests.py` — 9 tests: happy path, window expired por 10 días, window expired por <24hs a la salida, 404, 409 × 3 estados, 422 email, 502 MP
 
+### Completado (branch `claude/admiring-clarke-n1e1s2`)
+
+- `migrations/versions/b7c3a1d2_add_stops_table.py` — ENUM `country_code` (AR/PY); tabla `stops` (id, name unique, country, created_at); refactor de `routes`: columnas `origin`/`destination` reemplazadas por FK `origin_stop_id`/`destination_stop_id`; índices y UniqueConstraint actualizados.
+- `app/models/trip.py` — `CountryEnum` (AR/PY), modelo `Stop` con relaciones `origin_routes`/`destination_routes`; `Route` refactorizado a FKs `origin_stop_id`/`destination_stop_id` con relationships.
+- `app/models/__init__.py` — exporta `Stop` y `CountryEnum`.
+- `app/schemas/trips.py` — `StopRead` (id, name, country); `RouteRead` actualizado a nested `origin_stop`/`destination_stop` de tipo `StopRead`.
+- `app/services/booking.py` — `InternationalRouteRequiredError` (excepción de dominio, sin handler global); `create_booking` recibe `origin_country`/`destination_country` y valida AR↔PY.
+- `app/routers/trips.py` — selectinload chain para cargar stops; filtros por nombre de stop (string-based); nuevo `stops_router` con `GET /stops` y `GET /stops/{stop_id}/valid-destinations`.
+- `app/routers/bookings.py` — carga trip con selectinload de stops; pasa países al service; captura `InternationalRouteRequiredError` → 422; `NoPriceTranche` re-raise convertido a `HTTPException(500)` explícito.
+- `app/main.py` — registra `stops_router`.
+- `tests/integration/conftest.py` — `stops` agregado a `_TABLES`; soporte `TEST_DATABASE_URL` para entornos sin Docker.
+- `tests/integration/test_trips_router.py` — reescrito: helpers con get-or-create stops; asserts actualizados a `route["origin_stop"]["name"]`; 6 tests nuevos de `/stops` y `/stops/{id}/valid-destinations`.
+- `tests/integration/test_bookings_router.py` — fixtures actualizados a rutas AR↔PY; 2 tests nuevos (422 mismo país, PY→AR aceptada).
+- `tests/integration/test_booking_service.py` — fixtures actualizados; test nuevo `test_create_booking_same_country_raises`.
+- `tests/integration/test_payments_router.py` — fixtures actualizados a rutas AR↔PY.
+- `tests/integration/test_admin_router.py` — fixtures actualizados a rutas AR↔PY.
+- `tests/integration/test_refund_requests.py` — fixtures actualizados a rutas AR↔PY.
+- `tests/integration/test_pricing.py` — fixtures actualizados a rutas AR↔PY.
+- `tests/integration/test_inventory.py` — fixtures actualizados a rutas AR↔PY; segunda ruta en test de trip-cross-check usa stops distintos.
+
 ### Bugs críticos resueltos (branch `claude/vibrant-cori-71dm2`)
 
 - ✅ **Bug 1 — Race `expire_bookings_job` vs webhook** (`app/services/booking.py`) — guard en `expire_booking`: retorna early si `status != pending_payment`, dentro del lock `FOR UPDATE`.
@@ -310,18 +330,7 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 
 ### Próximo a implementar
 
-**#012 — Tabla `stops` + validación AR↔PY completa**
-
-Implementar el modelo de paradas internacionales y la validación de cabotaje en backend. Este es un módulo crítico con implicancias legales — seguir el protocolo de módulos críticos antes de escribir cualquier código.
-
-Contexto para la implementación:
-
-- La tabla `stops` va **separada** de `Route` (decisión confirmada 14/06). No agregar campo `country` a `Route`. La tabla `stops` es más escalable y soporta el sistema de multi-paradas futuro.
-- Cada `Stop` tiene: `id`, `name`, `country` (enum: `AR` / `PY`), y relación con `Route`. La relación exacta entre `Stop`, `Route` y `Trip` debe ser propuesta y aprobada antes de implementar.
-- La validación en `app/routers/bookings.py` debe rechazar con 422 `international_route_required` si origen y destino son del mismo país. Esta validación existe **tanto en la query de destinos disponibles como al crear el booking**.
-- ⚠️ Los fixtures de tests existentes usan `Route(origin="Buenos Aires", destination="Rosario")` — una ruta doméstica AR→AR que se vuelve **inválida** con la nueva validación. Al implementar, actualizar todos los fixtures afectados a rutas AR↔PY válidas (ej. `origin="Retiro"` con `country=AR`, `destination="Asunción"` con `country=PY`).
-- La migración de Alembic es obligatoria. Seguir el patrón de las migraciones existentes.
-- Tests requeridos: al menos un test de integración que valide que una booking con origen y destino del mismo país es rechazada con 422, y otro que confirme que una ruta AR↔PY válida es aceptada.
+No hay módulos pendientes definidos actualmente.
 
 ---
 
@@ -373,7 +382,7 @@ Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipa
 11. **Índice compuesto faltante en `Trip(status, departure_at)`**: `GET /trips` filtra y ordena por ambos. Sin índice, full scan al crecer. Agregar en próxima migración.
 12. **`if admin_id is None` redundante en `app/deps.py`**: con `require: ["sub"]`, PyJWT lanza `MissingRequiredClaimError` antes de llegar a ese check. Inofensivo; limpiar en pasada futura.
 13. **`_DUMMY_HASH` se computa en cada import** (`app/routers/admin.py`): bcrypt con cost factor 12 tarda ~250ms en import-time. Hardcodear un hash pre-computado como constante.
-14. **`NoPriceTranche`, `BookingNotFound`, `SeatNotAvailable` sin handlers registrados** (`app/errors.py`): propagan como 500 genérico. Agregar handlers explícitos con códigos y `detail` semánticos.
+14. **`BookingNotFound`, `SeatNotAvailable` sin handlers registrados** (`app/errors.py`): propagan como 500 genérico. Agregar handlers explícitos con códigos y `detail` semánticos. ~~`NoPriceTranche`~~ resuelto: handler registrado en `app/errors.py` → 500 `"no_price_tranche_available"` (branch `claude/admiring-clarke-n1e1s2`).
 15. **Doble lógica de resolución de tramo activo** (`app/services/pricing.py` y `app/routers/trips.py`): predicado `min_sold <= sold_count < max_sold` duplicado. Extraer función compartida.
 16. **`expire_bookings_job` carga objetos Booking completos** (`tasks/reminders.py`): solo usa `booking.id`. Cambiar a `select(Booking.id)` como los otros dos jobs.
 17. **`Trip` sin índice en `route_id`** (`app/models/trip.py`): Postgres no crea índice automático en FK. Agregar `Index("idx_trips_route_id", "route_id")` en próxima migración.

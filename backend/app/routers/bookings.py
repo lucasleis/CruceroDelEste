@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.deps import get_db
 from app.errors import NotFoundError, PaymentProcessingError, RefundWindowExpiredError, SeatUnavailableError
 from app.models.booking import Booking, BookingStatusEnum
-from app.models.trip import Trip, TripStatusEnum
+from app.models.trip import Route, Trip, TripStatusEnum
 from app.schemas.bookings import (
     BookingCreate,
     BookingCreateResponse,
@@ -20,6 +20,7 @@ from app.schemas.bookings import (
     RefundRequestRead,
 )
 from app.services.booking import (
+    InternationalRouteRequiredError,
     PassengerData,
     create_booking,
     create_refund_request,
@@ -43,7 +44,17 @@ async def create_booking_endpoint(
     booking_in: BookingCreate,
     db: AsyncSession = Depends(get_db),
 ) -> BookingCreateResponse:
-    trip = await db.get(Trip, booking_in.trip_id)
+    result = await db.execute(
+        select(Trip)
+        .options(
+            selectinload(Trip.route).options(
+                selectinload(Route.origin_stop),
+                selectinload(Route.destination_stop),
+            )
+        )
+        .where(Trip.id == booking_in.trip_id)
+    )
+    trip = result.scalar_one_or_none()
     if trip is None:
         raise NotFoundError()
 
@@ -71,7 +82,11 @@ async def create_booking_endpoint(
             booking_in.trip_id,
             booking_in.seat_ids,
             passengers_data,
+            trip.route.origin_stop.country,
+            trip.route.destination_stop.country,
         )
+    except InternationalRouteRequiredError:
+        raise HTTPException(status_code=422, detail="international_route_required")
     except SeatNotAvailable as exc:
         raise SeatUnavailableError(str(exc.seat_id)) from exc
     except NoPriceTranche:

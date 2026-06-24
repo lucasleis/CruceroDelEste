@@ -16,10 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.booking import Booking, BookingStatusEnum, Passenger, RefundRequest
-from app.models.trip import Seat, SeatStatusEnum, SeatTypeEnum
+from app.models.trip import CountryEnum, Seat, SeatStatusEnum, SeatTypeEnum
 from app.services.inventory import mark_seats_sold, reserve_seats
 from app.services.payment import PreferenceItem
 from app.services.pricing import get_current_price
+
+
+class InternationalRouteRequiredError(Exception):
+    pass
 
 
 _SEAT_TYPE_TITLES: dict[SeatTypeEnum, str] = {
@@ -47,7 +51,12 @@ async def create_booking(
     trip_id: UUID,
     seat_ids: list[UUID],
     passengers_data: list[PassengerData],
+    origin_country: CountryEnum,
+    destination_country: CountryEnum,
 ) -> tuple[Booking, list[PreferenceItem]]:
+    if origin_country == destination_country:
+        raise InternationalRouteRequiredError()
+
     provided = {p.seat_id for p in passengers_data}
     missing = set(seat_ids) - provided
     if missing:

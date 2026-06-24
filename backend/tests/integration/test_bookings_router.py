@@ -8,11 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking, BookingStatusEnum, Passenger
 from app.models.trip import (
+    CountryEnum,
     PriceTranche,
     Route,
     Seat,
     SeatStatusEnum,
     SeatTypeEnum,
+    Stop,
     Trip,
     TripStatusEnum,
 )
@@ -22,13 +24,24 @@ from app.models.trip import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+async def _make_stop(
+    db: AsyncSession, name: str, country: CountryEnum
+) -> Stop:
+    stop = Stop(name=name, country=country)
+    db.add(stop)
+    await db.flush()
+    return stop
+
+
 async def _make_scheduled_trip(
     db: AsyncSession,
     *,
     departure_offset_days: int = 1,
     status: TripStatusEnum = TripStatusEnum.scheduled,
 ) -> Trip:
-    route = Route(origin="Buenos Aires", destination="Rosario")
+    origin_stop = await _make_stop(db, "Retiro", CountryEnum.AR)
+    destination_stop = await _make_stop(db, "Asunción", CountryEnum.PY)
+    route = Route(origin_stop_id=origin_stop.id, destination_stop_id=destination_stop.id)
     db.add(route)
     await db.flush()
 
@@ -187,7 +200,9 @@ async def test_post_bookings_cancelled_trip_returns_409(client: AsyncClient, db:
 
 async def test_post_bookings_past_trip_returns_409(client: AsyncClient, db: AsyncSession):
     now = datetime.now(timezone.utc)
-    route = Route(origin="Buenos Aires", destination="Rosario")
+    origin_stop = await _make_stop(db, "Retiro", CountryEnum.AR)
+    destination_stop = await _make_stop(db, "Asunción", CountryEnum.PY)
+    route = Route(origin_stop_id=origin_stop.id, destination_stop_id=destination_stop.id)
     db.add(route)
     await db.flush()
 
@@ -258,6 +273,58 @@ async def test_post_bookings_no_price_tranche_returns_500(
     resp = await client.post("/bookings", json=_booking_payload(trip.id, seat.id))
 
     assert resp.status_code == 500
+
+
+async def test_post_bookings_same_country_returns_422(client: AsyncClient, db: AsyncSession):
+    origin_stop = await _make_stop(db, "Retiro", CountryEnum.AR)
+    destination_stop = await _make_stop(db, "Liniers", CountryEnum.AR)
+    route = Route(origin_stop_id=origin_stop.id, destination_stop_id=destination_stop.id)
+    db.add(route)
+    await db.flush()
+
+    now = datetime.now(timezone.utc)
+    trip = Trip(
+        route_id=route.id,
+        departure_at=now + timedelta(days=1),
+        arrival_at=now + timedelta(days=1, hours=4),
+        status=TripStatusEnum.scheduled,
+    )
+    db.add(trip)
+    await db.flush()
+
+    seat = await _make_seat(db, trip)
+    await _add_tranche(db, trip, SeatTypeEnum.cama)
+
+    resp = await client.post("/bookings", json=_booking_payload(trip.id, seat.id))
+
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "international_route_required"
+
+
+async def test_post_bookings_py_ar_route_accepted(client: AsyncClient, db: AsyncSession):
+    origin_stop = await _make_stop(db, "Asunción", CountryEnum.PY)
+    destination_stop = await _make_stop(db, "Retiro", CountryEnum.AR)
+    route = Route(origin_stop_id=origin_stop.id, destination_stop_id=destination_stop.id)
+    db.add(route)
+    await db.flush()
+
+    now = datetime.now(timezone.utc)
+    trip = Trip(
+        route_id=route.id,
+        departure_at=now + timedelta(days=1),
+        arrival_at=now + timedelta(days=1, hours=17),
+        status=TripStatusEnum.scheduled,
+    )
+    db.add(trip)
+    await db.flush()
+
+    seat = await _make_seat(db, trip)
+    await _add_tranche(db, trip, SeatTypeEnum.cama, price=24500)
+
+    resp = await client.post("/bookings", json=_booking_payload(trip.id, seat.id))
+
+    assert resp.status_code == 201
+    assert resp.json()["status"] == "pending_payment"
 
 
 async def test_post_bookings_mp_failure_returns_502(

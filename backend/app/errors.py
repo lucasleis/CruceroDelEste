@@ -4,6 +4,8 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.services.pricing import NoPriceTranche
+
 
 class SeatUnavailableError(Exception):
     def __init__(self, seat_id: str) -> None:
@@ -107,6 +109,15 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
             content={"detail": "not_found"},
+        )
+
+    @app.exception_handler(NoPriceTranche)
+    async def no_price_tranche_handler(
+        request: Request, exc: NoPriceTranche
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": "no_price_tranche_available"},
         )
 
     @app.exception_handler(500)

@@ -20,6 +20,11 @@ from app.database import Base
 import enum
 
 
+class CountryEnum(str, enum.Enum):
+    AR = "AR"
+    PY = "PY"
+
+
 class SeatTypeEnum(str, enum.Enum):
     cama = "cama"
     semi_cama = "semi_cama"
@@ -37,16 +42,38 @@ class TripStatusEnum(str, enum.Enum):
     cancelled = "cancelled"
 
 
+class Stop(Base):
+    __tablename__ = "stops"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), nullable=False, unique=True)
+    country = Column(Enum(CountryEnum, name="country_code"), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    origin_routes = relationship(
+        "Route",
+        foreign_keys="[Route.origin_stop_id]",
+        back_populates="origin_stop",
+    )
+    destination_routes = relationship(
+        "Route",
+        foreign_keys="[Route.destination_stop_id]",
+        back_populates="destination_stop",
+    )
+
+
 class Route(Base):
     __tablename__ = "routes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    origin = Column(String(100), nullable=False)
-    destination = Column(String(100), nullable=False)
+    origin_stop_id = Column(UUID(as_uuid=True), ForeignKey("stops.id"), nullable=False)
+    destination_stop_id = Column(UUID(as_uuid=True), ForeignKey("stops.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
-    __table_args__ = (UniqueConstraint("origin", "destination"),)
+    __table_args__ = (UniqueConstraint("origin_stop_id", "destination_stop_id"),)
 
+    origin_stop = relationship("Stop", foreign_keys=[origin_stop_id], back_populates="origin_routes")
+    destination_stop = relationship("Stop", foreign_keys=[destination_stop_id], back_populates="destination_routes")
     trips = relationship("Trip", back_populates="route")
 
 

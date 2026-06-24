@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.booking import Booking, BookingStatusEnum, Passenger
-from app.models.trip import Route, Seat, SeatStatusEnum, SeatTypeEnum, Trip, TripStatusEnum
+from app.models.trip import CountryEnum, Route, Seat, SeatStatusEnum, SeatTypeEnum, Stop, Trip, TripStatusEnum
 
 
 # ---------------------------------------------------------------------------
@@ -67,8 +67,13 @@ async def _post_webhook(
 
 
 async def _make_pending_booking(db: AsyncSession) -> Booking:
-    """Insert a Route → Trip → Seat → Booking → Passenger chain."""
-    route = Route(origin="Buenos Aires", destination="Rosario")
+    """Insert a Stop → Stop → Route → Trip → Seat → Booking → Passenger chain."""
+    origin_stop = Stop(name="Retiro", country=CountryEnum.AR)
+    destination_stop = Stop(name="Asunción", country=CountryEnum.PY)
+    db.add(origin_stop)
+    db.add(destination_stop)
+    await db.flush()
+    route = Route(origin_stop_id=origin_stop.id, destination_stop_id=destination_stop.id)
     db.add(route)
     await db.flush()
 
