@@ -95,7 +95,7 @@ async def create_booking_endpoint(
             booking_in.trip_id,
             booking_in.seat_ids,
         )
-        raise HTTPException(status_code=500, detail="internal_server_error")
+        raise
 
     await db.commit()
 

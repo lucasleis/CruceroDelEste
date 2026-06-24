@@ -15,8 +15,6 @@ from sqlalchemy import create_engine as _create_sync_engine
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
-import os
-
 from testcontainers.postgres import PostgresContainer
 
 # Import models so their tables are registered with Base before create_all.
@@ -38,9 +36,6 @@ _TABLES = [
     "admin_users",
 ]
 
-# If TEST_DATABASE_URL is set, skip testcontainers and use it directly.
-_TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
-
 
 # ---------------------------------------------------------------------------
 # Postgres container + async engine  (session-scoped, started once)
@@ -48,19 +43,13 @@ _TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
 @pytest.fixture(scope="session")
 def pg_container():
-    if _TEST_DATABASE_URL:
-        yield None
-    else:
-        with PostgresContainer("postgres:16") as container:
-            yield container
+    with PostgresContainer("postgres:16") as container:
+        yield container
 
 
 @pytest.fixture(scope="session")
 def test_engine(pg_container):
-    if _TEST_DATABASE_URL:
-        sync_url = _TEST_DATABASE_URL
-    else:
-        sync_url = pg_container.get_connection_url()
+    sync_url = pg_container.get_connection_url()
     # testcontainers returns a psycopg2 URL; build both the sync (for
     # metadata.create_all) and async (for test sessions) variants.
     async_url = sync_url.replace(
