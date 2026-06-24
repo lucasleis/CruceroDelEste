@@ -99,6 +99,7 @@ async def _make_pending_booking(db: AsyncSession) -> Booking:
     booking = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.pending_payment,
+        contact_email="buyer@example.com",
         total_amount=24500,
         expires_at=now + timedelta(minutes=15),
     )

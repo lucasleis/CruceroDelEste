@@ -109,6 +109,7 @@ def _booking_payload(trip_id, seat_id, **passenger_overrides) -> dict:
     }
     return {
         "trip_id": str(trip_id),
+        "contact_email": "buyer@example.com",
         "seat_ids": [str(seat_id)],
         "passengers": [passenger],
     }
@@ -123,6 +124,7 @@ async def _make_booking_in_db(db: AsyncSession) -> Booking:
     booking = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.pending_payment,
+        contact_email="buyer@example.com",
         total_amount=24500,
         expires_at=now + timedelta(minutes=15),
     )
@@ -157,6 +159,7 @@ async def test_post_bookings_happy_path_201(client: AsyncClient, db: AsyncSessio
 
     assert data["trip_id"] == str(trip.id)
     assert data["status"] == "pending_payment"
+    assert data["contact_email"] == "buyer@example.com"
     assert data["total_amount"] == 24500
     assert "id" in data
     assert "expires_at" in data
@@ -362,6 +365,7 @@ async def test_get_booking_returns_200_with_correct_shape(
     assert data["id"] == str(booking.id)
     assert data["trip_id"] == str(booking.trip_id)
     assert data["status"] == "pending_payment"
+    assert data["contact_email"] == "buyer@example.com"
     assert data["total_amount"] == 24500
     assert "expires_at" in data
     assert data["confirmed_at"] is None

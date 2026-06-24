@@ -53,6 +53,7 @@ async def create_booking(
     passengers_data: list[PassengerData],
     origin_country: CountryEnum,
     destination_country: CountryEnum,
+    contact_email: str,
 ) -> tuple[Booking, list[PreferenceItem]]:
     if origin_country == destination_country:
         raise InternationalRouteRequiredError()
@@ -78,6 +79,7 @@ async def create_booking(
     booking = Booking(
         trip_id=trip_id,
         status=BookingStatusEnum.pending_payment,
+        contact_email=contact_email,
         total_amount=total_amount,
         expires_at=now + timedelta(minutes=settings.booking_expiry_minutes),
     )

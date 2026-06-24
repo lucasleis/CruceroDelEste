@@ -31,6 +31,7 @@ class PassengerRead(BaseModel):
 
 class BookingCreate(BaseModel):
     trip_id: UUID
+    contact_email: EmailStr = Field(max_length=255)
     seat_ids: list[UUID] = Field(min_length=1)
     passengers: list[PassengerCreate] = Field(min_length=1)
 
@@ -55,6 +56,7 @@ class BookingRead(BaseModel):
     id: UUID
     trip_id: UUID
     status: BookingStatusEnum
+    contact_email: str
     total_amount: int
     expires_at: datetime
     confirmed_at: datetime | None
@@ -81,6 +83,7 @@ class BookingCreateResponse(BaseModel):
     id: UUID
     trip_id: UUID
     status: BookingStatusEnum
+    contact_email: str
     total_amount: int
     expires_at: datetime
     passengers: list[PassengerRead]

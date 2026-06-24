@@ -50,6 +50,7 @@ class AdminBookingRead(BaseModel):
     id: UUID
     trip_id: UUID
     status: BookingStatusEnum
+    contact_email: str
     total_amount: int
     mp_preference_id: str | None
     mp_payment_id: str | None
