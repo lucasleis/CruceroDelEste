@@ -159,7 +159,7 @@ ExpresRioParana/
 │   │   ├── database.py
 │   │   ├── limiter.py           # Instancia global de slowapi Limiter
 │   │   ├── models/
-│   │   │   ├── trip.py          # Route, Trip, Seat, PriceTranche
+│   │   │   ├── trip.py          # Route, Trip, Seat, PriceTranche, Stop, CountryEnum
 │   │   │   ├── booking.py       # Booking, Passenger, AdminUser, RefundRequest
 │   │   │   └── __init__.py
 │   │   ├── schemas/
@@ -190,7 +190,7 @@ ExpresRioParana/
 │   │   │   └── test_schemas.py
 │   │   └── integration/
 │   │       ├── __init__.py
-│   │       ├── conftest.py      # Postgres container + engine + TRUNCATE + AsyncClient
+│   │       ├── conftest.py      # Postgres container + engine + TRUNCATE + AsyncClient; soporta TEST_DATABASE_URL para entornos sin Docker
 │   │       ├── test_pricing.py
 │   │       ├── test_inventory.py
 │   │       ├── test_booking_service.py
@@ -237,23 +237,23 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/database.py` — async engine, sessionmaker, Base, get_db
 - `app/limiter.py` — instancia global de `slowapi.Limiter` con `get_remote_address`
 - `app/deps.py` — get_current_admin con PyJWT (HS256, iss+aud), re-exporta get_db
-- `app/errors.py` — todas las excepciones del proyecto (SeatUnavailableError, NotFoundError, InvalidWebhookSignature, PaymentProcessingError, PaymentConfigError) y register_exception_handlers. `app/exceptions.py` eliminado.
+- `app/errors.py` — todas las excepciones del proyecto (SeatUnavailableError, NotFoundError, InvalidWebhookSignature, PaymentProcessingError, PaymentConfigError, NoPriceTranche) y register_exception_handlers. `NoPriceTranche` → 500 `"no_price_tranche_available"`. `app/exceptions.py` eliminado.
 - `app/services/pricing.py` — get_current_price, NoPriceTranche
 - `app/services/inventory.py` — get_available_seats, reserve_seats, mark_seats_sold
-- `app/services/booking.py` — create_booking, confirm_booking, expire_booking
+- `app/services/booking.py` — create_booking, confirm_booking, expire_booking, InternationalRouteRequiredError
 - `app/services/payment.py` — verify_webhook_signature, get_payment, create_preference
 - `app/routers/payments.py` — POST /webhooks/mercadopago
 - `app/services/email.py` — send_confirmation_email, send_reminder_email, send_feedback_email
 - `templates/email/confirmation.html` + `confirmation.txt`
 - `templates/email/reminder.html` + `reminder.txt`
 - `templates/email/feedback.html` + `feedback.txt`
-- `app/schemas/trips.py` — RouteRead, SeatRead, TripRead
-- `app/schemas/bookings.py` — PassengerCreate, PassengerRead, BookingCreate, BookingRead, BookingCreateResponse
+- `app/schemas/trips.py` — StopRead, RouteRead (nested origin_stop/destination_stop), SeatRead, TripRead
+- `app/schemas/bookings.py` — PassengerCreate, PassengerRead, BookingCreate, BookingRead, BookingCreateResponse, RefundRequestCreate, RefundRequestRead
 - `app/schemas/admin.py` — AdminLoginRequest, AdminLoginResponse, PriceTrancheCreate, PriceTrancheRead, AdminBookingRead
-- `app/routers/trips.py` — GET /trips, GET /trips/{id}/seats
-- `app/routers/bookings.py` — POST /bookings, GET /bookings/{id}
-- `app/routers/admin.py` — POST /admin/login (con rate limiting 10/min), GET /admin/bookings, GET/POST/DELETE /admin/trips/{id}/price-tranches
-- `app/main.py` — FastAPI con lifespan, slowapi middleware, exception handlers, routers
+- `app/routers/trips.py` — GET /trips, GET /trips/{id}/seats, GET /stops, GET /stops/{id}/valid-destinations
+- `app/routers/bookings.py` — POST /bookings (con validación AR↔PY), GET /bookings/{id}, POST /bookings/{id}/refund-request
+- `app/routers/admin.py` — POST /admin/login (con rate limiting 10/min), GET /admin/bookings, GET/POST/DELETE /admin/trips/{id}/price-tranches, GET /admin/refund-requests
+- `app/main.py` — FastAPI con lifespan, slowapi middleware, exception handlers, routers (incluye stops_router)
 - `tasks/__init__.py` — vacío
 - `tasks/reminders.py` — AsyncIOScheduler, SQLAlchemyJobStore, tres jobs
 - `pyproject.toml` — dependencias (incluye slowapi>=0.1.9), hatchling, pytest config con env vars fake
@@ -265,72 +265,45 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `tests/unit/test_payment_signature.py` — 14 tests de verify_webhook_signature
 - `tests/unit/test_schemas.py` — 27 tests de BookingCreate y PriceTrancheCreate
 - `tests/integration/__init__.py` — vacío
-- `tests/integration/conftest.py` — PostgresContainer, sync engine para create_all, TRUNCATE autouse, AsyncSession, AsyncClient con override get_db, mock autouse SDK MercadoPago
-- `tests/integration/test_pricing.py` — 8 tests de get_current_price
-- `tests/integration/test_inventory.py` — 16 tests de reserve_seats, release_expired_reservations, mark_seats_sold
-- `tests/integration/test_booking_service.py` — 9 tests de create_booking, confirm_booking, expire_booking
-- `tests/integration/test_trips_router.py` — 14 tests: GET /trips (lista vacía, shape, filtros origin/destination/fecha, exclusión pasados/cancelados, conteo disponibles) y GET /trips/{id}/seats (404, lista vacía, shape, filtros tipo/estado, orden)
-- `tests/integration/test_bookings_router.py` — 11 tests: POST /bookings (201 shape, 404 trip, 409 trip_not_available por status y fecha, 409 seat_unavailable reserved/sold/inexistente, 500 sin tramo, 502 MP) y GET /bookings/{id} (200 shape, 404)
-- `tests/integration/test_payments_router.py` — 12 tests: firma inválida, booking not found, idempotencia (con `expire_all()` antes del assert final), happy path con verificación DB, payment no-approved (pending/rejected), MP API error 500, malformed payload, firma con x-request-id
-- `tests/integration/test_admin_router.py` — 24 tests: POST /admin/login (credenciales válidas/inválidas, token, rate limit 429), auth compartida (403 sin header, 401 token inválido), GET /admin/bookings (shape, filtros status/trip_id), GET/POST/DELETE /admin/trips/{id}/price-tranches (shape, orden, 409 overlap, adyacentes no conflictúan, seat_type diferente no conflictúa, 204 sin body, tranche de otro trip → 404)
+- `tests/integration/conftest.py` — PostgresContainer con fallback a `TEST_DATABASE_URL` para entornos sin Docker; sync engine para create_all; TRUNCATE autouse (incluye `stops`); AsyncSession; AsyncClient con override get_db; mock autouse SDK MercadoPago
+- `tests/integration/test_pricing.py` — 8 tests de get_current_price (fixtures actualizados a rutas AR↔PY)
+- `tests/integration/test_inventory.py` — 16 tests de reserve_seats, mark_seats_sold (fixtures actualizados a rutas AR↔PY)
+- `tests/integration/test_booking_service.py` — 10 tests: create_booking, confirm_booking, expire_booking + test_create_booking_same_country_raises
+- `tests/integration/test_trips_router.py` — 20 tests: GET /trips, GET /trips/{id}/seats, GET /stops, GET /stops/{id}/valid-destinations
+- `tests/integration/test_bookings_router.py` — 13 tests: POST /bookings (incluye 422 mismo país, PY→AR aceptada), GET /bookings/{id}
+- `tests/integration/test_payments_router.py` — 12 tests (fixtures actualizados a rutas AR↔PY)
+- `tests/integration/test_admin_router.py` — 24 tests (fixtures actualizados a rutas AR↔PY)
+- `tests/integration/test_refund_requests.py` — 9 tests (fixtures actualizados a rutas AR↔PY)
 - `migrations/versions/c9d4e2f1_add_refunded_and_refund_requests.py` — `ALTER TYPE booking_status ADD VALUE IF NOT EXISTS 'refunded'`; tabla `refund_requests` con FK a bookings, índice en booking_id
-- `app/models/booking.py` — `refunded` agregado a `BookingStatusEnum`; modelo `RefundRequest`; relación `refund_requests` en `Booking`
-- `app/models/__init__.py` — exporta `RefundRequest`
-- `app/schemas/bookings.py` — `RefundRequestCreate` (email), `RefundRequestRead`
-- `app/errors.py` — `RefundWindowExpiredError` con `refund_request_id`; handler → 422 `{detail, refund_request_id}`
-- `app/services/booking.py` — `create_refund_request` (flush para obtener ID), `mark_booking_refunded` (guard idempotente)
-- `app/services/payment.py` — `create_refund`: llama `sdk.payment().refunds()`, `PaymentProcessingError` si no 200/201
-- `app/routers/bookings.py` — `POST /bookings/{id}/refund-request`: persist-first (commit #1), valida ventana legal (10 días desde `confirmed_at` Y >24hs antes de `departure_at`), 422 si expirada o llama a MercadoPago + commit #2
-- `tests/integration/conftest.py` — `refund_requests` en `_TABLES` (primero, hija de bookings), mock default `payment().refunds()` → 201
-- `tests/integration/test_refund_requests.py` — 9 tests: happy path, window expired por 10 días, window expired por <24hs a la salida, 404, 409 × 3 estados, 422 email, 502 MP
-
-### Completado (branch `claude/admiring-clarke-n1e1s2`)
-
-- `migrations/versions/b7c3a1d2_add_stops_table.py` — ENUM `country_code` (AR/PY); tabla `stops` (id, name unique, country, created_at); refactor de `routes`: columnas `origin`/`destination` reemplazadas por FK `origin_stop_id`/`destination_stop_id`; índices y UniqueConstraint actualizados.
-- `app/models/trip.py` — `CountryEnum` (AR/PY), modelo `Stop` con relaciones `origin_routes`/`destination_routes`; `Route` refactorizado a FKs `origin_stop_id`/`destination_stop_id` con relationships.
-- `app/models/__init__.py` — exporta `Stop` y `CountryEnum`.
-- `app/schemas/trips.py` — `StopRead` (id, name, country); `RouteRead` actualizado a nested `origin_stop`/`destination_stop` de tipo `StopRead`.
-- `app/services/booking.py` — `InternationalRouteRequiredError` (excepción de dominio, sin handler global); `create_booking` recibe `origin_country`/`destination_country` y valida AR↔PY.
-- `app/routers/trips.py` — selectinload chain para cargar stops; filtros por nombre de stop (string-based); nuevo `stops_router` con `GET /stops` y `GET /stops/{stop_id}/valid-destinations`.
-- `app/routers/bookings.py` — carga trip con selectinload de stops; pasa países al service; captura `InternationalRouteRequiredError` → 422; `NoPriceTranche` re-raise convertido a `HTTPException(500)` explícito.
-- `app/main.py` — registra `stops_router`.
-- `tests/integration/conftest.py` — `stops` agregado a `_TABLES`; soporte `TEST_DATABASE_URL` para entornos sin Docker.
-- `tests/integration/test_trips_router.py` — reescrito: helpers con get-or-create stops; asserts actualizados a `route["origin_stop"]["name"]`; 6 tests nuevos de `/stops` y `/stops/{id}/valid-destinations`.
-- `tests/integration/test_bookings_router.py` — fixtures actualizados a rutas AR↔PY; 2 tests nuevos (422 mismo país, PY→AR aceptada).
-- `tests/integration/test_booking_service.py` — fixtures actualizados; test nuevo `test_create_booking_same_country_raises`.
-- `tests/integration/test_payments_router.py` — fixtures actualizados a rutas AR↔PY.
-- `tests/integration/test_admin_router.py` — fixtures actualizados a rutas AR↔PY.
-- `tests/integration/test_refund_requests.py` — fixtures actualizados a rutas AR↔PY.
-- `tests/integration/test_pricing.py` — fixtures actualizados a rutas AR↔PY.
-- `tests/integration/test_inventory.py` — fixtures actualizados a rutas AR↔PY; segunda ruta en test de trip-cross-check usa stops distintos.
+- `migrations/versions/b7c3a1d2_add_stops_table.py` — ENUM `country_code` (AR/PY); tabla `stops` (id, name unique, country, created_at); refactor de `routes`: columnas `origin`/`destination` reemplazadas por FK `origin_stop_id`/`destination_stop_id`; índices y UniqueConstraint actualizados
+- `app/models/trip.py` — `CountryEnum` (AR/PY), modelo `Stop` con relaciones `origin_routes`/`destination_routes`; `Route` refactorizado a FKs `origin_stop_id`/`destination_stop_id` con relationships
+- `app/models/__init__.py` — exporta `Stop`, `CountryEnum`, `RefundRequest`
 
 ### Bugs críticos resueltos (branch `claude/vibrant-cori-71dm2`)
 
 - ✅ **Bug 1 — Race `expire_bookings_job` vs webhook** (`app/services/booking.py`) — guard en `expire_booking`: retorna early si `status != pending_payment`, dentro del lock `FOR UPDATE`.
-- ✅ **Bug 2 — Email de confirmación nunca se enviaba** (`app/routers/payments.py`) — Step 12 implementado: re-fetch post-commit con `selectinload(Booking.passengers → Passenger.seat)` y `selectinload(Booking.trip → Trip.route)`, llamada a `send_confirmation_email`, `EmailDeliveryError` capturado con WARNING.
+- ✅ **Bug 2 — Email de confirmación nunca se enviaba** (`app/routers/payments.py`) — Step 12 implementado: re-fetch post-commit con selectinload, llamada a `send_confirmation_email`, `EmailDeliveryError` capturado con WARNING.
 - ✅ **Bug 3 — `datetime.utcnow` deprecated** (`app/models/trip.py`, `app/models/booking.py`) — 7 ocurrencias reemplazadas por `default=lambda: datetime.now(timezone.utc)`.
-- ✅ **Bug 4 — JWT sin `require exp`** (`app/deps.py`) — `options={"require": ["exp", "sub"]}` agregado a `jwt.decode`. Tokens sin `exp` o sin `sub` rechazados con 401.
+- ✅ **Bug 4 — JWT sin `require exp`** (`app/deps.py`) — `options={"require": ["exp", "sub"]}` agregado a `jwt.decode`.
 
 ### Bugs críticos resueltos (branch `claude/inspiring-edison-WJqep`)
 
-- ✅ **Bug [1.1] — Orphan de preferencia MP cuando `db.commit()` falla** (`app/routers/bookings.py`) — `await db.commit()` movido a antes de `create_preference`; bloque `except PaymentProcessingError` extendido con `expire_booking(db, booking.id)` + `await db.commit()` para liberar seats en caso de fallo de MP; `expire_booking` agregado al import de `app.services.booking`.
-- ✅ **Bug [1.2] — Email de confirmación nunca se reenvía tras retry de MP** (`app/routers/payments.py`) — `except EmailDeliveryError` reemplazado por `except Exception` en Step 12; el mensaje de log actualizado a `error=%s`.
-- ✅ **Bug [1.3] — Webhook: `data_id` y `payment_id` no se cross-checkean** (`app/routers/payments.py`) — validación `if payment_id != data_id` agregada dentro del try de Step 5, antes de Step 6; retorna `_IGN_MALFORMED` si difieren. Import de `EmailDeliveryError` eliminado (quedó muerto tras el fix).
-- ✅ **Bug [1.4] — Race en creación concurrente de price tranches sin filas previas** (`app/routers/admin.py`) — `pg_advisory_xact_lock(hashtext(:key))` insertado después del 404-check y antes del SELECT `with_for_update()`, serializando escrituras concurrentes por `trip_id`.
-- ✅ **Bug [1.5] — `release_expired_reservations` libera seats sin marcar booking como `expired`** (`app/services/inventory.py`) — función eliminada completamente; imports `timedelta` y `settings` también eliminados.
-- ✅ **Bug [1.6] — `confirm_booking` no valida estado previo** (`app/services/booking.py`) — guard `if booking.status != pending_payment: return booking` agregado después de `_get_booking`, simétrico al de `expire_booking`.
-- ✅ **Bug [1.7] — `reserve_seats` reporta `seat_ids[0]` en contención de lock** (`app/services/inventory.py`) — `except OperationalError` ahora filtra por `pgcode == '55P03'`; cualquier otro `OperationalError` se propaga con `raise` desnudo.
+- ✅ **Bug [1.1] — Orphan de preferencia MP cuando `db.commit()` falla** (`app/routers/bookings.py`)
+- ✅ **Bug [1.2] — Email de confirmación nunca se reenvía tras retry de MP** (`app/routers/payments.py`)
+- ✅ **Bug [1.3] — Webhook: `data_id` y `payment_id` no se cross-checkean** (`app/routers/payments.py`)
+- ✅ **Bug [1.4] — Race en creación concurrente de price tranches sin filas previas** (`app/routers/admin.py`)
+- ✅ **Bug [1.5] — `release_expired_reservations` libera seats sin marcar booking como `expired`** (`app/services/inventory.py`)
+- ✅ **Bug [1.6] — `confirm_booking` no valida estado previo** (`app/services/booking.py`)
+- ✅ **Bug [1.7] — `reserve_seats` reporta `seat_ids[0]` en contención de lock** (`app/services/inventory.py`)
 
 ### Fixes de seguridad resueltos (branch `claude/determined-bardeen-xTt1N`)
 
-- ✅ **[2.2] — Rate limiting en `POST /admin/login`** (`app/routers/admin.py`, `app/main.py`, `app/limiter.py`, `pyproject.toml`) — slowapi agregado como dependencia; `app/limiter.py` creado como módulo independiente para evitar import circular; endpoint decorado con `@limiter.limit("10/minute")`; handler `RateLimitExceeded` registrado en `main.py`; test `test_login_rate_limit_blocks_after_10_attempts` agregado a `test_admin_router.py`.
-- ✅ **[2.3] — JWT sin `iss`/`aud`** (`app/routers/admin.py`, `app/deps.py`) — payload de `jwt.encode` incluye `iss="crucero-admin"` y `aud="crucero-admin-api"`; `jwt.decode` valida `audience`, `issuer` y requiere `["exp", "sub", "iss", "aud"]`.
+- ✅ **[2.2] — Rate limiting en `POST /admin/login`** — slowapi, `@limiter.limit("10/minute")`, handler `RateLimitExceeded`.
+- ✅ **[2.3] — JWT sin `iss`/`aud`** — `iss="crucero-admin"`, `aud="crucero-admin-api"` en encode y decode.
 
 > ⚠️ Los valores `"crucero-admin"` y `"crucero-admin-api"` en los claims JWT deberán actualizarse a los valores correspondientes de Expreso Río Paraná cuando se defina el nombre final del sistema.
 
 ### Próximo a implementar
-
-No hay módulos pendientes definidos actualmente.
 
 ---
 
@@ -370,29 +343,31 @@ Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipa
 ## Deuda técnica conocida
 
 1. **`Booking` sin `buyer_email`**: resolver con `contact_email` al implementar gestión avanzada de reservas — requiere migración.
-2. **`send_reminder_email` / `send_feedback_email` retornan `None`**: cambiar firma a `-> bool`; solo flaggear `sent=True` cuando el envío fue exitoso (hoy se marca `True` aunque todos los envíos fallen).
+2. **`send_reminder_email` / `send_feedback_email` retornan `None`**: cambiar firma a `-> bool`; solo flaggear `sent=True` cuando el envío fue exitoso.
 3. **`selectinload` obligatorio para `email.py`**: cargar `booking.passengers`, `booking.trip`, `booking.trip.route`, `passenger.seat` antes de llamar a cualquier `send_*`.
-4. ✅ **Idempotencia de emails de confirmación — RESUELTO**: guard en `app/routers/payments.py:120-122` — `if booking.status == BookingStatusEnum.confirmed: return JSONResponse(_OK)` — antes de step 11 (`confirm_booking`) y step 12 (`send_confirmation_email`). Un segundo webhook para el mismo booking retorna en step 10 sin confirmar ni enviar email. Cubierto por `test_webhook_idempotency_two_posts_confirm_booking_once` (`tests/integration/test_payments_router.py`): verifica estado en DB y que `mp_payment_id` no se sobreescribe; la garantía de no-reenvío de email es estructural (el return en step 10 nunca alcanza step 12).
-5. **`create_booking()` no retorna desglose de precios por tipo**: workaround en router via `get_current_price()` — genera N+1 queries. Fix: retornar `(booking, prices_by_type)` desde el service.
-6. **`SeatNotAvailable` vs `SeatUnavailableError`**: dos excepciones casi homónimas. Unificar en pasada futura.
+4. ✅ **Idempotencia de emails de confirmación — RESUELTO**: guard en `app/routers/payments.py:120-122`.
+5. **`create_booking()` no retorna desglose de precios por tipo**: workaround en router via `get_current_price()` — genera N+1 queries.
+6. **`SeatNotAvailable` vs `SeatUnavailableError`**: dos excepciones casi homónimas. Unificar antes de resolver deuda #14 restante (LLE-65).
 7. **`GET /admin/bookings` sin paginación**: LIMIT 500 hardcodeado. Agregar cuando el volumen lo requiera.
 8. **Known gap en tests**: desglose por tipo de asiento en `create_booking` no validado. Comentario en `test_booking_service.py`: `# KNOWN GAP: seat type breakdown not validated — see CLAUDE.md`
-9. **`DELETE /admin/trips/{id}/price-tranches/{id}` sin validación de uso activo**: admin puede borrar el tramo que cubre el `sold_count` actual, dejando el trip sin precio vigente. Fix: rechazar con 409 si el tramo cubre el sold_count vigente.
-10. **CORS ausente en `app/main.py`**: agregar `CORSMiddleware` antes de conectar el frontend. Orígenes permitidos a definir con el cliente.
-11. **Índice compuesto faltante en `Trip(status, departure_at)`**: `GET /trips` filtra y ordena por ambos. Sin índice, full scan al crecer. Agregar en próxima migración.
-12. **`if admin_id is None` redundante en `app/deps.py`**: con `require: ["sub"]`, PyJWT lanza `MissingRequiredClaimError` antes de llegar a ese check. Inofensivo; limpiar en pasada futura.
-13. **`_DUMMY_HASH` se computa en cada import** (`app/routers/admin.py`): bcrypt con cost factor 12 tarda ~250ms en import-time. Hardcodear un hash pre-computado como constante.
-14. **`BookingNotFound`, `SeatNotAvailable` sin handlers registrados** (`app/errors.py`): propagan como 500 genérico. Agregar handlers explícitos con códigos y `detail` semánticos. ~~`NoPriceTranche`~~ resuelto: handler registrado en `app/errors.py` → 500 `"no_price_tranche_available"` (branch `claude/admiring-clarke-n1e1s2`).
-15. **Doble lógica de resolución de tramo activo** (`app/services/pricing.py` y `app/routers/trips.py`): predicado `min_sold <= sold_count < max_sold` duplicado. Extraer función compartida.
-16. **`expire_bookings_job` carga objetos Booking completos** (`tasks/reminders.py`): solo usa `booking.id`. Cambiar a `select(Booking.id)` como los otros dos jobs.
-17. **`Trip` sin índice en `route_id`** (`app/models/trip.py`): Postgres no crea índice automático en FK. Agregar `Index("idx_trips_route_id", "route_id")` en próxima migración.
-18. **`GET /bookings/{booking_id}` expone PII sin autenticación** (`app/routers/bookings.py`): retorna DNI/email/teléfono de pasajeros. Posible incumplimiento Ley 25.326. Evaluar vista mínima o verificación por email/DNI. **Alcance adicional (LLE-40)**: el campo `status` también se expone — cualquiera que conozca el `booking_id` puede determinar si una compra fue reembolsada (`status: "refunded"`). El scope de #035 (LLE-56, Sem 9) debe contemplar tanto los campos de PII de pasajeros como la visibilidad del estado de la reserva.
-19. **`test_login_rate_limit_blocks_after_10_attempts` es frágil ante orden de ejecución** (`tests/integration/test_admin_router.py`): slowapi usa contadores en memoria compartida por proceso. Si se agregan tests de login antes de este en el mismo módulo, el contador puede acumularse y disparar el 429 antes de los 10 intentos previstos. El test debe permanecer al final del archivo y ser el único que dispara 10+ requests a `/admin/login`.
-20. **`BookingCreate._passengers_match_seats` valida orden pero `create_booking` también** — verificación duplicada entre schema y service. Inofensivo; unificar en pasada futura dejando la validación solo en el service.
-21. **Validación AR↔PY no cubierta por tests**: la lógica de filtrado de paradas por país necesita tests de integración específicos una vez implementada en el router/service correspondiente.
-22. **Claims JWT con nombre "crucero-admin"**: los valores `iss` y `aud` en los tokens JWT todavía usan el nombre del proyecto anterior. Actualizar cuando se defina el nombre final del sistema.
-23. **`RefundRequest.id` — asimetría entre default Python y server_default DB** (`app/models/booking.py:96`, `migrations/versions/c9d4e2f1`): el modelo declara `default=uuid.uuid4` (sin `server_default`); la migración crea la columna con `server_default=gen_random_uuid()`. Fuente de verdad: Python. El `server_default` en la DB es letra muerta en todos los flujos conocidos — el único camino de creación es `create_refund_request()` en `app/services/booking.py` vía ORM. No remover el `server_default` de la DB para no generar una migración innecesaria. **Restricción**: cualquier INSERT directo futuro en `refund_requests` (scripts de seed, migraciones de datos) debe generar el `id` explícitamente — no puede depender del `server_default` como fallback porque el modelo ORM no lo declara y SQLAlchemy no lo usará.
-24. **Race condition en `create_refund_request_endpoint`**: si dos requests concurrentes llegan para el mismo `booking_id`, ambos pasan la validación `status == confirmed` y persisten su propio `RefundRequest` (ambos con `window_valid=True`) antes de que `mark_booking_refunded` tome el lock `FOR UPDATE`. El primero en tomar el lock ejecuta `create_refund` contra MercadoPago; el segundo encuentra `status != confirmed` en el guard y no llama a `create_refund`. Resultado: dos filas en `refund_requests` (ambas válidas), pero un solo reembolso real ejecutado. Aceptable para el MVP — bajo volumen y bajísima probabilidad de dos solicitudes simultáneas para la misma booking. Si se quiere prevenir el doble registro, habría que mover el lock `FOR UPDATE` a *antes* del primer commit (persist del `RefundRequest`), lo cual requiere repensar la transacción (hoy son dos commits separados).
+9. **`DELETE /admin/trips/{id}/price-tranches/{id}` sin validación de uso activo**: admin puede borrar el tramo que cubre el `sold_count` actual. Fix: rechazar con 409.
+10. **CORS ausente en `app/main.py`**: agregar `CORSMiddleware` antes de conectar el frontend. Orígenes a definir con el cliente.
+11. **Índice compuesto faltante en `Trip(status, departure_at)`**: agregar en próxima migración.
+12. **`if admin_id is None` redundante en `app/deps.py`**: inofensivo; limpiar en pasada futura.
+13. **`_DUMMY_HASH` se computa en cada import** (`app/routers/admin.py`): bcrypt ~250ms en import-time. Hardcodear un hash pre-computado.
+14. **`BookingNotFound` y `SeatNotAvailable` sin handlers registrados** (`app/errors.py`): propagan como 500 genérico (LLE-65). ~~`NoPriceTranche`~~ resuelto: handler registrado → 500 `"no_price_tranche_available"`.
+15. **Doble lógica de resolución de tramo activo** (`app/services/pricing.py` y `app/routers/trips.py`): extraer función compartida.
+16. **`expire_bookings_job` carga objetos Booking completos** (`tasks/reminders.py`): cambiar a `select(Booking.id)`.
+17. **`Trip` sin índice en `route_id`**: agregar `Index("idx_trips_route_id", "route_id")` en próxima migración.
+18. **`GET /bookings/{booking_id}` expone PII sin autenticación**: posible incumplimiento Ley 25.326. Scope de LLE-56 (#035) contempla PII de pasajeros y visibilidad del campo `status`.
+19. **`test_login_rate_limit_blocks_after_10_attempts` es frágil ante orden de ejecución**: debe permanecer al final de `test_admin_router.py`.
+20. **`BookingCreate._passengers_match_seats` valida orden pero `create_booking` también**: verificación duplicada. Unificar en pasada futura.
+21. ✅ **Validación AR↔PY cubierta por tests — RESUELTO**: tests implementados en `test_bookings_router.py` y `test_booking_service.py` (branch `claude/admiring-clarke-n1e1s2`).
+22. **Claims JWT con nombre "crucero-admin"**: actualizar cuando se defina el nombre final del sistema.
+23. **`RefundRequest.id` — asimetría entre default Python y server_default DB**: cualquier INSERT directo futuro en `refund_requests` debe generar el `id` explícitamente.
+24. **Race condition en `create_refund_request_endpoint`**: dos requests concurrentes pueden generar dos filas en `refund_requests` pero un solo reembolso. Aceptable para el MVP.
+25. **`HTTP_422_UNPROCESSABLE_ENTITY` deprecada en Starlette 1.3** (`app/errors.py`): reemplazar por `HTTP_422_UNPROCESSABLE_CONTENT` (LLE-64). Sin impacto en producción, genera warnings en tests.
+26. **`TEST_DATABASE_URL` en conftest** (`tests/integration/conftest.py`): al configurar CI/CD, asegurarse de que esta variable no esté seteada en entornos de producción o staging. Documentar en `.env.example` (LLE-66).
 
 ---
 
@@ -400,45 +375,39 @@ Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipa
 
 ### #012 — Tabla `stops` y lógica AR↔PY
 
-- **Tabla `stops` separada de `Route`** (confirmado 14/06): no agregar campo `country` a `Route`. La entidad `Stop` es independiente y soporta el sistema de multi-paradas futuro.
-- **La relación exacta entre `Stop`, `Route` y `Trip`** debe ser propuesta por Claude Code en el protocolo de decisiones y aprobada antes de implementar. No asumir el diseño.
-- **Validación en backend obligatoria**: `POST /bookings` debe rechazar con 422 `international_route_required` si origen y destino son del mismo país. Esta es la única validación que cuenta desde el punto de vista legal — la validación de frontend es solo UX.
-- **Fixtures de tests afectados**: `test_bookings_router.py`, `test_booking_service.py` y `test_payments_router.py` usan `Route(origin="Buenos Aires", destination="Rosario")` — ruta doméstica AR→AR que se vuelve inválida. Actualizar todos a rutas AR↔PY válidas al implementar este módulo.
-- **Migración Alembic obligatoria** siguiendo el patrón de `migrations/versions/`.
+- **Tabla `stops` separada de `Route`** (confirmado 14/06).
+- **`Stop` global, `Route` usa FKs `origin_stop_id` / `destination_stop_id`**: columnas string `origin`/`destination` eliminadas de `routes`.
+- **`RouteRead` expone `origin_stop: StopRead` y `destination_stop: StopRead`**: el frontend necesita `country` para el filtrado dinámico.
+- **`CountryEnum` en `app/models/trip.py`**: valores `AR` y `PY`. Tipo Postgres: `country_code`.
+- **Validación AR↔PY en `app/services/booking.py`**: `InternationalRouteRequiredError` (excepción de dominio, sin handler global). El router carga las relaciones, pasa `origin_country`/`destination_country` al service, captura la excepción y devuelve 422 `international_route_required`.
+- **`GET /trips` mantiene filtros string** (`origin`, `destination`): filtran contra `Stop.name` via join. Contrato del endpoint no cambiado.
+- **`GET /stops/{stop_id}/valid-destinations`**: 200 lista | 404 `not_found` si el stop no existe | lista vacía si no hay destinos del país opuesto.
+- **Migración Alembic atómica** (`b7c3a1d2`).
 
 ### Tests — arquitectura de la suite
 
 **Scope split:**
-- Unit tests: funciones puras sin DB — `verify_webhook_signature` y validadores Pydantic.
+- Unit tests: funciones puras sin DB.
 - Integration tests: todo lo que toca SQLAlchemy corre contra Postgres real via testcontainers.
 
 **DB strategy:**
-- Un contenedor Postgres por sesión de pytest (scope=`session`).
+- Un contenedor Postgres por sesión de pytest (scope=`session`). Fallback a `TEST_DATABASE_URL` si Docker no está disponible.
 - Tablas creadas con `Base.metadata.create_all` via sync engine.
-- Entre tests: `TRUNCATE passengers, bookings, seats, price_tranches, trips, routes, admin_users RESTART IDENTITY CASCADE`. No usar rollback — los routers hacen `await db.commit()` explícito.
+- Entre tests: `TRUNCATE stops, passengers, bookings, seats, price_tranches, trips, routes, admin_users RESTART IDENTITY CASCADE`.
 
 **conftest split:**
-- `tests/conftest.py`: solo mock autouse de Resend. Sin imports de app, sin DB.
-- `tests/integration/conftest.py`: container, engine, sesión, AsyncClient con override get_db, mock autouse SDK MercadoPago.
+- `tests/conftest.py`: solo mock autouse de Resend.
+- `tests/integration/conftest.py`: container con fallback TEST_DATABASE_URL, engine, sesión, AsyncClient, mock autouse SDK MercadoPago.
 
 **Mock del SDK MercadoPago:**
 - `patch("app.services.payment._sdk", mock_sdk)` en `tests/integration/conftest.py`.
-- Default del mock: `preference.create` devuelve `{"status": 201, "response": {"id": "fake-preference-id", "init_point": "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=fake"}}`.
-- Default del mock: `payment.get` devuelve `{"status": 200, "response": {"id": 123456789, "status": "approved", "external_reference": None, "transaction_amount": 24500.0}}`.
-- Default del mock: `payment().refunds` devuelve `{"status": 201, "response": {"id": 12345678}}`.
-- Tests de webhook que necesiten `external_reference` específico sobreescriben `mock_mp_sdk.payment.return_value.get.return_value` completo antes del POST.
+- Default: `preference.create` → `{"status": 201, "response": {"id": "fake-preference-id", "init_point": "https://..."}}`.
+- Default: `payment.get` → `{"status": 200, "response": {"id": 123456789, "status": "approved", "external_reference": None, "transaction_amount": 24500.0}}`.
+- Default: `payment().refunds` → `{"status": 201, "response": {"id": 12345678}}`.
 
-**Patrón identity map en tests de integración:**
-- Después de cualquier POST que haga `db.commit()` en el router, agregar `await db.expire_all()` antes del `select()` final en el test. Sin esto, SQLAlchemy puede devolver el objeto cacheado en lugar del estado real post-commit.
+**Patrón identity map:** después de cualquier POST que haga `db.commit()`, agregar `await db.expire_all()` antes del `select()` final.
 
-**Casos obligatorios en test_payments_router.py (ya implementados):**
-- Webhook con firma inválida → 200 `{"status": "ignored", "reason": "invalid_signature"}`
-- Webhook con `payment_id` desconocido → 200 `{"status": "ignored", "reason": "booking_not_found"}`
-- Idempotencia: dos POSTs consecutivos con el mismo `payment_id` → exactamente una booking confirmada.
-
-**Pricing — confirmación de alcance (14/06)**
-- El ajuste manual de precios por parte del cliente ("a mano, según demanda/competencia") se resuelve completamente con el modelo y endpoints ya implementados: el admin edita los PriceTranche de un trip puntual vía POST/DELETE /admin/trips/{id}/price-tranches. No se requiere override de precio fijo por trip ni cambios al schema.
-- Si en el futuro el cliente pide reglas automáticas (ej. ajuste por proximidad a la fecha del viaje independiente del sold_count), se evalúa como módulo nuevo extendiendo estos endpoints — no implementar preventivamente.
+**Pricing — confirmación de alcance (14/06):** el ajuste manual de precios se resuelve con los endpoints ya implementados. No se requiere override de precio fijo por trip ni cambios al schema.
 
 ### app/services/payment.py — verify_webhook_signature
 
@@ -446,8 +415,6 @@ Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipa
 manifest = "id:{data_id.lower()};[request-id:{x_request_id};]ts:{ts};"
 ```
 
-- `data_id` lowercase antes de insertar en manifest
-- Si `x_request_id` es None o vacío: omitir del manifest
 - `data_id` de `request.query_params["data.id"]` — NUNCA del body
 - `hmac.compare_digest` (timing-safe) — no modificar
 - Ventana de replay: 120s pasado, 600s futuro
@@ -460,7 +427,6 @@ manifest = "id:{data_id.lower()};[request-id:{x_request_id};]ts:{ts};"
 ### app/services/payment.py — create_refund
 
 - `create_refund(mp_payment_id)`: llama a `sdk.payment().refunds(mp_payment_id, {}, _REQUEST_OPTIONS)`. Si `status` no está en `(200, 201)`, levanta `PaymentProcessingError`.
-- El caller (`app/routers/bookings.py`) es responsable de actualizar el estado de la booking después de un retorno exitoso.
 
 ### app/services/email.py
 
@@ -469,9 +435,8 @@ manifest = "id:{data_id.lower()};[request-id:{x_request_id};]ts:{ts};"
 | FROM | `no-reply@expresorioparana.com` |
 | Destinatarios | Un email por pasajero — iterar `booking.passengers` |
 | Templates | HTML + txt, Jinja2 con `StrictUndefined` |
-| `EmailDeliveryError` | Definida en `email.py` |
 
-- `send_confirmation_email`: 3 intentos por pasajero, itera todos aunque alguno falle, lanza `EmailDeliveryError` si hay fallos.
+- `send_confirmation_email`: 3 intentos por pasajero, lanza `EmailDeliveryError` si hay fallos.
 - `send_reminder_email` / `send_feedback_email`: log WARNING por fallo, nunca relanzar.
 
 ### app/routers/payments.py — Contrato HTTP del webhook
@@ -486,81 +451,63 @@ manifest = "id:{data_id.lower()};[request-id:{x_request_id};]ts:{ts};"
 
 **NUNCA devolver 4xx.**
 
-Orden obligatorio: extraer data_id → x_request_id → verify_signature → parsear body → get_payment → check approved → SELECT FOR UPDATE booking → check confirmed → confirm_booking → return ok.
-
 ### app/routers/trips.py
 
-- GET /trips: filtros opcionales `origin`, `destination`, `departure_date`; implícitos `status==scheduled`, `departure_at>=now()`; orden `departure_at ASC`; counts y precios en queries únicas sin N+1.
-- GET /trips/{id}/seats: filtros opcionales `seat_type`, `status`; 404 si trip inexistente (`{"detail": "not_found"}`); lista vacía si sin asientos; response `list[SeatRead]` plano; orden `seat_number ASC`.
+- GET /trips: filtros opcionales `origin`, `destination` (strings, filtran contra `Stop.name`), `departure_date`; implícitos `status==scheduled`, `departure_at>=now()`; orden `departure_at ASC`.
+- GET /trips/{id}/seats: filtros opcionales `seat_type`, `status`; 404 si trip inexistente; orden `seat_number ASC`.
+- GET /stops: devuelve todas las paradas con id, name, country.
+- GET /stops/{stop_id}/valid-destinations: paradas del país opuesto; 404 si stop no existe; lista vacía si no hay destinos válidos.
 
 ### app/routers/bookings.py
 
-- POST /bookings: 404 trip inexistente, 409 `trip_not_available` (cancelado o pasado), 409 `seat_unavailable` con `seat_id` (seat no disponible o no pertenece al trip), 500 sin tramo de precio, 502 `payment_gateway_error` error MP.
-- POST /bookings: validar que origen y destino del booking sean de países distintos (regla AR↔PY) — 422 `international_route_required` si origen y destino son del mismo país.
+- POST /bookings: 404 trip inexistente, 409 `trip_not_available`, 409 `seat_unavailable`, 422 `international_route_required`, 500 sin tramo de precio, 502 `payment_gateway_error`.
 - GET /bookings/{id}: público, selectinload passengers, 404 si inexistente.
-- `_SEAT_TYPE_TITLES` tiene assert de cobertura al nivel de módulo: falla en startup si el dict no cubre todos los valores de `SeatTypeEnum`, evitando KeyError silencioso en producción.
+- `_SEAT_TYPE_TITLES` tiene assert de cobertura al nivel de módulo.
 
 ### app/routers/bookings.py — POST /{booking_id}/refund-request
 
-- Endpoint público, sin autenticación. Body: `{"email": "..."}` (`RefundRequestCreate`).
-- Identificación del solicitante: el email enviado debe coincidir (case-insensitive) con el de **cualquiera** de los pasajeros de la booking (`Passenger.email`). No hay distinción comprador/acompañante en el modelo actual (ver deuda técnica #1, `buyer_email`).
-- Precondiciones: 404 si booking inexistente; 409 `booking_not_refundable` si `status != confirmed`; 422 `email_not_found` si el email no coincide con ningún pasajero.
-- **Cálculo de `window_valid`** — requiere **ambas** condiciones (Resolución 424/2020):
-  1. `now <= booking.confirmed_at + timedelta(days=10)`
-  2. `now <= booking.trip.departure_at - timedelta(hours=24)`
-
-  Si `confirmed_at` es `None`, o cualquiera de las dos condiciones falla, `window_valid = False`.
-- **Flujo persist-first** (dos commits):
-  1. Se crea y persiste `RefundRequest` (commit #1) con `window_valid` ya calculado — esto ocurre **siempre**, sea válida o no la solicitud, para garantizar que toda solicitud tenga un `id` recuperable como código de trámite (cumplimiento del requisito de informar el trámite dentro de 24hs, satisfecho en el mismo ciclo request/response).
-  2. Si `window_valid == False` → `RefundWindowExpiredError(refund_req.id)` → handler devuelve 422 `{"detail": "refund_window_expired", "refund_request_id": "..."}`.
-  3. Si `window_valid == True` → valida `mp_payment_id` no nulo (500 si lo es, caso de corrupción de datos) → `mark_booking_refunded` (libera asientos vía `_release_booking_seats`, marca `status = refunded`) → `create_refund(mp_payment_id)` → 502 `payment_gateway_error` si MP falla → commit #2.
-- Response 201 en éxito: `RefundRequestRead` (incluye `id` como código de trámite).
-- `_REFUND_WINDOW_DAYS = 10` hardcodeado a nivel de módulo — consistente con el patrón del proyecto; mover a `settings` si el cliente necesita ajustarlo en el futuro.
+- Endpoint público. Body: `{"email": "..."}`.
+- Email debe coincidir (case-insensitive) con el de cualquier pasajero de la booking.
+- 404 si booking inexistente; 409 `booking_not_refundable`; 422 `email_not_found`.
+- **`window_valid`** requiere ambas condiciones (Resolución 424/2020): `now <= confirmed_at + 10d` Y `now <= departure_at - 24h`.
+- **Flujo persist-first** (dos commits): persiste `RefundRequest` siempre → 422 si `window_valid==False` → reembolso MP → commit #2.
+- Response 201: `RefundRequestRead`. `_REFUND_WINDOW_DAYS = 10` hardcodeado.
 
 ### app/routers/admin.py
 
-- POST /admin/login: bcrypt, mismo 401 `invalid_credentials` para email y password incorrectos. `_DUMMY_HASH` calculado al nivel de módulo; cuando el email no existe se ejecuta `_pwd_context.verify` contra el dummy antes de lanzar 401, eliminando timing attack por short-circuit. Rate limit: 10 requests/minuto por IP vía slowapi.
-- GET /admin/bookings: filtros `booking_status` y `trip_id`, LIMIT 500, orden `created_at DESC`, selectinload passengers.
-- GET /admin/trips/{id}/price-tranches: 404 si trip inexistente, orden `seat_type ASC, min_sold ASC` (orden de enum Postgres: `cama` < `semi_cama`).
-- POST /admin/trips/{id}/price-tranches: 404 trip, validación solapamiento explícita con `min_sold < existing.max_sold AND max_sold > existing.min_sold` (rangos adyacentes no solapan) usando `.with_for_update()` para serializar escrituras concurrentes → 409 `tranche_overlap`, 201 en éxito.
-- DELETE /admin/trips/{id}/price-tranches/{tranche_id}: 404 trip o tranche (incluyendo tranche de otro trip), 204 sin body en éxito.
-- GET /admin/refund-requests: lista **todas** las solicitudes de reembolso (válidas y rechazadas — `window_valid` distingue el resultado, no filtra qué se persiste). Filtros opcionales `window_valid` y `booking_id`, LIMIT 500, orden `requested_at DESC`.
-- Panel admin debe permitir gestión autónoma de trayectos, paradas, orígenes y destinos (sin depender del desarrollador para cada cambio). Endpoints a definir antes de implementar.
+- POST /admin/login: bcrypt, 401 `invalid_credentials`. Rate limit: 10/minuto por IP.
+- GET /admin/bookings: filtros `booking_status` y `trip_id`, LIMIT 500, orden `created_at DESC`.
+- GET/POST/DELETE /admin/trips/{id}/price-tranches: con validación solapamiento y lock advisory.
+- GET /admin/refund-requests: filtros `window_valid` y `booking_id`, LIMIT 500, orden `requested_at DESC`.
+- Panel admin permite gestión autónoma de trayectos, paradas, orígenes y destinos.
 
 ### app/limiter.py
 
-- Módulo independiente sin dependencias del resto de la app — evita import circular entre `main.py` y `admin.py`.
-- `limiter = Limiter(key_func=get_remote_address)` — instancia global importada por `main.py` y `admin.py`.
-- `main.py` registra `app.state.limiter = limiter` y el handler `RateLimitExceeded`.
+- Módulo independiente. `limiter = Limiter(key_func=get_remote_address)`.
 
 ### app/deps.py — JWT con iss/aud
 
-- Tokens emitidos con `iss="crucero-admin"` y `aud="crucero-admin-api"`.
-- `jwt.decode` valida `audience="crucero-admin-api"`, `issuer="crucero-admin"` y requiere `["exp", "sub", "iss", "aud"]`.
+- `iss="crucero-admin"`, `aud="crucero-admin-api"`. Requiere `["exp", "sub", "iss", "aud"]`.
 
 ### tasks/reminders.py
 
 - `AsyncIOScheduler` + `SQLAlchemyJobStore` con `sync_database_url`.
-- `register_jobs()` llamada después de `scheduler.start()` en lifecycle.
-- expire_bookings: IntervalTrigger(minutes=1), misfire_grace_time=60s.
-- send_reminders / send_feedback: IntervalTrigger(hours=1), misfire_grace_time=3600s.
-- Ventana reminder: `departure_at` entre now y now+24h.
-- Ventana feedback: `arrival_at <= now - 2h`.
-- Patrón dos sesiones: primera sesión selecciona solo `Booking.id` (sin selectinload); segunda sesión hace refetch completo con `selectinload(Booking.passengers, Passenger.seat, Booking.trip, Trip.route)` antes de llamar al service de email, luego commit.
-- Commit por booking individual con try/except — loop nunca se corta.
+- expire_bookings: IntervalTrigger(minutes=1). send_reminders / send_feedback: IntervalTrigger(hours=1).
+- Ventana reminder: `departure_at` entre now y now+24h. Ventana feedback: `arrival_at <= now - 2h`.
+- Patrón dos sesiones: primera selecciona solo `Booking.id`; segunda hace refetch completo con selectinload.
 
 ### pyproject.toml + Dockerfile
 
 - `pytest-env`: variables fake en `[tool.pytest.ini_options] env = [...]` — no en conftest.
 - `apscheduler>=3.10,<4.0` — upper bound explícito.
-- `--workers 1` obligatorio en Dockerfile — APScheduler no soporta múltiples workers.
+- `--workers 1` obligatorio en Dockerfile.
 
 ### app/services/inventory.py
 
-- `reserve_seats`: `.with_for_update(nowait=True)` — si el lock no está disponible, SQLAlchemy lanza `OperationalError` que se captura y relanza como `SeatNotAvailable(seat_ids[0])`, resultando en 409 inmediato para el segundo comprador en vez de bloqueo por timeout.
-- `mark_seats_sold` conserva `.with_for_update()` sin nowait — semántica distinta: el webhook ya tiene el booking, no hay contención entre compradores.
+- `reserve_seats`: `.with_for_update(nowait=True)` — 409 inmediato en contención.
+- `mark_seats_sold`: `.with_for_update()` sin nowait.
 
 ### app/services/booking.py — refunds
 
-- `create_refund_request(db, booking_id, email_used, window_valid)`: crea y `flush()`ea un `RefundRequest` (necesario para obtener el `id` antes del commit). No hace commit — responsabilidad del caller.
-- `mark_booking_refunded(db, booking_id)`: guard idempotente — si `booking.status != confirmed`, retorna sin modificar. Si es `confirmed`, lo pasa a `refunded` y libera los asientos vía `_release_booking_seats` (mismo mecanismo que el resto del flujo de liberación, sin decremento explícito de `sold_count` — se deriva en tiempo real del estado de `seats`).
+- `create_refund_request`: crea y `flush()`ea un `RefundRequest`. No hace commit.
+- `mark_booking_refunded`: guard idempotente — si `status != confirmed`, retorna sin modificar.
