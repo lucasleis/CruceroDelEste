@@ -382,7 +382,7 @@ Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipa
 11. **Índice compuesto faltante en `Trip(status, departure_at)`**: `GET /trips` filtra y ordena por ambos. Sin índice, full scan al crecer. Agregar en próxima migración.
 12. **`if admin_id is None` redundante en `app/deps.py`**: con `require: ["sub"]`, PyJWT lanza `MissingRequiredClaimError` antes de llegar a ese check. Inofensivo; limpiar en pasada futura.
 13. **`_DUMMY_HASH` se computa en cada import** (`app/routers/admin.py`): bcrypt con cost factor 12 tarda ~250ms en import-time. Hardcodear un hash pre-computado como constante.
-14. **`NoPriceTranche`, `BookingNotFound`, `SeatNotAvailable` sin handlers registrados** (`app/errors.py`): propagan como 500 genérico. Agregar handlers explícitos con códigos y `detail` semánticos.
+14. **`BookingNotFound`, `SeatNotAvailable` sin handlers registrados** (`app/errors.py`): propagan como 500 genérico. Agregar handlers explícitos con códigos y `detail` semánticos. ~~`NoPriceTranche`~~ resuelto: handler registrado en `app/errors.py` → 500 `"no_price_tranche_available"` (branch `claude/admiring-clarke-n1e1s2`).
 15. **Doble lógica de resolución de tramo activo** (`app/services/pricing.py` y `app/routers/trips.py`): predicado `min_sold <= sold_count < max_sold` duplicado. Extraer función compartida.
 16. **`expire_bookings_job` carga objetos Booking completos** (`tasks/reminders.py`): solo usa `booking.id`. Cambiar a `select(Booking.id)` como los otros dos jobs.
 17. **`Trip` sin índice en `route_id`** (`app/models/trip.py`): Postgres no crea índice automático en FK. Agregar `Index("idx_trips_route_id", "route_id")` en próxima migración.
