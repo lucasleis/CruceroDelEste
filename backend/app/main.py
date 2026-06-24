@@ -3,7 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.middleware.cors import CORSMiddleware
 
+from app.config import settings
 from app.errors import register_exception_handlers
 from app.limiter import limiter
 from app.routers import admin, admin_catalog, bookings, payments, trips
@@ -20,6 +22,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Expreso Río Paraná API", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
