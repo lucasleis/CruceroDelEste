@@ -33,6 +33,7 @@ _TABLES = [
     "seats",
     "price_tranches",
     "trips",
+    "seat_layouts",
     "routes",
     "stops",
     "admin_users",
