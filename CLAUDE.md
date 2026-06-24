@@ -160,7 +160,7 @@ ExpresRioParana/
 │   │   ├── limiter.py           # Instancia global de slowapi Limiter
 │   │   ├── models/
 │   │   │   ├── trip.py          # Route, Trip, Seat, PriceTranche, Stop, CountryEnum
-│   │   │   ├── booking.py       # Booking, Passenger, AdminUser, RefundRequest
+│   │   │   ├── booking.py       # Booking, Passenger (con luggage_count), AdminUser, RefundRequest
 │   │   │   └── __init__.py
 │   │   ├── schemas/
 │   │   │   ├── trips.py
@@ -243,17 +243,17 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/services/booking.py` — create_booking, confirm_booking, expire_booking, InternationalRouteRequiredError
 - `app/services/payment.py` — verify_webhook_signature, get_payment, create_preference
 - `app/routers/payments.py` — POST /webhooks/mercadopago
-- `app/services/email.py` — send_confirmation_email, send_reminder_email, send_feedback_email
+- `app/services/email.py` — send_confirmation_email, send_reminder_email, send_feedback_email. FROM: `no-reply@expresorioparana.com`. Subjects: "Expreso Río Paraná".
 - `templates/email/confirmation.html` + `confirmation.txt`
 - `templates/email/reminder.html` + `reminder.txt`
 - `templates/email/feedback.html` + `feedback.txt`
 - `app/schemas/trips.py` — StopRead, RouteRead (nested origin_stop/destination_stop), SeatRead, TripRead
-- `app/schemas/bookings.py` — PassengerCreate, PassengerRead, BookingCreate, BookingRead, BookingCreateResponse, RefundRequestCreate, RefundRequestRead
+- `app/schemas/bookings.py` — PassengerCreate (con `luggage_count: int = 0`), PassengerRead (con `luggage_count: int`), BookingCreate, BookingRead, BookingCreateResponse, RefundRequestCreate, RefundRequestRead
 - `app/schemas/admin.py` — AdminLoginRequest, AdminLoginResponse, PriceTrancheCreate, PriceTrancheRead, AdminBookingRead
 - `app/routers/trips.py` — GET /trips, GET /trips/{id}/seats, GET /stops, GET /stops/{id}/valid-destinations
 - `app/routers/bookings.py` — POST /bookings (con validación AR↔PY), GET /bookings/{id}, POST /bookings/{id}/refund-request
 - `app/routers/admin.py` — POST /admin/login (con rate limiting 10/min), GET /admin/bookings, GET/POST/DELETE /admin/trips/{id}/price-tranches, GET /admin/refund-requests
-- `app/main.py` — FastAPI con lifespan, slowapi middleware, exception handlers, routers (incluye stops_router)
+- `app/main.py` — FastAPI con lifespan, slowapi middleware, exception handlers, routers (incluye stops_router). title: "Expreso Río Paraná API".
 - `tasks/__init__.py` — vacío
 - `tasks/reminders.py` — AsyncIOScheduler, SQLAlchemyJobStore, tres jobs
 - `pyproject.toml` — dependencias (incluye slowapi>=0.1.9), hatchling, pytest config con env vars fake
@@ -275,8 +275,11 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `tests/integration/test_admin_router.py` — 24 tests (fixtures actualizados a rutas AR↔PY)
 - `tests/integration/test_refund_requests.py` — 9 tests (fixtures actualizados a rutas AR↔PY)
 - `migrations/versions/c9d4e2f1_add_refunded_and_refund_requests.py` — `ALTER TYPE booking_status ADD VALUE IF NOT EXISTS 'refunded'`; tabla `refund_requests` con FK a bookings, índice en booking_id
+- `migrations/versions/a3d5e8f1_add_luggage_count_to_passengers.py` — columna `luggage_count INTEGER NOT NULL DEFAULT 0` en tabla `passengers`; downgrade elimina la columna. ⚠️ Esta migración bifurcaba desde `c9d4e2f1` en paralelo con `b7c3a1d2` — resuelta con merge migration `f3a9c7d5`.
 - `migrations/versions/b7c3a1d2_add_stops_table.py` — ENUM `country_code` (AR/PY); tabla `stops` (id, name unique, country, created_at); refactor de `routes`: columnas `origin`/`destination` reemplazadas por FK `origin_stop_id`/`destination_stop_id`; índices y UniqueConstraint actualizados
-- `app/models/trip.py` — `CountryEnum` (AR/PY), modelo `Stop` con relaciones `origin_routes`/`destination_routes`; `Route` refactorizado a FKs `origin_stop_id`/`destination_stop_id` con relationships
+- `migrations/versions/f3a9c7d5_add_trip_indexes.py` — merge migration: consolida branches `a3d5e8f1` y `b7c3a1d2` en único head; agrega `idx_trips_status_departure_at` (compuesto `status, departure_at`) e `idx_trips_route_id` (simple `route_id`) a la tabla `trips`; downgrade elimina ambos índices
+- `app/models/trip.py` — `CountryEnum` (AR/PY), modelo `Stop` con relaciones `origin_routes`/`destination_routes`; `Route` refactorizado a FKs `origin_stop_id`/`destination_stop_id` con relationships; `Trip` con `__table_args__` declarando `idx_trips_status_departure_at` e `idx_trips_route_id`
+- `app/models/booking.py` — `Booking`, `Passenger` (con `luggage_count = Column(Integer, nullable=False, default=0)`), `AdminUser`, `RefundRequest`; `refunded` en `BookingStatusEnum`; relación `refund_requests` en `Booking`
 - `app/models/__init__.py` — exporta `Stop`, `CountryEnum`, `RefundRequest`
 
 ### Bugs críticos resueltos (branch `claude/vibrant-cori-71dm2`)
@@ -334,9 +337,7 @@ El cliente vende simultáneamente por su sistema SOR, Plataforma 10 y Central de
 La regla que impide vender tramos internos dentro de un mismo país puede ser bypasseada si los asientos no están sincronizados con SOR. Un pasajero podría comprar en la web un tramo que SOR ya vendió como parte de un servicio interno.
 
 ### 🟡 Riesgo medio — Norma de trazabilidad de equipaje
-Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipaje al pasaje del pasajero nominalmente. Por ahora aplica solo al control físico, pero podría impactar el módulo de QR.
-
-- El modelo de datos del pasaje debería contemplar un campo para vinculación de equipaje desde el inicio para evitar refactoring posterior.
+Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipaje al pasaje del pasajero nominalmente. El campo `luggage_count` ya existe en `Passenger` (migración `a3d5e8f1`), pero la norma requiere vinculación nominal (nombre + número de boleto), no solo conteo. El módulo de Control de Pasajeros (QR) deberá contemplar esto.
 
 ---
 
@@ -352,13 +353,13 @@ Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipa
 8. **Known gap en tests**: desglose por tipo de asiento en `create_booking` no validado. Comentario en `test_booking_service.py`: `# KNOWN GAP: seat type breakdown not validated — see CLAUDE.md`
 9. **`DELETE /admin/trips/{id}/price-tranches/{id}` sin validación de uso activo**: admin puede borrar el tramo que cubre el `sold_count` actual. Fix: rechazar con 409.
 10. **CORS ausente en `app/main.py`**: agregar `CORSMiddleware` antes de conectar el frontend. Orígenes a definir con el cliente.
-11. **Índice compuesto faltante en `Trip(status, departure_at)`**: agregar en próxima migración.
+11. ✅ **Índice compuesto `Trip(status, departure_at)` — RESUELTO**: `idx_trips_status_departure_at` agregado en migración `f3a9c7d5`.
 12. **`if admin_id is None` redundante en `app/deps.py`**: inofensivo; limpiar en pasada futura.
 13. **`_DUMMY_HASH` se computa en cada import** (`app/routers/admin.py`): bcrypt ~250ms en import-time. Hardcodear un hash pre-computado.
 14. **`BookingNotFound` y `SeatNotAvailable` sin handlers registrados** (`app/errors.py`): propagan como 500 genérico (LLE-65). ~~`NoPriceTranche`~~ resuelto: handler registrado → 500 `"no_price_tranche_available"`.
 15. **Doble lógica de resolución de tramo activo** (`app/services/pricing.py` y `app/routers/trips.py`): extraer función compartida.
 16. **`expire_bookings_job` carga objetos Booking completos** (`tasks/reminders.py`): cambiar a `select(Booking.id)`.
-17. **`Trip` sin índice en `route_id`**: agregar `Index("idx_trips_route_id", "route_id")` en próxima migración.
+17. ✅ **Índice `Trip.route_id` — RESUELTO**: `idx_trips_route_id` agregado en migración `f3a9c7d5`.
 18. **`GET /bookings/{booking_id}` expone PII sin autenticación**: posible incumplimiento Ley 25.326. Scope de LLE-56 (#035) contempla PII de pasajeros y visibilidad del campo `status`.
 19. **`test_login_rate_limit_blocks_after_10_attempts` es frágil ante orden de ejecución**: debe permanecer al final de `test_admin_router.py`.
 20. **`BookingCreate._passengers_match_seats` valida orden pero `create_booking` también**: verificación duplicada. Unificar en pasada futura.
@@ -383,6 +384,13 @@ Norma gubernamental (aprox. abril 2026) que exige vincular cada ticket de equipa
 - **`GET /trips` mantiene filtros string** (`origin`, `destination`): filtran contra `Stop.name` via join. Contrato del endpoint no cambiado.
 - **`GET /stops/{stop_id}/valid-destinations`**: 200 lista | 404 `not_found` si el stop no existe | lista vacía si no hay destinos del país opuesto.
 - **Migración Alembic atómica** (`b7c3a1d2`).
+
+### #013 — Índices en Trip
+
+- **`idx_trips_status_departure_at`**: índice compuesto `(status, departure_at)` — filtro de igualdad primero, luego rango/orden.
+- **`idx_trips_route_id`**: índice simple sobre FK `route_id` — Postgres no los crea automáticamente.
+- **Declarados en `Trip.__table_args__`** además de la migración — consistente con el patrón de `Seat` y `PriceTranche`.
+- **Merge migration `f3a9c7d5`**: consolida los dos heads que existían (`a3d5e8f1` y `b7c3a1d2`, ambos bifurcando desde `c9d4e2f1`).
 
 ### Tests — arquitectura de la suite
 
