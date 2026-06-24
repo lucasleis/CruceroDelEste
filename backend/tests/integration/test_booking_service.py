@@ -132,10 +132,12 @@ async def test_create_booking_happy_path(db: AsyncSession):
         passengers_data=[_passenger_data(seat)],
         origin_country=CountryEnum.AR,
         destination_country=CountryEnum.PY,
+        contact_email="buyer@example.com",
     )
     await db.commit()
 
     assert booking.status == BookingStatusEnum.pending_payment
+    assert booking.contact_email == "buyer@example.com"
     assert booking.total_amount == 24500
     assert booking.trip_id == trip.id
     assert booking.expires_at > _NOW
@@ -166,6 +168,7 @@ async def test_create_booking_already_reserved_seat_raises(db: AsyncSession):
             passengers_data=[_passenger_data(seat)],
             origin_country=CountryEnum.AR,
             destination_country=CountryEnum.PY,
+            contact_email="buyer@example.com",
         )
 
 
@@ -183,6 +186,7 @@ async def test_create_booking_no_price_tranche_raises(db: AsyncSession):
             passengers_data=[_passenger_data(seat)],
             origin_country=CountryEnum.AR,
             destination_country=CountryEnum.PY,
+            contact_email="buyer@example.com",
         )
 
 
@@ -208,6 +212,7 @@ async def test_create_booking_nonexistent_trip_raises(db: AsyncSession):
             passengers_data=[fake_passenger],
             origin_country=CountryEnum.AR,
             destination_country=CountryEnum.PY,
+            contact_email="buyer@example.com",
         )
 
 
@@ -225,6 +230,7 @@ async def test_create_booking_same_country_raises(db: AsyncSession):
             passengers_data=[_passenger_data(seat)],
             origin_country=CountryEnum.AR,
             destination_country=CountryEnum.AR,
+            contact_email="buyer@example.com",
         )
 
 
@@ -240,6 +246,7 @@ async def test_confirm_booking_happy_path(db: AsyncSession):
     booking = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.pending_payment,
+        contact_email="buyer@example.com",
         total_amount=24500,
         expires_at=_NOW + timedelta(minutes=15),
     )
@@ -282,6 +289,7 @@ async def test_confirm_already_confirmed_booking_is_idempotent(db: AsyncSession)
     booking = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.confirmed,
+        contact_email="buyer@example.com",
         mp_payment_id="mp-old",
         total_amount=24500,
         expires_at=_NOW + timedelta(minutes=15),
@@ -320,6 +328,7 @@ async def test_confirm_expired_booking_is_not_reactivated(db: AsyncSession):
     booking = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.expired,
+        contact_email="buyer@example.com",
         total_amount=24500,
         expires_at=_NOW - timedelta(hours=1),
     )
@@ -355,6 +364,7 @@ async def test_expire_booking_happy_path(db: AsyncSession):
     booking = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.pending_payment,
+        contact_email="buyer@example.com",
         total_amount=24500,
         expires_at=_NOW + timedelta(minutes=15),
     )
@@ -392,6 +402,7 @@ async def test_expire_already_expired_booking_is_idempotent(db: AsyncSession):
     booking = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.expired,
+        contact_email="buyer@example.com",
         total_amount=24500,
         expires_at=_NOW - timedelta(hours=1),
     )

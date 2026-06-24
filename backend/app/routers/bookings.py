@@ -84,6 +84,7 @@ async def create_booking_endpoint(
             passengers_data,
             trip.route.origin_stop.country,
             trip.route.destination_stop.country,
+            contact_email=booking_in.contact_email,
         )
     except InternationalRouteRequiredError:
         raise HTTPException(status_code=422, detail="international_route_required")
@@ -99,7 +100,7 @@ async def create_booking_endpoint(
 
     await db.commit()
 
-    payer_email = booking_in.passengers[0].email
+    payer_email = booking_in.contact_email
 
     try:
         preference = await create_preference(booking.id, items, payer_email)
@@ -125,6 +126,7 @@ async def create_booking_endpoint(
         id=booking.id,
         trip_id=booking.trip_id,
         status=booking.status,
+        contact_email=booking.contact_email,
         total_amount=booking.total_amount,
         expires_at=booking.expires_at,
         passengers=[PassengerRead.model_validate(p) for p in booking.passengers],
@@ -150,8 +152,10 @@ async def create_refund_request_endpoint(
     if booking.status != BookingStatusEnum.confirmed:
         raise HTTPException(status_code=409, detail="booking_not_refundable")
 
-    passenger_emails = {p.email.lower() for p in booking.passengers}
-    if body.email.lower() not in passenger_emails:
+    # Accept the booking's contact_email (buyer) in addition to any passenger email.
+    # The buyer may not be a passenger themselves but must be able to request a refund.
+    valid_emails = {p.email.lower() for p in booking.passengers} | {booking.contact_email.lower()}
+    if body.email.lower() not in valid_emails:
         raise HTTPException(status_code=422, detail="email_not_found")
 
     now = datetime.now(timezone.utc)

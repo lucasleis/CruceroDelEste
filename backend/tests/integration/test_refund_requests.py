@@ -70,6 +70,7 @@ async def _make_confirmed_booking(
     booking = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.confirmed,
+        contact_email="buyer@example.com",
         total_amount=24500,
         expires_at=now + timedelta(minutes=15),
         confirmed_at=confirmed_at,
@@ -211,6 +212,7 @@ async def test_refund_request_pending_booking_returns_409(
     booking = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.pending_payment,
+        contact_email="buyer@example.com",
         total_amount=24500,
         expires_at=now + timedelta(minutes=15),
     )
@@ -315,3 +317,43 @@ async def test_refund_request_mp_failure_returns_502_booking_stays_confirmed(
     refund_req = result.scalar_one_or_none()
     assert refund_req is not None
     assert refund_req.window_valid is True
+
+
+async def test_refund_request_contact_email_accepted(
+    client: AsyncClient, db: AsyncSession
+):
+    """Buyer (contact_email) can request a refund even when they are not a passenger."""
+    booking, _ = await _make_confirmed_booking(db)
+    # contact_email is "buyer@example.com"; passenger email is "ana@example.com".
+    # Submitting with the buyer's email must succeed.
+
+    resp = await client.post(
+        f"/bookings/{booking.id}/refund-request",
+        json={"email": "buyer@example.com"},
+    )
+
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["booking_id"] == str(booking.id)
+    assert data["window_valid"] is True
+    assert data["email_used"] == "buyer@example.com"
+
+    booking_id = booking.id
+    db.expire_all()
+    refreshed = await db.get(Booking, booking_id)
+    assert refreshed.status == BookingStatusEnum.refunded
+
+
+async def test_refund_request_unrelated_email_returns_422(
+    client: AsyncClient, db: AsyncSession
+):
+    """An email that is neither a passenger email nor the contact_email is rejected."""
+    booking, _ = await _make_confirmed_booking(db)
+
+    resp = await client.post(
+        f"/bookings/{booking.id}/refund-request",
+        json={"email": "stranger@example.com"},
+    )
+
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "email_not_found"

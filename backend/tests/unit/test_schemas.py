@@ -30,6 +30,7 @@ def _passenger(seat_id: uuid.UUID, *, email: str = "passenger@example.com") -> d
 def _booking(seat_ids: list[uuid.UUID], passengers: list[dict]) -> dict:
     return {
         "trip_id": str(uuid.uuid4()),
+        "contact_email": "buyer@example.com",
         "seat_ids": [str(s) for s in seat_ids],
         "passengers": passengers,
     }
@@ -152,6 +153,22 @@ def test_booking_create_invalid_trip_id_format():
     seat = uuid.uuid4()
     data = _booking([seat], [_passenger(seat)])
     data["trip_id"] = "not-a-uuid"
+    with pytest.raises(ValidationError):
+        BookingCreate.model_validate(data)
+
+
+def test_booking_create_missing_contact_email():
+    seat = uuid.uuid4()
+    data = _booking([seat], [_passenger(seat)])
+    del data["contact_email"]
+    with pytest.raises(ValidationError):
+        BookingCreate.model_validate(data)
+
+
+def test_booking_create_invalid_contact_email():
+    seat = uuid.uuid4()
+    data = _booking([seat], [_passenger(seat)])
+    data["contact_email"] = "not-an-email"
     with pytest.raises(ValidationError):
         BookingCreate.model_validate(data)
 

@@ -40,6 +40,7 @@ class Booking(Base):
     )
     mp_preference_id = Column(String(255), nullable=True)
     mp_payment_id = Column(String(255), nullable=True)
+    contact_email = Column(String(255), nullable=False)
     total_amount = Column(Integer, nullable=False)
     # seats.reserved_at (seat-level) and bookings.expires_at (booking-level) MUST stay in sync.
     # reserved_at is the source of truth for individual seat expiration;

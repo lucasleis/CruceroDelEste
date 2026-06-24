@@ -107,6 +107,7 @@ async def _make_booking_with_passenger(db: AsyncSession, trip: Trip) -> Booking:
     booking = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.pending_payment,
+        contact_email="buyer@example.com",
         total_amount=24500,
         expires_at=now + timedelta(minutes=15),
     )
@@ -237,6 +238,7 @@ async def test_list_bookings_returns_correct_shape(
     assert b["id"] == str(booking.id)
     assert b["trip_id"] == str(trip.id)
     assert b["status"] == "pending_payment"
+    assert b["contact_email"] == "buyer@example.com"
     assert b["total_amount"] == 24500
     assert b["mp_preference_id"] is None
     assert b["mp_payment_id"] is None
@@ -274,12 +276,14 @@ async def test_list_bookings_filter_by_status(
     booking_pending = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.pending_payment,
+        contact_email="buyer@example.com",
         total_amount=24500,
         expires_at=now + timedelta(minutes=15),
     )
     booking_confirmed = Booking(
         trip_id=trip.id,
         status=BookingStatusEnum.confirmed,
+        contact_email="buyer@example.com",
         total_amount=24500,
         expires_at=now + timedelta(minutes=15),
         confirmed_at=now,
