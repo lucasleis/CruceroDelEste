@@ -91,6 +91,11 @@ class Trip(Base):
     )
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
+    __table_args__ = (
+        Index("idx_trips_status_departure_at", "status", "departure_at"),
+        Index("idx_trips_route_id", "route_id"),
+    )
+
     route = relationship("Route", back_populates="trips")
     seats = relationship("Seat", back_populates="trip")
     price_tranches = relationship("PriceTranche", back_populates="trip")
