@@ -10,19 +10,22 @@ from sqlalchemy.orm import selectinload
 from app.deps import get_db
 from app.errors import NotFoundError
 from app.models.trip import (
+    CountryEnum,
     PriceTranche,
     Route,
     Seat,
     SeatStatusEnum,
     SeatTypeEnum,
+    Stop,
     Trip,
     TripStatusEnum,
 )
-from app.schemas.trips import RouteRead, SeatRead, TripRead
+from app.schemas.trips import RouteRead, SeatRead, StopRead, TripRead
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/trips", tags=["trips"])
+stops_router = APIRouter(prefix="/stops", tags=["stops"])
 
 
 @router.get("", response_model=list[TripRead])
@@ -36,7 +39,12 @@ async def list_trips(
 
     query = (
         select(Trip)
-        .options(selectinload(Trip.route))
+        .options(
+            selectinload(Trip.route).options(
+                selectinload(Route.origin_stop),
+                selectinload(Route.destination_stop),
+            )
+        )
         .where(
             Trip.status == TripStatusEnum.scheduled,
             Trip.departure_at >= now,
@@ -44,9 +52,13 @@ async def list_trips(
     )
 
     if origin is not None:
-        query = query.where(Trip.route.has(Route.origin == origin))
+        query = query.where(
+            Trip.route.has(Route.origin_stop.has(Stop.name == origin))
+        )
     if destination is not None:
-        query = query.where(Trip.route.has(Route.destination == destination))
+        query = query.where(
+            Trip.route.has(Route.destination_stop.has(Stop.name == destination))
+        )
 
     if departure_date is not None:
         day_start = datetime.combine(departure_date, time.min, tzinfo=timezone.utc)
@@ -112,6 +124,33 @@ async def list_trip_seats(
 
     result = await db.execute(query)
     return [SeatRead.model_validate(s) for s in result.scalars().all()]
+
+
+# --- stops endpoints ---------------------------------------------------------
+
+
+@stops_router.get("", response_model=list[StopRead])
+async def list_stops(db: AsyncSession = Depends(get_db)) -> list[StopRead]:
+    result = await db.execute(select(Stop).order_by(Stop.name.asc()))
+    return [StopRead.model_validate(s) for s in result.scalars().all()]
+
+
+@stops_router.get("/{stop_id}/valid-destinations", response_model=list[StopRead])
+async def list_valid_destinations(
+    stop_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> list[StopRead]:
+    stop = await db.get(Stop, stop_id)
+    if stop is None:
+        raise NotFoundError()
+
+    opposite_country = CountryEnum.PY if stop.country == CountryEnum.AR else CountryEnum.AR
+    result = await db.execute(
+        select(Stop)
+        .where(Stop.country == opposite_country)
+        .order_by(Stop.name.asc())
+    )
+    return [StopRead.model_validate(s) for s in result.scalars().all()]
 
 
 # --- helpers -----------------------------------------------------------------

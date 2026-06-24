@@ -15,16 +15,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking, BookingStatusEnum, Passenger
 from app.models.trip import (
+    CountryEnum,
     PriceTranche,
     Route,
     Seat,
     SeatStatusEnum,
     SeatTypeEnum,
+    Stop,
     Trip,
     TripStatusEnum,
 )
 from app.services.booking import (
     BookingNotFound,
+    InternationalRouteRequiredError,
     PassengerData,
     confirm_booking,
     create_booking,
@@ -43,7 +46,12 @@ _ARRIVAL = _NOW + timedelta(days=1, hours=4)
 # ---------------------------------------------------------------------------
 
 async def _make_trip(db: AsyncSession) -> Trip:
-    route = Route(origin="Buenos Aires", destination="Rosario")
+    origin_stop = Stop(name="Retiro", country=CountryEnum.AR)
+    destination_stop = Stop(name="Asunción", country=CountryEnum.PY)
+    db.add(origin_stop)
+    db.add(destination_stop)
+    await db.flush()
+    route = Route(origin_stop_id=origin_stop.id, destination_stop_id=destination_stop.id)
     db.add(route)
     await db.flush()
     trip = Trip(
@@ -122,6 +130,8 @@ async def test_create_booking_happy_path(db: AsyncSession):
         trip_id=trip.id,
         seat_ids=[seat.id],
         passengers_data=[_passenger_data(seat)],
+        origin_country=CountryEnum.AR,
+        destination_country=CountryEnum.PY,
     )
     await db.commit()
 
@@ -154,6 +164,8 @@ async def test_create_booking_already_reserved_seat_raises(db: AsyncSession):
             trip_id=trip.id,
             seat_ids=[seat.id],
             passengers_data=[_passenger_data(seat)],
+            origin_country=CountryEnum.AR,
+            destination_country=CountryEnum.PY,
         )
 
 
@@ -169,6 +181,8 @@ async def test_create_booking_no_price_tranche_raises(db: AsyncSession):
             trip_id=trip.id,
             seat_ids=[seat.id],
             passengers_data=[_passenger_data(seat)],
+            origin_country=CountryEnum.AR,
+            destination_country=CountryEnum.PY,
         )
 
 
@@ -192,6 +206,25 @@ async def test_create_booking_nonexistent_trip_raises(db: AsyncSession):
             trip_id=fake_trip_id,
             seat_ids=[fake_seat_id],
             passengers_data=[fake_passenger],
+            origin_country=CountryEnum.AR,
+            destination_country=CountryEnum.PY,
+        )
+
+
+async def test_create_booking_same_country_raises(db: AsyncSession):
+    trip = await _make_trip(db)
+    seat = await _make_seat(db, trip, "9A")
+    await _add_tranche(db, trip)
+    await db.commit()
+
+    with pytest.raises(InternationalRouteRequiredError):
+        await create_booking(
+            db,
+            trip_id=trip.id,
+            seat_ids=[seat.id],
+            passengers_data=[_passenger_data(seat)],
+            origin_country=CountryEnum.AR,
+            destination_country=CountryEnum.AR,
         )
 
 

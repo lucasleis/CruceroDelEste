@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import AdminUser, Booking, BookingStatusEnum, Passenger
 from app.models.trip import (
+    CountryEnum,
     PriceTranche,
     Route,
     Seat,
     SeatStatusEnum,
     SeatTypeEnum,
+    Stop,
     Trip,
     TripStatusEnum,
 )
@@ -50,7 +52,12 @@ def _auth(token: str) -> dict:
 
 
 async def _make_trip(db: AsyncSession) -> Trip:
-    route = Route(origin="Buenos Aires", destination="Rosario")
+    origin_stop = Stop(name="Retiro", country=CountryEnum.AR)
+    destination_stop = Stop(name="Asunción", country=CountryEnum.PY)
+    db.add(origin_stop)
+    db.add(destination_stop)
+    await db.flush()
+    route = Route(origin_stop_id=origin_stop.id, destination_stop_id=destination_stop.id)
     db.add(route)
     await db.flush()
     now = datetime.now(timezone.utc)
@@ -307,7 +314,12 @@ async def test_list_bookings_filter_by_trip_id(
     await _make_admin(db)
     trip_a = await _make_trip(db)
     # Second trip on a different route
-    route_b = Route(origin="Rosario", destination="Córdoba")
+    stop_enc = Stop(name="Encarnación", country=CountryEnum.PY)
+    stop_laj = Stop(name="La Plata", country=CountryEnum.AR)
+    db.add(stop_enc)
+    db.add(stop_laj)
+    await db.flush()
+    route_b = Route(origin_stop_id=stop_laj.id, destination_stop_id=stop_enc.id)
     db.add(route_b)
     await db.flush()
     now = datetime.now(timezone.utc)
@@ -604,7 +616,12 @@ async def test_delete_price_tranche_wrong_trip_returns_404(
     await _make_admin(db)
     trip_a = await _make_trip(db)
     # Second trip on a different route
-    route_b = Route(origin="Rosario", destination="Córdoba")
+    stop_enc2 = Stop(name="Encarnación", country=CountryEnum.PY)
+    stop_lin = Stop(name="Liniers", country=CountryEnum.AR)
+    db.add(stop_enc2)
+    db.add(stop_lin)
+    await db.flush()
+    route_b = Route(origin_stop_id=stop_lin.id, destination_stop_id=stop_enc2.id)
     db.add(route_b)
     await db.flush()
     now = datetime.now(timezone.utc)

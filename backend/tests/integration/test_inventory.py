@@ -11,10 +11,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.trip import (
+    CountryEnum,
     Route,
     Seat,
     SeatStatusEnum,
     SeatTypeEnum,
+    Stop,
     Trip,
     TripStatusEnum,
 )
@@ -34,7 +36,12 @@ _ARRIVAL = _NOW + timedelta(days=1, hours=4)
 # ---------------------------------------------------------------------------
 
 async def _make_trip(db: AsyncSession) -> Trip:
-    route = Route(origin="Buenos Aires", destination="Rosario")
+    origin_stop = Stop(name="Retiro", country=CountryEnum.AR)
+    destination_stop = Stop(name="Asunción", country=CountryEnum.PY)
+    db.add(origin_stop)
+    db.add(destination_stop)
+    await db.flush()
+    route = Route(origin_stop_id=origin_stop.id, destination_stop_id=destination_stop.id)
     db.add(route)
     await db.flush()
     trip = Trip(
@@ -143,8 +150,13 @@ async def test_reserve_sold_seat_raises(db: AsyncSession):
 
 async def test_reserve_seat_belonging_to_different_trip_raises(db: AsyncSession):
     trip_a = await _make_trip(db)
-    # Use a different route to avoid UNIQUE constraint on (origin, destination).
-    route_b = Route(origin="Rosario", destination="Buenos Aires")
+    # Use a different route (reversed) to avoid UNIQUE constraint on (origin_stop_id, destination_stop_id).
+    origin_b = Stop(name="Encarnación", country=CountryEnum.PY)
+    destination_b = Stop(name="Liniers", country=CountryEnum.AR)
+    db.add(origin_b)
+    db.add(destination_b)
+    await db.flush()
+    route_b = Route(origin_stop_id=origin_b.id, destination_stop_id=destination_b.id)
     db.add(route_b)
     await db.flush()
     trip_b = Trip(

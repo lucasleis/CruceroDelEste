@@ -3,15 +3,23 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.trip import SeatStatusEnum, SeatTypeEnum, TripStatusEnum
+from app.models.trip import CountryEnum, SeatStatusEnum, SeatTypeEnum, TripStatusEnum
+
+
+class StopRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    country: CountryEnum
 
 
 class RouteRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    origin: str
-    destination: str
+    origin_stop: StopRead
+    destination_stop: StopRead
 
 
 class SeatRead(BaseModel):

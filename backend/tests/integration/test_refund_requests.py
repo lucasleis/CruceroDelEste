@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking, BookingStatusEnum, Passenger, RefundRequest
 from app.models.trip import (
+    CountryEnum,
     PriceTranche,
     Route,
     Seat,
     SeatStatusEnum,
     SeatTypeEnum,
+    Stop,
     Trip,
     TripStatusEnum,
 )
@@ -24,7 +26,12 @@ from app.models.trip import (
 # ---------------------------------------------------------------------------
 
 async def _make_trip(db: AsyncSession, *, departure_hours_from_now: int = 72) -> Trip:
-    route = Route(origin="Buenos Aires", destination="Asunción")
+    origin_stop = Stop(name="Retiro", country=CountryEnum.AR)
+    destination_stop = Stop(name="Asunción", country=CountryEnum.PY)
+    db.add(origin_stop)
+    db.add(destination_stop)
+    await db.flush()
+    route = Route(origin_stop_id=origin_stop.id, destination_stop_id=destination_stop.id)
     db.add(route)
     await db.flush()
 
