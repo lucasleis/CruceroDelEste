@@ -352,8 +352,14 @@ El cliente vende simultáneamente por su sistema SOR, Plataforma 10 y Central de
 ### 🔴 Riesgo alto — Validación AR↔PY sin integración con SOR
 La regla AR↔PY puede ser bypasseada si los asientos no están sincronizados con SOR.
 
-### 🟡 Riesgo medio — Norma de trazabilidad de equipaje
-Campo `luggage_count` existe en `Passenger`, pero la norma requiere vinculación nominal. El módulo QR deberá contemplarlo.
+### 🟡 Riesgo medio — Norma de trazabilidad de equipaje (Resolución ST N° 4/2026)
+**Norma vigente desde el 14 de marzo de 2026.** Identificador: RESOL-2026-4-APN-ST#MEC. Publicada en el Boletín Oficial el 13/01/2026. Fiscaliza la CNRT.
+
+Exige vinculación inequívoca entre cada equipaje y el pasajero propietario. No prescribe un mecanismo específico — los operadores eligen libremente (QR, registro digital en ticketing, etiqueta física, etc.). El equipaje sin identificación no puede ser ingresado a la unidad.
+
+El campo `luggage_count` en `Passenger` **no es suficiente** para cumplir la norma — se requiere vinculación nominal, no solo conteo. El módulo de Control de Pasajeros (QR, LLE-26) es el lugar natural para implementarlo.
+
+⚠️ No se encontró prórroga publicada. Si el cliente afirma estar gestionando una, debe verificarse con documentación oficial. El plazo de notificación a la CNRT del mecanismo adoptado ya venció. Ver LLE-24 para acciones pendientes.
 
 ---
 
