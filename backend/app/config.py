@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     backend_url: str
     environment: str = "dev"
     booking_expiry_minutes: int = 15
+    cors_origins: list[str] = ["http://localhost:3000", "http://31.97.25.173"]
 
     @model_validator(mode="after")
     def _validate_backend_url(self) -> "Settings":
