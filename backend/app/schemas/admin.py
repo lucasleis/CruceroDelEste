@@ -5,8 +5,9 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from app.models.booking import BookingStatusEnum
-from app.models.trip import SeatTypeEnum
+from app.models.trip import CountryEnum, SeatTypeEnum, TripStatusEnum
 from app.schemas.bookings import PassengerRead
+from app.schemas.trips import RouteRead
 
 
 class AdminLoginRequest(BaseModel):
@@ -41,6 +42,56 @@ class PriceTrancheRead(BaseModel):
     min_sold: int
     max_sold: int
     price: int
+    created_at: datetime
+
+
+class SeatLayoutRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    total_cama: int
+    total_semi_cama: int
+    description: str | None
+
+
+class StopCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    country: CountryEnum
+
+
+class StopUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    country: CountryEnum | None = None
+
+
+class RouteCreate(BaseModel):
+    origin_stop_id: UUID
+    destination_stop_id: UUID
+
+
+class TripCreate(BaseModel):
+    route_id: UUID
+    departure_at: datetime
+    arrival_at: datetime
+    seat_layout_id: UUID
+
+
+class TripUpdate(BaseModel):
+    departure_at: datetime | None = None
+    arrival_at: datetime | None = None
+    status: TripStatusEnum | None = None
+
+
+class AdminTripRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    route: RouteRead
+    departure_at: datetime
+    arrival_at: datetime
+    status: TripStatusEnum
+    seat_layout_id: UUID | None
     created_at: datetime
 
 

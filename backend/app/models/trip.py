@@ -77,11 +77,30 @@ class Route(Base):
     trips = relationship("Trip", back_populates="route")
 
 
+class SeatLayout(Base):
+    __tablename__ = "seat_layouts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), nullable=False, unique=True)
+    total_cama = Column(Integer, nullable=False)
+    total_semi_cama = Column(Integer, nullable=False)
+    description = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        CheckConstraint("total_cama > 0", name="ck_seat_layouts_total_cama"),
+        CheckConstraint("total_semi_cama >= 0", name="ck_seat_layouts_total_semi_cama"),
+    )
+
+    trips = relationship("Trip", back_populates="seat_layout")
+
+
 class Trip(Base):
     __tablename__ = "trips"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=False)
+    seat_layout_id = Column(UUID(as_uuid=True), ForeignKey("seat_layouts.id"), nullable=True)
     departure_at = Column(DateTime(timezone=True), nullable=False)
     arrival_at = Column(DateTime(timezone=True), nullable=False)
     status = Column(
@@ -97,6 +116,7 @@ class Trip(Base):
     )
 
     route = relationship("Route", back_populates="trips")
+    seat_layout = relationship("SeatLayout", back_populates="trips")
     seats = relationship("Seat", back_populates="trip")
     price_tranches = relationship("PriceTranche", back_populates="trip")
     bookings = relationship("Booking", back_populates="trip")

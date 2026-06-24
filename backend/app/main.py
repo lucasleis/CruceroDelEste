@@ -6,7 +6,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.errors import register_exception_handlers
 from app.limiter import limiter
-from app.routers import admin, bookings, payments, trips
+from app.routers import admin, admin_catalog, bookings, payments, trips
 from app.routers.trips import stops_router
 from tasks.reminders import register_jobs, scheduler
 
@@ -30,4 +30,5 @@ app.include_router(payments.router)
 app.include_router(bookings.router)
 app.include_router(trips.router)
 app.include_router(stops_router)
+app.include_router(admin_catalog.router)
 app.include_router(admin.router)
