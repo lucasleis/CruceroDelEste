@@ -48,6 +48,8 @@ async def reserve_seats(
         )
     except OperationalError as exc:
         if getattr(exc.orig, "pgcode", None) == "55P03":
+            # Cannot determine which seat caused the lock contention (Postgres 55P03
+            # does not expose the blocking row). Reporting seat_ids[0] as a placeholder.
             raise SeatNotAvailable(seat_ids[0])
         raise
     seats = list(result.scalars().all())
