@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     sync_database_url: str
 
     # Security
-    secret_key: str
+    secret_key: str  # Must be at least 32 characters — use secrets.token_hex(32)
     jwt_expiry_minutes: int = 60
 
     # MercadoPago
@@ -33,6 +33,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_backend_url(self) -> "Settings":
+        if len(self.secret_key) < 32:
+            raise ValueError(
+                "secret_key must be at least 32 characters long. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
         parsed = urlparse(self.backend_url)
         if not parsed.scheme or not parsed.netloc:
             raise ValueError(
