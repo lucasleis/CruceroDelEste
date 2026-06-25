@@ -3,12 +3,14 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_db
 from app.models.booking import AdminUser
+from app.models.trip import Route, Trip
 
-__all__ = ["get_db", "get_current_admin"]
+__all__ = ["get_db", "get_current_admin", "trip_load_options"]
 
 _bearer = HTTPBearer()
 
@@ -43,3 +45,10 @@ async def get_current_admin(
         raise invalid
 
     return admin
+
+
+def trip_load_options():
+    return selectinload(Trip.route).options(
+        selectinload(Route.origin_stop),
+        selectinload(Route.destination_stop),
+    )

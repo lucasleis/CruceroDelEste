@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.deps import get_current_admin, get_db
+from app.deps import get_current_admin, get_db, trip_load_options
 from app.errors import NotFoundError
 from app.models.booking import AdminUser, Booking, BookingStatusEnum
 from app.models.trip import (
@@ -31,13 +31,6 @@ from app.schemas.admin import (
 from app.schemas.trips import RouteRead, StopRead
 
 router = APIRouter(prefix="/admin", tags=["admin-catalog"])
-
-
-def _trip_load_options():
-    return selectinload(Trip.route).options(
-        selectinload(Route.origin_stop),
-        selectinload(Route.destination_stop),
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +243,7 @@ async def list_admin_trips(
 ) -> list[AdminTripRead]:
     result = await db.execute(
         select(Trip)
-        .options(_trip_load_options())
+        .options(trip_load_options())
         .order_by(Trip.departure_at.asc())
     )
     return list(result.scalars().all())
@@ -263,7 +256,7 @@ async def get_admin_trip(
     db: AsyncSession = Depends(get_db),
 ) -> AdminTripRead:
     result = await db.execute(
-        select(Trip).options(_trip_load_options()).where(Trip.id == trip_id)
+        select(Trip).options(trip_load_options()).where(Trip.id == trip_id)
     )
     trip = result.scalar_one_or_none()
     if trip is None:
@@ -326,7 +319,7 @@ async def create_trip(
     await db.commit()
 
     result = await db.execute(
-        select(Trip).options(_trip_load_options()).where(Trip.id == trip_id)
+        select(Trip).options(trip_load_options()).where(Trip.id == trip_id)
     )
     return result.scalar_one()
 
@@ -339,7 +332,7 @@ async def update_trip(
     db: AsyncSession = Depends(get_db),
 ) -> AdminTripRead:
     result = await db.execute(
-        select(Trip).options(_trip_load_options()).where(Trip.id == trip_id)
+        select(Trip).options(trip_load_options()).where(Trip.id == trip_id)
     )
     trip = result.scalar_one_or_none()
     if trip is None:
@@ -378,7 +371,7 @@ async def update_trip(
     await db.commit()
 
     result = await db.execute(
-        select(Trip).options(_trip_load_options()).where(Trip.id == trip_id)
+        select(Trip).options(trip_load_options()).where(Trip.id == trip_id)
     )
     return result.scalar_one()
 

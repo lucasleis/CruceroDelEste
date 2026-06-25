@@ -11,6 +11,7 @@ from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models.booking import Booking, BookingStatusEnum, Passenger
 from app.models.trip import Route, Trip
+from app.deps import trip_load_options
 from app.services.booking import expire_booking
 from app.services.email import send_feedback_email, send_reminder_email
 
@@ -97,8 +98,7 @@ async def send_reminders_job() -> None:
                     .where(Booking.id == booking_id)
                     .options(
                         selectinload(Booking.passengers).selectinload(Passenger.seat),
-                        selectinload(Booking.trip).selectinload(Trip.route).selectinload(Route.origin_stop),
-                        selectinload(Booking.trip).selectinload(Trip.route).selectinload(Route.destination_stop),
+                        selectinload(Booking.trip).options(trip_load_options()),
                     )
                 )
                 db_booking = result.scalar_one()
@@ -138,8 +138,7 @@ async def send_feedback_job() -> None:
                     .where(Booking.id == booking_id)
                     .options(
                         selectinload(Booking.passengers).selectinload(Passenger.seat),
-                        selectinload(Booking.trip).selectinload(Trip.route).selectinload(Route.origin_stop),
-                        selectinload(Booking.trip).selectinload(Trip.route).selectinload(Route.destination_stop),
+                        selectinload(Booking.trip).options(trip_load_options()),
                     )
                 )
                 db_booking = result.scalar_one()

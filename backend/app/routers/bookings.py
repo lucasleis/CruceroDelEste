@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.deps import get_db
+from app.deps import get_db, trip_load_options
 from app.limiter import limiter
 from app.errors import NotFoundError, PaymentProcessingError, RefundWindowExpiredError, SeatUnavailableError
 from app.models.booking import Booking, BookingStatusEnum
@@ -47,12 +47,7 @@ async def create_booking_endpoint(
 ) -> BookingCreateResponse:
     result = await db.execute(
         select(Trip)
-        .options(
-            selectinload(Trip.route).options(
-                selectinload(Route.origin_stop),
-                selectinload(Route.destination_stop),
-            )
-        )
+        .options(trip_load_options())
         .where(Trip.id == booking_in.trip_id)
     )
     trip = result.scalar_one_or_none()
