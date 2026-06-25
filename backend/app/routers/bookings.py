@@ -2,12 +2,13 @@ import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.deps import get_db
+from app.limiter import limiter
 from app.errors import NotFoundError, PaymentProcessingError, RefundWindowExpiredError, SeatUnavailableError
 from app.models.booking import Booking, BookingStatusEnum
 from app.models.trip import Route, Trip, TripStatusEnum
@@ -134,8 +135,10 @@ async def create_booking_endpoint(
     )
 
 
+@limiter.limit("5/minute")
 @router.post("/{booking_id}/refund-request", response_model=RefundRequestRead, status_code=201)
 async def create_refund_request_endpoint(
+    request: Request,
     booking_id: UUID,
     body: RefundRequestCreate,
     db: AsyncSession = Depends(get_db),
