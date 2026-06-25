@@ -68,7 +68,6 @@ class PaymentDetails:
     payment_id: str
     status: str  # "approved" | "pending" | "rejected" | "cancelled" | ...
     external_reference: str  # our booking_id, set when creating the preference
-    amount: int  # ARS, integer pesos
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +158,6 @@ async def get_payment(payment_id: str) -> PaymentDetails:
         payment_id=str(data["id"]),
         status=data["status"],
         external_reference=external_reference,
-        amount=round(data["transaction_amount"]),
     )
 
 

@@ -7,10 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.deps import get_db
+from app.deps import get_db, trip_load_options
 from app.errors import InvalidWebhookSignature, PaymentProcessingError
 from app.models.booking import Booking, BookingStatusEnum, Passenger
-from app.models.trip import Trip, Route
+
 from app.services.booking import confirm_booking
 from app.services.email import send_confirmation_email
 from app.services.payment import get_payment, verify_webhook_signature
@@ -131,8 +131,7 @@ async def mercadopago_webhook(
             .where(Booking.id == booking_id)
             .options(
                 selectinload(Booking.passengers).selectinload(Passenger.seat),
-                selectinload(Booking.trip).selectinload(Trip.route).selectinload(Route.origin_stop),
-                selectinload(Booking.trip).selectinload(Trip.route).selectinload(Route.destination_stop),
+                selectinload(Booking.trip).options(trip_load_options()),
             )
         )
         booking_full = result.scalar_one()

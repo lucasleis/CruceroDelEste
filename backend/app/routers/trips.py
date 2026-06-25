@@ -5,9 +5,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from app.deps import get_db
+from app.deps import get_db, trip_load_options
 from app.errors import NotFoundError
 from app.models.trip import (
     CountryEnum,
@@ -39,12 +38,7 @@ async def list_trips(
 
     query = (
         select(Trip)
-        .options(
-            selectinload(Trip.route).options(
-                selectinload(Route.origin_stop),
-                selectinload(Route.destination_stop),
-            )
-        )
+        .options(trip_load_options())
         .where(
             Trip.status == TripStatusEnum.scheduled,
             Trip.departure_at >= now,
