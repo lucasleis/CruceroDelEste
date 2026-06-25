@@ -213,6 +213,9 @@ async def mark_booking_refunded(db: AsyncSession, booking_id: UUID) -> Booking:
     if booking.status != BookingStatusEnum.confirmed:
         return booking
     booking.status = BookingStatusEnum.refunded
+    with db.sync_session.no_autoflush:
+        seat_ids = await _seat_ids_for_booking(db, booking_id)
+        await _release_booking_seats(db, seat_ids)
     return booking
 
 

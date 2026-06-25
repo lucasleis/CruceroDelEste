@@ -117,6 +117,14 @@ async def test_refund_request_happy_path_201(client: AsyncClient, db: AsyncSessi
     refreshed = await db.get(Booking, booking_id)
     assert refreshed.status == BookingStatusEnum.refunded
 
+    # Seats must be released back to available.
+    result = await db.execute(
+        select(Seat).join(Passenger, Passenger.seat_id == Seat.id).where(Passenger.booking_id == booking_id)
+    )
+    seats = result.scalars().all()
+    assert len(seats) > 0
+    assert all(s.status == SeatStatusEnum.available for s in seats)
+
 
 async def test_refund_request_window_expired_10_days_422_persists_row(
     client: AsyncClient, db: AsyncSession
