@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
-from app.models.booking import BookingStatusEnum
+from app.models.booking import BookingStatusEnum, ChargebackStatusEnum
 from app.models.trip import CountryEnum, SeatTypeEnum, TripStatusEnum
 from app.schemas.bookings import PassengerRead
 from app.schemas.trips import RouteRead
@@ -93,6 +93,20 @@ class AdminTripRead(BaseModel):
     status: TripStatusEnum
     seat_layout_id: UUID | None
     created_at: datetime
+
+
+class ChargebackRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    booking_id: UUID
+    mp_payment_id: str
+    mp_chargeback_id: str | None
+    status: ChargebackStatusEnum
+    status_detail: str | None
+    date_documentation_deadline: datetime | None
+    created_at: datetime
+    updated_at: datetime
 
 
 class AdminBookingRead(BaseModel):

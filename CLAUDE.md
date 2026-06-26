@@ -394,6 +394,7 @@ El campo `luggage_count` en `Passenger` **no es suficiente** para cumplir la nor
 27. Gap de cobertura — rendering de templates de email no testeado (LLE-69).
 28. Numeración de asientos provisional: `C01`…`Cnn` / `S01`…`Snn`. `Seat.seat_number` es `String(4)` — máximo 4 caracteres. ⚠️ Si los planos del cliente usan formato tipo `1A`, `2B` (5 chars), requiere migración. Confirmar cuando lleguen los planos (LLE-63).
 29. `GET /admin/trips` sin paginación — aceptable con ~2500 trips/año.
+30. `mp_chargeback_id` en tabla `chargebacks` es nullable. MP no siempre lo provee en el webhook inicial. Si en el futuro se necesita reconciliar chargebacks con el objeto chargeback de MP, implementar llamada a `GET /v1/chargebacks?payment_id={id}` en el handler.
 
 ---
 

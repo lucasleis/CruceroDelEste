@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -9,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.deps import get_db, trip_load_options
 from app.errors import InvalidWebhookSignature, PaymentProcessingError
-from app.models.booking import Booking, BookingStatusEnum, Passenger
+from app.models.booking import Booking, BookingStatusEnum, Chargeback, ChargebackStatusEnum, Passenger
 
 from app.services.booking import confirm_booking
 from app.services.email import send_confirmation_email
@@ -150,4 +151,133 @@ async def mercadopago_webhook(
         # Catch-all: unknown exception → 500 so MP will retry (transient failure).
         logger.exception("webhook_unexpected_error request_id=%s: %s",
                          request.headers.get("x-request-id"), exc)
+        return JSONResponse(_ERR, status_code=500)
+
+
+@router.post("/webhooks/chargebacks", status_code=200)
+async def chargebacks_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Receive MercadoPago chargeback and fraud-alert notifications.
+
+    Subscribes to topic_chargebacks_wh and stop_delivery_op_wh.
+    Always returns 2xx — MP retries on non-2xx (stop_delivery_op has no retry,
+    so any status is final for that event type).
+    """
+    try:
+        # --- Step 1: data.id from query string (same convention as payment webhook). ---
+        data_id: str | None = request.query_params.get("data.id")
+        if not data_id:
+            logger.warning(
+                "chargeback_webhook_malformed: missing data.id request_id=%s",
+                request.headers.get("x-request-id"),
+            )
+            return JSONResponse(_IGN_MALFORMED)
+
+        x_request_id: str | None = request.headers.get("x-request-id")
+        x_signature: str = request.headers.get("x-signature", "")
+
+        # --- Step 2: HMAC verification — same algorithm as the payment webhook. ---
+        try:
+            verify_webhook_signature(data_id, x_signature, x_request_id)
+        except InvalidWebhookSignature:
+            return JSONResponse(_IGN_INVALID_SIG)
+
+        # --- Step 3: parse body and read notification type. ---
+        try:
+            body = await request.json()
+            event_type: str = str(body.get("type", ""))
+            event_action: str = str(body.get("action", ""))
+        except Exception:
+            logger.warning(
+                "chargeback_webhook_malformed: bad JSON request_id=%s", x_request_id,
+            )
+            return JSONResponse(_IGN_MALFORMED)
+
+        # --- Step 4: route by notification type. ---
+        # topic_chargebacks_wh arrives as type="payment", action="payment.updated".
+        # stop_delivery_op_wh (pre-chargeback fraud alert, no retry) arrives as
+        # type="stop_delivery_op". Both are handled: treat stop_delivery_op as a
+        # chargeback in_process because it signals an imminent dispute.
+        if event_type == "stop_delivery_op":
+            logger.warning(
+                "chargeback_stop_delivery_op mp_payment_id=%s request_id=%s",
+                data_id, x_request_id,
+            )
+            # Fall through to step 5 — persist as in_process.
+        elif event_type != "payment" or event_action != "payment.updated":
+            logger.warning(
+                "chargeback_webhook_unknown_type type=%r action=%r request_id=%s",
+                event_type, event_action, x_request_id,
+            )
+            return JSONResponse(_OK)
+
+        # --- Step 5: fetch real payment status from MercadoPago. ---
+        try:
+            payment = await get_payment(data_id)
+        except PaymentProcessingError as exc:
+            logger.error(
+                "chargeback_webhook_get_payment_failed: %s request_id=%s",
+                exc, x_request_id,
+            )
+            return JSONResponse(_ERR, status_code=500)
+
+        # --- Step 6: only act on charged_back payments. ---
+        if payment.status != "charged_back":
+            return JSONResponse(_OK)
+
+        # --- Step 7: find booking by mp_payment_id. ---
+        booking_result = await db.execute(
+            select(Booking).where(Booking.mp_payment_id == data_id)
+        )
+        booking = booking_result.scalar_one_or_none()
+        if booking is None:
+            logger.warning(
+                "chargeback_booking_not_found mp_payment_id=%s request_id=%s",
+                data_id, x_request_id,
+            )
+            return JSONResponse(_OK)
+
+        # --- Step 8: upsert Chargeback — create or update. ---
+        try:
+            new_status = ChargebackStatusEnum(payment.status_detail)
+        except ValueError:
+            logger.warning(
+                "chargeback_unknown_status_detail status_detail=%r mp_payment_id=%s",
+                payment.status_detail, data_id,
+            )
+            new_status = ChargebackStatusEnum.in_process
+
+        cb_result = await db.execute(
+            select(Chargeback)
+            .where(Chargeback.mp_payment_id == data_id)
+            .order_by(Chargeback.created_at.desc())
+            .limit(1)
+        )
+        existing = cb_result.scalar_one_or_none()
+
+        if existing is not None:
+            if existing.status == new_status:
+                return JSONResponse(_OK)  # idempotent — same status, nothing to do
+            existing.status = new_status
+            existing.status_detail = payment.status_detail or None
+            existing.updated_at = datetime.now(timezone.utc)
+        else:
+            db.add(Chargeback(
+                booking_id=booking.id,
+                mp_payment_id=data_id,
+                status=new_status,
+                status_detail=payment.status_detail or None,
+            ))
+
+        # --- Step 9: commit. The booking status is intentionally NOT changed. ---
+        await db.commit()
+        return JSONResponse(_OK)
+
+    except Exception as exc:
+        logger.exception(
+            "chargeback_webhook_unexpected_error request_id=%s: %s",
+            request.headers.get("x-request-id"), exc,
+        )
         return JSONResponse(_ERR, status_code=500)

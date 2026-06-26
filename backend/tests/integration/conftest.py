@@ -28,6 +28,7 @@ from app.main import app
 # Dependency order: children before parents so CASCADE works correctly.
 _TABLES = [
     "refund_requests",
+    "chargebacks",
     "passengers",
     "bookings",
     "seats",

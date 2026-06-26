@@ -28,6 +28,12 @@ class BookingStatusEnum(str, enum.Enum):
     refunded = "refunded"
 
 
+class ChargebackStatusEnum(str, enum.Enum):
+    in_process = "in_process"
+    settled = "settled"
+    reimbursed = "reimbursed"
+
+
 class Booking(Base):
     __tablename__ = "bookings"
 
@@ -65,6 +71,7 @@ class Booking(Base):
     trip = relationship("Trip", back_populates="bookings")
     passengers = relationship("Passenger", back_populates="booking")
     refund_requests = relationship("RefundRequest", back_populates="booking")
+    chargebacks = relationship("Chargeback", back_populates="booking")
 
 
 class Passenger(Base):
@@ -109,6 +116,38 @@ class RefundRequest(Base):
     )
 
     booking = relationship("Booking", back_populates="refund_requests")
+
+
+class Chargeback(Base):
+    __tablename__ = "chargebacks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=False)
+    mp_payment_id = Column(String(255), nullable=False)
+    mp_chargeback_id = Column(String(255), nullable=True)
+    status = Column(
+        Enum(ChargebackStatusEnum, name="chargeback_status"),
+        nullable=False,
+    )
+    status_detail = Column(String(255), nullable=True)
+    date_documentation_deadline = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        Index("idx_chargebacks_booking", "booking_id"),
+    )
+
+    booking = relationship("Booking", back_populates="chargebacks")
 
 
 class AdminUser(Base):

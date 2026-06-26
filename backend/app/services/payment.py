@@ -66,7 +66,8 @@ class CreatedPreference:
 @dataclass
 class PaymentDetails:
     payment_id: str
-    status: str  # "approved" | "pending" | "rejected" | "cancelled" | ...
+    status: str  # "approved" | "pending" | "rejected" | "cancelled" | "charged_back" | ...
+    status_detail: str  # e.g. "in_process" | "settled" | "reimbursed" for charged_back payments
     external_reference: str  # our booking_id, set when creating the preference
 
 
@@ -157,6 +158,7 @@ async def get_payment(payment_id: str) -> PaymentDetails:
     return PaymentDetails(
         payment_id=str(data["id"]),
         status=data["status"],
+        status_detail=data.get("status_detail") or "",
         external_reference=external_reference,
     )
 

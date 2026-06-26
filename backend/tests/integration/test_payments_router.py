@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models.booking import Booking, BookingStatusEnum, Passenger
+from app.models.booking import Booking, BookingStatusEnum, Chargeback, ChargebackStatusEnum, Passenger
 from app.models.trip import CountryEnum, Route, Seat, SeatStatusEnum, SeatTypeEnum, Stop, Trip, TripStatusEnum
 
 
@@ -409,3 +409,265 @@ async def test_webhook_valid_signature_with_request_id(
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
+
+
+# ===========================================================================
+# POST /webhooks/chargebacks
+# ===========================================================================
+#
+# MercadoPago's sandbox does not support simulating chargebacks (undocumented).
+# All tests below mock both the webhook payload and the GET /v1/payments/{id}
+# response so the handler logic can be exercised without real API calls.
+# ---------------------------------------------------------------------------
+
+async def _post_chargeback_webhook(
+    client: AsyncClient,
+    *,
+    data_id: str,
+    x_signature: str,
+    body: dict,
+    request_id: str | None = None,
+):
+    headers = {"x-signature": x_signature}
+    if request_id:
+        headers["x-request-id"] = request_id
+    return await client.post(
+        "/webhooks/chargebacks",
+        params={"data.id": data_id},
+        headers=headers,
+        json=body,
+    )
+
+
+def _charged_back_payment_response(
+    external_reference: str,
+    payment_id: int = 111222333,
+    status_detail: str = "in_process",
+) -> dict:
+    return {
+        "status": 200,
+        "response": {
+            "id": payment_id,
+            "status": "charged_back",
+            "status_detail": status_detail,
+            "external_reference": external_reference,
+            "transaction_amount": 24500.0,
+        },
+    }
+
+
+async def _make_confirmed_booking_with_mp_payment(
+    db: AsyncSession,
+    mp_payment_id: str = "111222333",
+) -> Booking:
+    """Insert a confirmed booking with the given mp_payment_id."""
+    booking = await _make_pending_booking(db)
+    booking.status = BookingStatusEnum.confirmed
+    booking.mp_payment_id = mp_payment_id
+    booking.confirmed_at = datetime.now(timezone.utc)
+    await db.flush()
+    return booking
+
+
+def _chargeback_body(data_id: str) -> dict:
+    return {"type": "payment", "action": "payment.updated", "data": {"id": data_id}}
+
+
+# ---------------------------------------------------------------------------
+# Case 1 — booking not found for the given mp_payment_id
+# ---------------------------------------------------------------------------
+
+async def test_chargeback_webhook_booking_not_found_returns_200_no_persist(
+    client: AsyncClient, db: AsyncSession, mock_mp_sdk
+):
+    # MP sandbox does not support simulating chargebacks; webhook payload and
+    # GET /v1/payments response are mocked to exercise the handler logic.
+    data_id = "999888777"
+    unknown_booking_id = str(uuid.uuid4())  # valid UUID, not in DB
+
+    mock_mp_sdk.payment.return_value.get.return_value = _charged_back_payment_response(
+        external_reference=unknown_booking_id,
+        payment_id=int(data_id),
+    )
+
+    x_sig = _make_valid_signature(data_id)
+    resp = await _post_chargeback_webhook(
+        client,
+        data_id=data_id,
+        x_signature=x_sig,
+        body=_chargeback_body(data_id),
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
+
+    # Nothing persisted — no booking matched mp_payment_id.
+    result = await db.execute(
+        select(Chargeback).where(Chargeback.mp_payment_id == data_id)
+    )
+    assert result.scalar_one_or_none() is None
+
+
+# ---------------------------------------------------------------------------
+# Case 2 — booking exists → creates Chargeback with in_process
+# ---------------------------------------------------------------------------
+
+async def test_chargeback_webhook_creates_chargeback_in_process(
+    client: AsyncClient, db: AsyncSession, mock_mp_sdk
+):
+    # MP sandbox does not support simulating chargebacks; mocked.
+    mp_payment_id = "111222333"
+    booking = await _make_confirmed_booking_with_mp_payment(db, mp_payment_id)
+
+    mock_mp_sdk.payment.return_value.get.return_value = _charged_back_payment_response(
+        external_reference=str(booking.id),
+        payment_id=int(mp_payment_id),
+        status_detail="in_process",
+    )
+
+    x_sig = _make_valid_signature(mp_payment_id)
+    resp = await _post_chargeback_webhook(
+        client,
+        data_id=mp_payment_id,
+        x_signature=x_sig,
+        body=_chargeback_body(mp_payment_id),
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
+
+    booking_id = booking.id
+    db.expire_all()
+
+    # Chargeback row created with correct status and booking reference.
+    result = await db.execute(
+        select(Chargeback).where(Chargeback.mp_payment_id == mp_payment_id)
+    )
+    cb = result.scalar_one_or_none()
+    assert cb is not None
+    assert cb.status == ChargebackStatusEnum.in_process
+    assert cb.booking_id == booking_id
+
+    # Booking must remain confirmed — chargebacks do not mutate booking status.
+    refreshed = await db.get(Booking, booking_id)
+    assert refreshed.status == BookingStatusEnum.confirmed
+
+
+# ---------------------------------------------------------------------------
+# Case 3 — existing in_process chargeback updated to settled
+# ---------------------------------------------------------------------------
+
+async def test_chargeback_webhook_updates_to_settled(
+    client: AsyncClient, db: AsyncSession, mock_mp_sdk
+):
+    # MP sandbox does not support simulating chargebacks; mocked.
+    mp_payment_id = "444555666"
+    booking = await _make_confirmed_booking_with_mp_payment(db, mp_payment_id)
+
+    # Pre-insert an in_process Chargeback to simulate a prior notification.
+    db.add(Chargeback(
+        booking_id=booking.id,
+        mp_payment_id=mp_payment_id,
+        status=ChargebackStatusEnum.in_process,
+    ))
+    await db.flush()
+
+    mock_mp_sdk.payment.return_value.get.return_value = _charged_back_payment_response(
+        external_reference=str(booking.id),
+        payment_id=int(mp_payment_id),
+        status_detail="settled",
+    )
+
+    x_sig = _make_valid_signature(mp_payment_id)
+    resp = await _post_chargeback_webhook(
+        client,
+        data_id=mp_payment_id,
+        x_signature=x_sig,
+        body=_chargeback_body(mp_payment_id),
+    )
+
+    assert resp.status_code == 200
+
+    db.expire_all()
+    result = await db.execute(
+        select(Chargeback).where(Chargeback.mp_payment_id == mp_payment_id)
+    )
+    cb = result.scalar_one()
+    assert cb.status == ChargebackStatusEnum.settled
+
+    refreshed = await db.get(Booking, booking.id)
+    assert refreshed.status == BookingStatusEnum.confirmed
+
+
+# ---------------------------------------------------------------------------
+# Case 4 — existing chargeback updated to reimbursed
+# ---------------------------------------------------------------------------
+
+async def test_chargeback_webhook_updates_to_reimbursed(
+    client: AsyncClient, db: AsyncSession, mock_mp_sdk
+):
+    # MP sandbox does not support simulating chargebacks; mocked.
+    mp_payment_id = "777888999"
+    booking = await _make_confirmed_booking_with_mp_payment(db, mp_payment_id)
+
+    db.add(Chargeback(
+        booking_id=booking.id,
+        mp_payment_id=mp_payment_id,
+        status=ChargebackStatusEnum.in_process,
+    ))
+    await db.flush()
+
+    mock_mp_sdk.payment.return_value.get.return_value = _charged_back_payment_response(
+        external_reference=str(booking.id),
+        payment_id=int(mp_payment_id),
+        status_detail="reimbursed",
+    )
+
+    x_sig = _make_valid_signature(mp_payment_id)
+    resp = await _post_chargeback_webhook(
+        client,
+        data_id=mp_payment_id,
+        x_signature=x_sig,
+        body=_chargeback_body(mp_payment_id),
+    )
+
+    assert resp.status_code == 200
+
+    db.expire_all()
+    result = await db.execute(
+        select(Chargeback).where(Chargeback.mp_payment_id == mp_payment_id)
+    )
+    cb = result.scalar_one()
+    assert cb.status == ChargebackStatusEnum.reimbursed
+
+    refreshed = await db.get(Booking, booking.id)
+    assert refreshed.status == BookingStatusEnum.confirmed
+
+
+# ---------------------------------------------------------------------------
+# Case 5 — invalid signature → 200, nothing persisted
+# ---------------------------------------------------------------------------
+
+async def test_chargeback_webhook_invalid_signature_returns_200_no_persist(
+    client: AsyncClient, db: AsyncSession
+):
+    # MP sandbox does not support simulating chargebacks; mocked.
+    # Invalid signature must return 200 (not 4xx) — returning 4xx would cause
+    # MP to enter a retry loop for what may be a configuration error, not a
+    # transient failure. Consistent with the payment webhook contract.
+    data_id = "123999456"
+
+    resp = await _post_chargeback_webhook(
+        client,
+        data_id=data_id,
+        x_signature="ts=0,v1=invalidsignature",
+        body=_chargeback_body(data_id),
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ignored", "reason": "invalid_signature"}
+
+    result = await db.execute(
+        select(Chargeback).where(Chargeback.mp_payment_id == data_id)
+    )
+    assert result.scalar_one_or_none() is None

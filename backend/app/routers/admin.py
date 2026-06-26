@@ -12,7 +12,7 @@ from app.config import settings
 from app.deps import get_current_admin, get_db
 from app.limiter import limiter
 from app.errors import NotFoundError
-from app.models.booking import AdminUser, Booking, BookingStatusEnum
+from app.models.booking import AdminUser, Booking, BookingStatusEnum, Chargeback, ChargebackStatusEnum
 from app.models.trip import PriceTranche, Trip
 from app.schemas.admin import (
     AdminLoginRequest,
@@ -20,6 +20,7 @@ from app.schemas.admin import (
     PriceTrancheCreate,
     PriceTrancheRead,
     AdminBookingRead,
+    ChargebackRead,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -171,3 +172,24 @@ async def delete_price_tranche(
 
     await db.delete(tranche)
     await db.commit()
+
+
+@router.get("/chargebacks", response_model=list[ChargebackRead])
+async def list_chargebacks(
+    status: ChargebackStatusEnum | None = None,
+    booking_id: UUID | None = None,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[ChargebackRead]:
+    query = (
+        select(Chargeback)
+        .limit(500)
+        .order_by(Chargeback.created_at.desc())
+    )
+    if status is not None:
+        query = query.where(Chargeback.status == status)
+    if booking_id is not None:
+        query = query.where(Chargeback.booking_id == booking_id)
+
+    result = await db.execute(query)
+    return list(result.scalars().all())
