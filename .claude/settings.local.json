@@ -21,7 +21,14 @@
       "Bash(.venv312/bin/python *)",
       "Bash(tee /tmp/suite_output.txt)",
       "Bash(echo \"EXIT:$?\")",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(git checkout *)",
+      "Bash(python3 -m pytest tests/integration/test_refund_requests.py -v)",
+      "Bash(.venv/bin/python *)",
+      "Bash(git -C /mnt/c/Users/lucas/Codigos/CruceroDelEste add backend/app/services/payment.py backend/app/routers/bookings.py backend/tests/integration/conftest.py backend/tests/integration/test_refund_requests.py CLAUDE.md)",
+      "Bash(git -C /mnt/c/Users/lucas/Codigos/CruceroDelEste status)",
+      "Bash(git *)",
+      "Bash(.venv/bin/alembic heads *)"
     ]
   }
 }
