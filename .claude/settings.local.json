@@ -28,7 +28,14 @@
       "Bash(git -C /mnt/c/Users/lucas/Codigos/CruceroDelEste add backend/app/services/payment.py backend/app/routers/bookings.py backend/tests/integration/conftest.py backend/tests/integration/test_refund_requests.py CLAUDE.md)",
       "Bash(git -C /mnt/c/Users/lucas/Codigos/CruceroDelEste status)",
       "Bash(git *)",
-      "Bash(.venv/bin/alembic heads *)"
+      "Bash(.venv/bin/alembic heads *)",
+      "Bash(npx shadcn@latest *)",
+      "Bash(npx tsc *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(kill %1)",
+      "Read(//tmp/**)",
+      "Bash(jobs)"
     ]
   }
 }
