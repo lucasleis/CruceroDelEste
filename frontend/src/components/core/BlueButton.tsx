@@ -21,6 +21,7 @@ interface BlueButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   icon?: string;
   arrow?: boolean;
+  leftIcon?: ReactNode;
 }
 
 const variantStyles: Record<Variant, { base: string; hover: string; active: string; radius: string }> = {
@@ -49,6 +50,7 @@ export function BlueButton({
   variant = "blue",
   icon,
   arrow = false,
+  leftIcon,
   disabled,
   style,
   ...rest
@@ -96,6 +98,7 @@ export function BlueButton({
       }}
       {...rest}
     >
+      {leftIcon && leftIcon}
       {icon && <BusIcon />}
       {children}
       {arrow && <ArrowIcon />}
