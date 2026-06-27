@@ -1,0 +1,31 @@
+@import "../styles/tokens.css";
+@import "tailwindcss";
+
+@theme {
+  --color-rio-blue: var(--color-primary);
+  --color-rio-red: var(--color-accent);
+  --color-rio-aqua: var(--color-aqua);
+  --color-rio-navy: var(--color-navy);
+  --color-rio-navy-dark: var(--color-navy-dark);
+  --color-rio-surface: var(--color-surface);
+  --color-rio-border: var(--color-border);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+
+  --radius-rio-sm: var(--radius-sm);
+  --radius-rio-md: var(--radius-md);
+  --radius-rio-lg: var(--radius-lg);
+  --radius-rio-pill: var(--radius-pill);
+
+  --shadow-rio-xs: var(--shadow-xs);
+  --shadow-rio-sm: var(--shadow-sm);
+  --shadow-rio-md: var(--shadow-md);
+  --shadow-rio-lg: var(--shadow-lg);
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-text-body);
+  font-family: var(--font-body);
+}
