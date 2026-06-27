@@ -29,3 +29,124 @@ body {
   color: var(--color-text-body);
   font-family: var(--font-body);
 }
+
+.rdp {
+  --rdp-cell-size: 32px;
+  --rdp-accent-color: var(--color-primary);
+  --rdp-background-color: white;
+  margin: 0;
+  width: 100%;
+}
+
+.rdp-months {
+  width: 100%;
+}
+
+.rdp-month {
+  width: 100%;
+}
+
+.rdp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rdp-head_cell {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 2px 0;
+}
+
+.rdp-cell {
+  text-align: center;
+  padding: 1px;
+}
+
+.rdp-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--color-navy);
+  background: none;
+  border: none;
+  cursor: pointer !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--duration-base) var(--ease-out);
+}
+
+.rdp-button:hover:not([disabled]) {
+  background: var(--color-surface);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.rdp-day_button:hover:not(:disabled) {
+  background: var(--color-border);
+  border-radius: 50%;
+}
+
+.rdp-cell button {
+  cursor: pointer;
+}
+
+.rdp-day_selected .rdp-button,
+.rdp-day_selected .rdp-button:hover {
+  background: var(--color-primary);
+  color: white;
+}
+
+.rdp-day_today .rdp-button {
+  font-weight: 700;
+  border: 2px solid var(--color-primary);
+}
+
+[data-outside="true"] .rdp-day_button {
+  color: var(--color-text-muted) !important;
+  opacity: 0.4;
+}
+
+.rdp-day_disabled .rdp-button {
+  color: var(--color-text-muted);
+  opacity: 0.3;
+  cursor: not-allowed !important;
+  pointer-events: auto;
+}
+
+.rdp-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 6px 4px;
+}
+
+.rdp-caption_label {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-navy);
+}
+
+.rdp-nav_button {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-navy);
+  background: none;
+  border: none;
+  transition: background var(--duration-base) var(--ease-out);
+}
+
+.rdp-nav_button:hover {
+  background: var(--color-surface);
+}
