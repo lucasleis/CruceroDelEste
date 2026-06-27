@@ -4,8 +4,10 @@ import { useState } from "react"
 import { CityInput } from "@/components/search/CityInput"
 import { DateInput } from "@/components/search/DateInput"
 import { TripTypeSelector } from "@/components/search/TripTypeSelector"
+import { PassengerSelector } from "@/components/search/PassengerSelector"
 
 type TripType = "round-trip" | "one-way"
+type SeatClass = "cualquiera" | "semi-cama" | "cama"
 
 export default function SearchPage() {
   const [origin, setOrigin] = useState("")
@@ -13,6 +15,11 @@ export default function SearchPage() {
   const [tripType, setTripType] = useState<TripType>("round-trip")
   const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined)
   const [returnDate, setReturnDate] = useState<Date | undefined>(undefined)
+  const [passengers, setPassengers] = useState<{ adults: number; children: number; class: SeatClass }>({
+    adults: 1,
+    children: 0,
+    class: "cualquiera",
+  })
 
   return (
     <div style={{ background: "white", padding: "48px" }}>
@@ -74,6 +81,14 @@ export default function SearchPage() {
           />
         )}
       </div>
+
+      <h2
+        className="mt-10 mb-4 text-lg font-bold"
+        style={{ fontFamily: "var(--font-display)" }}
+      >
+        PassengerSelector
+      </h2>
+      <PassengerSelector value={passengers} onChange={setPassengers} />
     </div>
   )
 }

@@ -150,3 +150,16 @@ body {
 .rdp-nav_button:hover {
   background: var(--color-surface);
 }
+
+button.flex.h-10.items-center.justify-between {
+  cursor: pointer !important;
+}
+
+[role="option"] {
+  cursor: pointer !important;
+}
+
+[role="option"]:hover {
+  background: var(--color-border) !important;
+  cursor: pointer !important;
+}
