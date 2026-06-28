@@ -163,3 +163,17 @@ button.flex.h-10.items-center.justify-between {
   background: var(--color-border) !important;
   cursor: pointer !important;
 }
+
+.carousel-prev-btn {
+  left: 0 !important;
+}
+
+.carousel-next-btn {
+  right: 0 !important;
+}
+
+.carousel-prev-btn,
+.carousel-next-btn {
+  cursor: pointer !important;
+}
+

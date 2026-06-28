@@ -35,7 +35,8 @@
       "Bash(npm run *)",
       "Bash(kill %1)",
       "Read(//tmp/**)",
-      "Bash(jobs)"
+      "Bash(jobs)",
+      "Bash(npx shadcn@latest add carousel --yes)"
     ]
   }
 }

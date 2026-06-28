@@ -3,6 +3,7 @@
 import { DestinationCard } from "@/components/travel/DestinationCard"
 import { DestinationCardV2 } from "@/components/travel/DestinationCardV2"
 
+
 const CARDS = [
   { city: "Buenos Aires", description: "Capital de Argentina", price: 18000 },
   { city: "Asunción", description: "Capital de Paraguay", price: 24000 },
@@ -88,6 +89,7 @@ export default function TravelPage() {
           image="/secciones/Destinos-Dest4.jpg"
         />
       </div>
+
     </div>
   )
 }
