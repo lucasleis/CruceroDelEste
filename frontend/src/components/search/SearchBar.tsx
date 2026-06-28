@@ -37,7 +37,7 @@ const SearchIcon = () => (
 )
 
 const Divider = () => (
-  <div style={{ width: 1, height: 32, background: "var(--color-border)", flexShrink: 0, marginLeft: "0.75rem", marginRight: "0.75rem" }} />
+  <div style={{ width: 1, height: 32, background: "var(--color-border)", flexShrink: 0, margin: "0 clamp(8px, 1.5vw, 16px)" }} />
 )
 
 export function SearchBar({ onSearch }: SearchBarProps) {
@@ -56,9 +56,12 @@ export function SearchBar({ onSearch }: SearchBarProps) {
   return (
     <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
     <div
-      className="items-center px-4 py-3"
+      className="items-center"
       style={{
         display: "inline-flex",
+        minWidth: "clamp(600px, 85vw, 1100px)",
+        fontSize: "clamp(11px, 1.1vw, 14px)",
+        padding: "clamp(8px, 1vw, 16px) clamp(12px, 2vw, 24px)",
         background: "white",
         boxShadow: "var(--shadow-md)",
         borderRadius: "var(--radius-lg)",
@@ -68,28 +71,39 @@ export function SearchBar({ onSearch }: SearchBarProps) {
 
       <Divider />
 
-      <CityInput label="Origen" placeholder="Elegí ciudad" value={origin} onChange={setOrigin} icon="pin" />
-      <CityInput label="Destino" placeholder="Elegí destino" value={destination} onChange={setDestination} icon="arrows" />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <CityInput label="Origen" value={origin} onChange={setOrigin} icon="pin" />
+      </div>
+      <div style={{ width: "12px", flexShrink: 0 }} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <CityInput label="Destino" value={destination} onChange={setDestination} icon="arrows" />
+      </div>
 
       <Divider />
 
-      <DateInput label="Fecha de ida" value={departureDate} onChange={setDepartureDate} mode={tripType} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <DateInput label="Fecha de ida" value={departureDate} onChange={setDepartureDate} mode={tripType} />
+      </div>
       {tripType === "round-trip" && (
-        <DateInput
-          label="Fecha de vuelta"
-          value={returnDate}
-          onChange={setReturnDate}
-          mode={tripType}
-          minDate={departureDate}
-          defaultMonth={departureDate}
-        />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <DateInput
+            label="Fecha de vuelta"
+            value={returnDate}
+            onChange={setReturnDate}
+            mode={tripType}
+            minDate={departureDate}
+            defaultMonth={departureDate}
+          />
+        </div>
       )}
 
       <Divider />
 
-      <PassengerSelector value={passengers} onChange={setPassengers} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <PassengerSelector value={passengers} onChange={setPassengers} />
+      </div>
 
-      <div style={{ marginLeft: "0.75rem", flexShrink: 0 }}>
+      <div style={{ marginLeft: "clamp(8px, 1.5vw, 16px)", flexShrink: 0 }}>
         <BlueButton
           variant="navy"
           leftIcon={<SearchIcon />}

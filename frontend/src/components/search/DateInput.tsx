@@ -86,7 +86,7 @@ export function DateInput({ label, value, onChange, minDate, defaultMonth }: Dat
               paddingLeft: "22px",
             }}
           >
-            {value ? format(value, "d MMM yyyy", { locale: es }) : "Seleccioná fecha"}
+            {value ? format(value, "d MMM yyyy", { locale: es }) : ""}
           </span>
         </button>
       </PopoverTrigger>
