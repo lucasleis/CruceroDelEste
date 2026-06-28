@@ -177,3 +177,40 @@ button.flex.h-10.items-center.justify-between {
   cursor: pointer !important;
 }
 
+
+/* Footer */
+.footer-link {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: none;
+}
+.footer-link:hover {
+  color: white;
+  text-decoration: underline;
+}
+
+.footer-social {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: white;
+  opacity: 0.75;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.footer-social:hover {
+  opacity: 1;
+}
+
+.footer-legal {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: white;
+  opacity: 0.6;
+  text-decoration: none;
+}
+.footer-legal:hover {
+  opacity: 1;
+}
