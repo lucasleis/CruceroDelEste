@@ -5,13 +5,7 @@ import { BlueButton } from "@/components/core/BlueButton"
 import { DestinationCardV2 } from "@/components/travel/DestinationCardV2"
 
 const BusIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="7" width="20" height="13" rx="2" />
-    <path d="M17 7V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2" />
-    <line x1="12" y1="12" x2="12" y2="12" />
-    <line x1="7" y1="12" x2="7" y2="12" />
-    <line x1="17" y1="12" x2="17" y2="12" />
-  </svg>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--color-primary)", flexShrink: 0 }}><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M17 7V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="12"/><line x1="7" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="17" y2="12"/></svg>
 )
 
 const CARDS = [
