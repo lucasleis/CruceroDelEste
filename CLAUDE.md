@@ -177,6 +177,7 @@ ExpresRioParana/
 │   │   │   ├── inventory.py
 │   │   │   ├── booking.py
 │   │   │   ├── payment.py
+│   │   │   ├── http.py          # call_with_retry — backoff exponencial para 429 de MP
 │   │   │   └── email.py
 │   │   ├── deps.py
 │   │   └── errors.py
@@ -258,9 +259,10 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/errors.py` — todas las excepciones del proyecto (SeatUnavailableError, NotFoundError, InvalidWebhookSignature, PaymentProcessingError, PaymentConfigError, NoPriceTranche) y register_exception_handlers. `NoPriceTranche` → 500 `"no_price_tranche_available"`. `app/exceptions.py` eliminado.
 - `app/services/pricing.py` — get_current_price, NoPriceTranche
 - `app/services/inventory.py` — get_available_seats, reserve_seats, mark_seats_sold
-- `app/services/booking.py` — create_booking (con parámetro `contact_email`), confirm_booking, expire_booking, InternationalRouteRequiredError
-- `app/services/payment.py` — verify_webhook_signature, get_payment, create_preference
-- `app/routers/payments.py` — POST /webhooks/mercadopago; selectinload chain extendido con `Route.origin_stop` y `Route.destination_stop`
+- `app/services/booking.py` — create_booking (con parámetro `contact_email`), confirm_booking, expire_booking, mark_booking_refunded, create_refund_request, InternationalRouteRequiredError
+- `app/services/payment.py` — verify_webhook_signature, get_payment, create_preference, create_refund. SDK retry interno desactivado (`max_retries=0`). `create_refund` envía `X-Idempotency-Key` por llamada. Tres calls wrapeadas con `call_with_retry`.
+- `app/services/http.py` — `call_with_retry`: async, backoff exponencial con jitter, reintenta solo en 429, max 3 reintentos (4 intentos totales), loguea warning al agotar reintentos, lanza `PaymentProcessingError(status_code=429)`.
+- `app/routers/payments.py` — POST /webhooks/mercadopago; POST /webhooks/chargebacks; selectinload chain extendido con `Route.origin_stop` y `Route.destination_stop`
 - `app/services/email.py` — send_confirmation_email, send_reminder_email, send_feedback_email. FROM: `no-reply@expresorioparana.com`. Subjects: "Expreso Río Paraná". `_context_for()` usa `trip.route.origin_stop.name` / `trip.route.destination_stop.name`.
 - `templates/email/confirmation.html` + `confirmation.txt`
 - `templates/email/reminder.html` + `reminder.txt`
@@ -269,7 +271,7 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `app/schemas/bookings.py` — PassengerCreate (con `luggage_count: int = 0`), PassengerRead (con `luggage_count: int`), BookingCreate (con `contact_email: EmailStr` requerido), BookingRead (con `contact_email: str`), BookingCreateResponse (con `contact_email: str`), RefundRequestCreate, RefundRequestRead
 - `app/schemas/admin.py` — AdminLoginRequest, AdminLoginResponse, PriceTrancheCreate, PriceTrancheRead, AdminBookingRead (con `contact_email: str`), SeatLayoutRead, StopCreate, StopUpdate, RouteCreate, TripCreate, TripUpdate, AdminTripRead
 - `app/routers/trips.py` — GET /trips, GET /trips/{id}/seats, GET /stops, GET /stops/{id}/valid-destinations
-- `app/routers/bookings.py` — POST /bookings (con validación AR↔PY, pasa `contact_email` a service y a MP payer), GET /bookings/{id}, POST /bookings/{id}/refund-request (acepta `contact_email` además de emails de pasajeros)
+- `app/routers/bookings.py` — POST /bookings (con validación AR↔PY, pasa `contact_email` a service y a MP payer), GET /bookings/{id}, POST /bookings/{id}/refund-request (acepta `contact_email` además de emails de pasajeros). Orden correcto: `create_refund` (MP) → `mark_booking_refunded` (DB) → `commit`.
 - `app/routers/admin.py` — POST /admin/login (con rate limiting 10/min), GET /admin/bookings, GET/POST/DELETE /admin/trips/{id}/price-tranches, GET /admin/refund-requests
 - `app/routers/admin_catalog.py` — GET /admin/seat-layouts; CRUD /admin/stops; CRUD /admin/routes; CRUD /admin/trips (con auto-generación de seats desde SeatLayout)
 - `app/main.py` — FastAPI con lifespan, CORSMiddleware (orígenes desde `settings.cors_origins`), slowapi middleware, exception handlers, routers. title: "Expreso Río Paraná API".
@@ -301,8 +303,7 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `migrations/versions/e5b8c3a2_add_contact_email_to_bookings.py` — `contact_email` en `bookings`
 - `migrations/versions/d4b1f9e2_add_seat_layouts.py` — tabla `seat_layouts`; FK nullable `seat_layout_id` en `trips`
 - `app/models/trip.py` — `CountryEnum`, `Stop`, `Route`, `Trip` (con FK `seat_layout_id`), `SeatLayout`
-- `app/models/booking.py` — `Booking` (con `contact_email`), `Passenger` (con `luggage_count`), `AdminUser`, `RefundRequest`
-- `app/models/__init__.py` — exporta `Stop`, `CountryEnum`, `RefundRequest`, `SeatLayout`
+- `app/models/booking.py` — `Booking` (con `contact_email`), `Passenger` (con `luggage_count`), `AdminUser`, `RefundRequest`, `Chargeback`, `ChargebackStatusEnum`
 
 ### Bugs críticos resueltos (branch `claude/vibrant-cori-71dm2`)
 
@@ -325,6 +326,12 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 ### Bugs críticos resueltos (branch de #014)
 
 - ✅ LLE-68 — `email.py` referenciaba `Route.origin`/`Route.destination` eliminados en #012
+
+### Bugs críticos resueltos (branch `claude/review-payments-bookings-tm37v3`)
+
+- ✅ LLE-87 — `app/services/http.py` creado: `call_with_retry` con backoff exponencial para 429. `app/services/payment.py`: tres calls MP wrapeadas, SDK retry interno desactivado (`max_retries=0`), `X-Idempotency-Key` en `create_refund`.
+- ✅ LLE-83 — Orden corregido en `app/routers/bookings.py`: `create_refund` (MP) antes de `mark_booking_refunded` (DB).
+- ✅ LLE-89 — Cerrado sin cambios. Riesgo de row lock contention ya mitigado por LLE-82: `mark_booking_refunded` no realiza I/O externo mientras mantiene el lock.
 
 ### Próximo a implementar
 
@@ -395,6 +402,7 @@ El campo `luggage_count` en `Passenger` **no es suficiente** para cumplir la nor
 28. Numeración de asientos provisional: `C01`…`Cnn` / `S01`…`Snn`. `Seat.seat_number` es `String(4)` — máximo 4 caracteres. ⚠️ Si los planos del cliente usan formato tipo `1A`, `2B` (5 chars), requiere migración. Confirmar cuando lleguen los planos (LLE-63).
 29. `GET /admin/trips` sin paginación — aceptable con ~2500 trips/año.
 30. `mp_chargeback_id` en tabla `chargebacks` es nullable. MP no siempre lo provee en el webhook inicial. Si en el futuro se necesita reconciliar chargebacks con el objeto chargeback de MP, implementar llamada a `GET /v1/chargebacks?payment_id={id}` en el handler.
+31. Tests de `test_bookings_router.py` y `test_refund_requests.py` no cubren el orden MP-antes-DB en el flujo de reembolso — el mock de MP no valida secuencia de llamadas.
 
 ---
 
@@ -445,6 +453,26 @@ El campo `luggage_count` en `Passenger` **no es suficiente** para cumplir la nor
 - Producción: `https://expresorioparana.com,https://admin.expresorioparana.com` (LLE-71).
 - `allow_credentials: True`, methods: GET/POST/PATCH/DELETE/OPTIONS, headers: Authorization/Content-Type.
 
+### app/services/http.py — call_with_retry
+
+- Async, acepta `fn: Callable[[], Awaitable[dict]]`.
+- Reintenta solo en `status == 429`. Todas las demás respuestas retornan inmediatamente.
+- Backoff: `base_delay * 2^attempt + random.uniform(0, 1)`. Default: `max_retries=3`, `base_delay=1.0`.
+- Total de intentos: `max_retries + 1` (loop de reintentos + intento final fuera del loop).
+- Al agotar reintentos: `logger.warning(...)` + `raise PaymentProcessingError(status_code=429)`.
+
+### app/services/payment.py — MercadoPago
+
+- `_REQUEST_OPTIONS`: `connection_timeout=30.0`, `max_retries=0` (SDK retry interno desactivado — el retry lo maneja `call_with_retry`).
+- `create_refund`: genera `idempotency_key = str(uuid.uuid4())` antes del retry loop; lo pasa via `RequestOptions(custom_headers={"X-Idempotency-Key": idempotency_key})`. Key capturado por closure en el lambda — mismo key en todos los reintentos.
+- `verify_webhook_signature`: manifest `"id:{data_id.lower()};[request-id:{x_request_id};]ts:{ts};"`. Ventana 120s/600s.
+- `get_payment`: `external_reference` como UUID → 502 si inválido. `round()` para amount.
+
+### app/routers/bookings.py — flujo de reembolso
+
+- Orden correcto: `create_refund` (MP) → `mark_booking_refunded` (DB) → `db.commit()`.
+- El `db.commit()` previo que persiste `RefundRequest` se mantiene independiente.
+
 ### Tests — arquitectura de la suite
 
 - Unit: funciones puras. Integration: Postgres real via testcontainers (fallback `TEST_DATABASE_URL`).
@@ -452,12 +480,7 @@ El campo `luggage_count` en `Passenger` **no es suficiente** para cumplir la nor
 - Mock MP: `preference.create` → 201, `payment.get` → approved, `payment().refunds` → 201.
 - Patrón identity map: `await db.expire_all()` post-commit.
 - Gap: `_context_for()` y Jinja2 no se ejecutan (Resend mockeado). Ver deuda #27.
-
-### app/services/payment.py
-
-- `verify_webhook_signature`: manifest `"id:{data_id.lower()};[request-id:{x_request_id};]ts:{ts};"`. Ventana 120s/600s.
-- `get_payment`: `external_reference` como UUID → 502 si inválido. `round()` para amount.
-- `create_refund`: `sdk.payment().refunds()` → `PaymentProcessingError` si status no en (200, 201).
+- Gap: tests de reembolso no validan secuencia MP-antes-DB. Ver deuda #31.
 
 ### app/services/email.py
 
@@ -476,12 +499,6 @@ NUNCA devolver 4xx. Casos: ok (200) | invalid_signature (200) | malformed_payloa
 - GET /trips/{id}/seats: filtros `seat_type`, `status`; 404; orden `seat_number ASC`.
 - GET /stops: todas las paradas.
 - GET /stops/{id}/valid-destinations: país opuesto; 404.
-
-### app/routers/bookings.py
-
-- POST /bookings: 404 | 409 `trip_not_available` | 409 `seat_unavailable` | 422 `international_route_required` | 500 | 502.
-- GET /bookings/{id}: público, selectinload passengers.
-- POST /bookings/{id}/refund-request: email = `{contact_email} | passenger_emails`. Persist-first (dos commits). `window_valid`: `now <= confirmed_at + 10d` Y `now <= departure_at - 24h`.
 
 ### app/routers/admin.py
 
@@ -509,4 +526,4 @@ NUNCA devolver 4xx. Casos: ok (200) | invalid_signature (200) | malformed_payloa
 - `reserve_seats`: `.with_for_update(nowait=True)`.
 - `mark_seats_sold`: `.with_for_update()` sin nowait.
 - `create_refund_request`: `flush()` para ID. No hace commit.
-- `mark_booking_refunded`: guard idempotente.
+- `mark_booking_refunded`: guard idempotente. Solo opera sobre DB — sin I/O externo mientras mantiene el lock.
