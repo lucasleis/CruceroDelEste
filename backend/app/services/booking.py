@@ -30,10 +30,11 @@ _SEAT_TYPE_TITLES: dict[SeatTypeEnum, str] = {
     SeatTypeEnum.cama: "Pasaje Cama",
     SeatTypeEnum.semi_cama: "Pasaje Semi Cama",
 }
-assert set(_SEAT_TYPE_TITLES) == set(SeatTypeEnum), (
-    f"_SEAT_TYPE_TITLES no cubre todos los SeatTypeEnum: "
-    f"faltan {set(SeatTypeEnum) - set(_SEAT_TYPE_TITLES)}"
-)
+if set(_SEAT_TYPE_TITLES) != set(SeatTypeEnum):
+    _missing = set(SeatTypeEnum) - set(_SEAT_TYPE_TITLES)
+    raise ValueError(
+        f"_SEAT_TYPE_TITLES no cubre todos los SeatTypeEnum: faltan {_missing}"
+    )
 
 
 @dataclass
