@@ -23,6 +23,7 @@ import hashlib
 import hmac
 import logging
 import time
+import uuid
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -31,13 +32,14 @@ from mercadopago.config import RequestOptions
 
 from app.config import settings
 from app.errors import InvalidWebhookSignature, PaymentProcessingError
+from app.services.http import call_with_retry
 
 logger = logging.getLogger(__name__)
 
 # The SDK uses `requests` under the hood; `connection_timeout` is forwarded as
 # the single `timeout=` argument and applies to both connect and read.
 _REQUEST_TIMEOUT_S = 30.0
-_REQUEST_OPTIONS = RequestOptions(connection_timeout=_REQUEST_TIMEOUT_S)
+_REQUEST_OPTIONS = RequestOptions(connection_timeout=_REQUEST_TIMEOUT_S, max_retries=0)
 
 # Replay protection: reject webhooks whose ts is outside this window.
 _REPLAY_PAST_S = 120
@@ -107,8 +109,8 @@ async def create_preference(
         "auto_return": "approved",
     }
 
-    result = await asyncio.to_thread(
-        _sdk.preference().create, body, _REQUEST_OPTIONS,
+    result = await call_with_retry(
+        lambda: asyncio.to_thread(_sdk.preference().create, body, _REQUEST_OPTIONS),
     )
 
     status_code = result.get("status")
@@ -131,8 +133,8 @@ async def get_payment(payment_id: str) -> PaymentDetails:
     Used by the webhook handler to verify the payment status after receiving
     a notification. Raises PaymentProcessingError on non-200 responses.
     """
-    result = await asyncio.to_thread(
-        _sdk.payment().get, payment_id, _REQUEST_OPTIONS,
+    result = await call_with_retry(
+        lambda: asyncio.to_thread(_sdk.payment().get, payment_id, _REQUEST_OPTIONS),
     )
 
     status_code = result.get("status")
@@ -169,8 +171,14 @@ async def create_refund(mp_payment_id: str) -> None:
     Raises PaymentProcessingError on any non-2xx response.
     The caller is responsible for updating the booking status after this returns.
     """
-    result = await asyncio.to_thread(
-        _sdk.payment().refunds, mp_payment_id, {}, _REQUEST_OPTIONS,
+    idempotency_key = str(uuid.uuid4())
+    request_options = RequestOptions(
+        connection_timeout=_REQUEST_TIMEOUT_S,
+        max_retries=0,
+        custom_headers={"X-Idempotency-Key": idempotency_key},
+    )
+    result = await call_with_retry(
+        lambda: asyncio.to_thread(_sdk.payment().refunds, mp_payment_id, {}, request_options),
     )
 
     status_code = result.get("status")
