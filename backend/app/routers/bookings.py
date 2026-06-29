@@ -177,8 +177,6 @@ async def create_refund_request_endpoint(
         logger.error("refund_no_mp_payment_id booking_id=%s", booking.id)
         raise HTTPException(status_code=500, detail="internal_server_error")
 
-    await mark_booking_refunded(db, booking.id)
-
     try:
         await create_refund(booking.mp_payment_id)
     except PaymentProcessingError as exc:
@@ -190,6 +188,7 @@ async def create_refund_request_endpoint(
         )
         raise HTTPException(status_code=502, detail="payment_gateway_error") from exc
 
+    await mark_booking_refunded(db, booking.id)
     await db.commit()
 
     return RefundRequestRead.model_validate(refund_req)
