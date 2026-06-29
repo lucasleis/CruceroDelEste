@@ -14,14 +14,16 @@ async def call_with_retry(
     max_retries: int = 3,
     base_delay: float = 1.0,
 ) -> dict:
-    for attempt in range(max_retries + 1):
+    for attempt in range(max_retries):
         result = await fn()
         if result.get("status") != 429:
             return result
-        if attempt == max_retries:
-            break
         delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
         await asyncio.sleep(delay)
+
+    result = await fn()
+    if result.get("status") != 429:
+        return result
 
     logger.warning("MP rate limit: max retries exhausted after %d attempts", max_retries)
     raise PaymentProcessingError("MP rate limit exceeded", status_code=429)
