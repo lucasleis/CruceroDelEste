@@ -58,7 +58,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["route_id"], ["routes.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.execute("ALTER TABLE trips ALTER COLUMN status DROP DEFAULT")
     op.execute("ALTER TABLE trips ALTER COLUMN status TYPE trip_status USING status::trip_status")
+    op.execute("ALTER TABLE trips ALTER COLUMN status SET DEFAULT 'scheduled'")
 
     op.create_table(
         "seats",
@@ -84,7 +86,9 @@ def upgrade() -> None:
         sa.UniqueConstraint("trip_id", "seat_number"),
     )
     op.execute("ALTER TABLE seats ALTER COLUMN seat_type TYPE seat_type USING seat_type::seat_type")
+    op.execute("ALTER TABLE seats ALTER COLUMN status DROP DEFAULT")
     op.execute("ALTER TABLE seats ALTER COLUMN status TYPE seat_status USING status::seat_status")
+    op.execute("ALTER TABLE seats ALTER COLUMN status SET DEFAULT 'available'")
 
     op.create_index("idx_seats_trip_status", "seats", ["trip_id", "status"])
     op.create_index(
@@ -148,9 +152,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["trip_id"], ["trips.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.execute("ALTER TABLE bookings ALTER COLUMN status DROP DEFAULT")
     op.execute(
         "ALTER TABLE bookings ALTER COLUMN status TYPE booking_status USING status::booking_status"
     )
+    op.execute("ALTER TABLE bookings ALTER COLUMN status SET DEFAULT 'pending_payment'")
 
     op.create_index("idx_bookings_trip", "bookings", ["trip_id"])
     op.create_index("idx_bookings_status", "bookings", ["status"])

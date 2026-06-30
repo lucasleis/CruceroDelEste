@@ -15,9 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "CREATE TYPE chargeback_status AS ENUM ('in_process', 'settled', 'reimbursed')"
-    )
+    # op.execute("CREATE TYPE chargeback_status AS ENUM ('in_process', 'settled', 'reimbursed')")
 
     op.create_table(
         "chargebacks",
@@ -35,7 +33,7 @@ def upgrade() -> None:
             sa.Enum(
                 "in_process", "settled", "reimbursed",
                 name="chargeback_status",
-                create_type=False,
+                create_type=True,
             ),
             nullable=False,
         ),

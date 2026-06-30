@@ -50,3 +50,5 @@ env = [
     "BOOKING_EXPIRY_MINUTES=15",
     "ENVIRONMENT=dev",
 ]
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
