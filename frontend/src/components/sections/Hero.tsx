@@ -88,7 +88,7 @@ export function Hero() {
           zIndex: 20,
         }}
       >
-        <SearchBar />
+        <SearchBar onSearch={(value) => console.log(value)} />
       </div>
     </section>
   )
