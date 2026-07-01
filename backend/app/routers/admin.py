@@ -12,7 +12,14 @@ from app.config import settings
 from app.deps import get_current_admin, get_db
 from app.limiter import limiter
 from app.errors import NotFoundError
-from app.models.booking import AdminUser, Booking, BookingStatusEnum, Chargeback, ChargebackStatusEnum
+from app.models.booking import (
+    AdminUser,
+    Booking,
+    BookingStatusEnum,
+    Chargeback,
+    ChargebackStatusEnum,
+    RefundRequest,
+)
 from app.models.trip import PriceTranche, Trip
 from app.schemas.admin import (
     AdminLoginRequest,
@@ -22,6 +29,7 @@ from app.schemas.admin import (
     AdminBookingRead,
     ChargebackRead,
 )
+from app.schemas.bookings import RefundRequestRead
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -78,6 +86,28 @@ async def list_bookings(
         query = query.where(Booking.status == booking_status)
     if trip_id is not None:
         query = query.where(Booking.trip_id == trip_id)
+
+    result = await db.execute(query)
+    return list(result.scalars().all())
+
+
+@router.get("/refund-requests", response_model=list[RefundRequestRead])
+async def list_refund_requests(
+    booking_id: UUID | None = None,
+    window_valid: bool | None = None,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[RefundRequestRead]:
+    query = (
+        select(RefundRequest)
+        # MVP: sin paginación, límite defensivo de 500
+        .limit(500)
+        .order_by(RefundRequest.requested_at.desc())
+    )
+    if booking_id is not None:
+        query = query.where(RefundRequest.booking_id == booking_id)
+    if window_valid is not None:
+        query = query.where(RefundRequest.window_valid == window_valid)
 
     result = await db.execute(query)
     return list(result.scalars().all())
