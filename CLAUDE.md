@@ -304,6 +304,8 @@ Las carpetas de referencias dentro de cada skill también están disponibles. Us
 - `migrations/versions/d4b1f9e2_add_seat_layouts.py` — tabla `seat_layouts`; FK nullable `seat_layout_id` en `trips`
 - `app/models/trip.py` — `CountryEnum`, `Stop`, `Route`, `Trip` (con FK `seat_layout_id`), `SeatLayout`
 - `app/models/booking.py` — `Booking` (con `contact_email`), `Passenger` (con `luggage_count`), `AdminUser`, `RefundRequest`, `Chargeback`, `ChargebackStatusEnum`
+- `app/routers/admin.py` — agregado GET /admin/refund-requests (filtros booking_id, window_valid; LIMIT 500; order by requested_at DESC). Reutiliza RefundRequestRead existente. (LLE-94)
+- `app/routers/admin.py` — agregado GET /admin/bookings/{booking_id} (selectinload passengers, 404 booking_not_found, reutiliza AdminBookingRead). (LLE-109)
 
 ### Bugs críticos resueltos (branch `claude/vibrant-cori-71dm2`)
 
