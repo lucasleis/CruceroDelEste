@@ -91,6 +91,23 @@ async def list_bookings(
     return list(result.scalars().all())
 
 
+@router.get("/bookings/{booking_id}", response_model=AdminBookingRead)
+async def get_booking(
+    booking_id: UUID,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AdminBookingRead:
+    result = await db.execute(
+        select(Booking)
+        .options(selectinload(Booking.passengers))
+        .where(Booking.id == booking_id)
+    )
+    booking = result.scalar_one_or_none()
+    if booking is None:
+        raise NotFoundError(detail="booking_not_found")
+    return booking
+
+
 @router.get("/refund-requests", response_model=list[RefundRequestRead])
 async def list_refund_requests(
     booking_id: UUID | None = None,
