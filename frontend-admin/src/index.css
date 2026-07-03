@@ -3,6 +3,25 @@
 @import "shadcn/tailwind.css";
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #6B7FD4;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #E8EBFA;
+  --color-secondary-foreground: #1A1A2E;
+  --color-muted: #E8EBFA;
+  --color-muted-foreground: #4A4A6A;
+  --color-destructive: #E87B7B;
+  --color-background: #F4F5FB;
+  --color-foreground: #1A1A2E;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #1A1A2E;
+  --color-border: #E2E4F0;
+  --color-input: #E2E4F0;
+  --color-ring: #6B7FD4;
+  --color-accent: #E8EBFA;
+  --color-accent-foreground: #1A1A2E;
+}
+
 * {
   font-family: 'Inter', sans-serif;
 }

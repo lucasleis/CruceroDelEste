@@ -44,7 +44,18 @@
       "Bash(echo \"PID:$!\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173/)",
       "Bash(curl -s http://localhost:5173/)",
-      "Bash(kill 7796)"
+      "Bash(kill 7796)",
+      "Bash(npx shadcn@latest add input --yes)",
+      "Bash(rm -f /tmp/vite-dev2.log)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5174/login)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5174/)",
+      "Bash(curl -s http://localhost:5174/src/pages/LoginPage.tsx)",
+      "Bash(kill 11679)",
+      "Bash(rm -f /tmp/vite-dev3.log)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5175/login)",
+      "Bash(curl -s http://localhost:5175/src/index.css)",
+      "Bash(kill 12335)",
+      "Bash(pkill -f \"vite\")"
     ]
   }
 }
