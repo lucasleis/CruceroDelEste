@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import type { ReactElement } from "react";
 import LoginPage from "@/pages/LoginPage";
+import AdminLayout from "@/components/AdminLayout";
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const token = localStorage.getItem("admin_token");
@@ -8,10 +9,6 @@ function ProtectedRoute({ children }: { children: ReactElement }) {
     return <Navigate to="/login" replace />;
   }
   return children;
-}
-
-function DashboardPlaceholder() {
-  return <p className="p-8 text-2xl font-semibold">Dashboard</p>;
 }
 
 function RootRedirect() {
@@ -28,7 +25,49 @@ export default function AppRouter() {
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <DashboardPlaceholder />
+            <AdminLayout>
+              <div className="p-8 text-2xl font-semibold">Dashboard</div>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/viajes"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <div className="p-8 text-2xl font-semibold">Viajes</div>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reservas"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <div className="p-8 text-2xl font-semibold">Reservas</div>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reembolsos"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <div className="p-8 text-2xl font-semibold">Reembolsos</div>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/contracargos"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <div className="p-8 text-2xl font-semibold">Contracargos</div>
+            </AdminLayout>
           </ProtectedRoute>
         }
       />
