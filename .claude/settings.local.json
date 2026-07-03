@@ -36,7 +36,15 @@
       "Bash(kill %1)",
       "Read(//tmp/**)",
       "Bash(jobs)",
-      "Bash(npx shadcn@latest add carousel --yes)"
+      "Bash(npx shadcn@latest add carousel --yes)",
+      "Bash(npm uninstall *)",
+      "Bash(timeout 15 npm run dev -- --host)",
+      "Bash(rm -f /tmp/vite-dev.log)",
+      "Bash(nohup npm run dev)",
+      "Bash(echo \"PID:$!\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(kill 7796)"
     ]
   }
 }

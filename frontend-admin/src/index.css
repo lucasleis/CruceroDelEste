@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "tailwindcss";
+
+* {
+  font-family: 'Inter', sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: #F4F5FB;
+    --foreground: #1A1A2E;
+    --card: #FFFFFF;
+    --card-foreground: #1A1A2E;
+    --popover: #FFFFFF;
+    --popover-foreground: #1A1A2E;
+    --primary: #6B7FD4;
+    --primary-foreground: #FFFFFF;
+    --secondary: #E8EBFA;
+    --secondary-foreground: #1A1A2E;
+    --muted: #E8EBFA;
+    --muted-foreground: #4A4A6A;
+    --accent: #E8EBFA;
+    --accent-foreground: #1A1A2E;
+    --destructive: #E87B7B;
+    --border: #E2E4F0;
+    --input: #E2E4F0;
+    --ring: #6B7FD4;
+    --radius: 0.625rem;
+    --sidebar: #FFFFFF;
+    --sidebar-foreground: #1A1A2E;
+    --sidebar-primary: #6B7FD4;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #E8EBFA;
+    --sidebar-accent-foreground: #1A1A2E;
+    --sidebar-border: #E2E4F0;
+    --sidebar-ring: #6B7FD4;
+  }
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
