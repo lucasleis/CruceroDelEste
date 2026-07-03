@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import type { ReactElement } from "react";
 import LoginPage from "@/pages/LoginPage";
 import AdminLayout from "@/components/AdminLayout";
+import TripsPage from "@/pages/TripsPage"
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const token = localStorage.getItem("admin_token");
@@ -36,7 +37,7 @@ export default function AppRouter() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <div className="p-8 text-2xl font-semibold">Viajes</div>
+              <TripsPage />
             </AdminLayout>
           </ProtectedRoute>
         }
