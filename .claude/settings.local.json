@@ -55,7 +55,11 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5175/login)",
       "Bash(curl -s http://localhost:5175/src/index.css)",
       "Bash(kill 12335)",
-      "Bash(pkill -f \"vite\")"
+      "Bash(pkill -f \"vite\")",
+      "Bash(rm -f /tmp/vite-dev4.log)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5174/dashboard)",
+      "Bash(curl -s http://localhost:5174/src/router.tsx)",
+      "Bash(kill 13427)"
     ]
   }
 }
