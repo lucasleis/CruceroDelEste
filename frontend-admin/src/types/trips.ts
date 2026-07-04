@@ -31,3 +31,20 @@ export interface AdminTripRead {
   seat_layout_id: string | null;
   created_at: string;
 }
+
+export interface PriceTrancheRead {
+  id: string;
+  trip_id: string;
+  seat_type: SeatTypeEnum;
+  min_sold: number;
+  max_sold: number;
+  price: number;
+  created_at: string;
+}
+
+export interface PriceTrancheCreate {
+  seat_type: SeatTypeEnum;
+  min_sold: number;
+  max_sold: number;
+  price: number;
+}

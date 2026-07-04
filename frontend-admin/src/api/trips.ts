@@ -6,6 +6,11 @@ export async function getAdminTrips(): Promise<AdminTripRead[]> {
   return response.data;
 }
 
+export async function getAdminTrip(id: string): Promise<AdminTripRead> {
+  const response = await apiClient.get<AdminTripRead>(`/admin/trips/${id}`);
+  return response.data;
+}
+
 export async function createTrip(data: {
   route_id: string;
   seat_layout_id: string;

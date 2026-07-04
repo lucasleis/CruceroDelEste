@@ -4,6 +4,7 @@ import LoginPage from "@/pages/LoginPage";
 import AdminLayout from "@/components/AdminLayout";
 import TripsPage from "@/pages/TripsPage"
 import ConfiguracionPage from "@/pages/ConfiguracionPage";
+import TripDetailPage from "@/pages/TripDetailPage";
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const token = localStorage.getItem("admin_token");
@@ -39,6 +40,16 @@ export default function AppRouter() {
           <ProtectedRoute>
             <AdminLayout>
               <TripsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/viajes/:tripId"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <TripDetailPage />
             </AdminLayout>
           </ProtectedRoute>
         }

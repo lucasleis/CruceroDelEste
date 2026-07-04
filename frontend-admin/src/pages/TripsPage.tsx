@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
@@ -65,6 +66,7 @@ function formatDate(iso: string): string {
 }
 
 export default function TripsPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [tripToDelete, setTripToDelete] = useState<AdminTripRead | null>(null);
 
@@ -230,7 +232,11 @@ export default function TripsPage() {
                 );
 
                 return (
-                  <TableRow key={trip.id}>
+                  <TableRow
+                    key={trip.id}
+                    className="cursor-pointer"
+                    onClick={() => navigate(`/viajes/${trip.id}`)}
+                  >
                     <TableCell className="py-3">
                       <div className="text-sm text-neutral-900">
                         {trip.route.origin_stop.name} →{" "}
@@ -260,7 +266,10 @@ export default function TripsPage() {
                         variant="ghost"
                         size="icon-sm"
                         className="text-[#E87B7B]"
-                        onClick={() => setTripToDelete(trip)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTripToDelete(trip);
+                        }}
                       >
                         <Trash2 className="size-4" />
                       </Button>
