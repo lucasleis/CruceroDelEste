@@ -20,6 +20,8 @@
   --color-ring: #6B7FD4;
   --color-accent: #E8EBFA;
   --color-accent-foreground: #1A1A2E;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #1A1A2E;
 }
 
 * {
@@ -55,6 +57,8 @@
     --sidebar-accent-foreground: #1A1A2E;
     --sidebar-border: #E2E4F0;
     --sidebar-ring: #6B7FD4;
+    --popover: #FFFFFF;
+    --popover-foreground: #1A1A2E;
   }
   * {
     border-color: var(--border);
