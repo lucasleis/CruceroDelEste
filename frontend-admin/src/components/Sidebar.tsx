@@ -6,6 +6,7 @@ const navItems = [
   { label: "Reservas", to: "/reservas" },
   { label: "Reembolsos", to: "/reembolsos" },
   { label: "Contracargos", to: "/contracargos" },
+  { label: "Configuración", to: "/configuracion" },
 ];
 
 export default function Sidebar() {

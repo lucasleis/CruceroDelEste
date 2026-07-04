@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import LoginPage from "@/pages/LoginPage";
 import AdminLayout from "@/components/AdminLayout";
 import TripsPage from "@/pages/TripsPage"
+import ConfiguracionPage from "@/pages/ConfiguracionPage";
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const token = localStorage.getItem("admin_token");
@@ -68,6 +69,16 @@ export default function AppRouter() {
           <ProtectedRoute>
             <AdminLayout>
               <div className="p-8 text-2xl font-semibold">Contracargos</div>
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/configuracion"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <ConfiguracionPage />
             </AdminLayout>
           </ProtectedRoute>
         }
