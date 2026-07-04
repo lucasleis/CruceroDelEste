@@ -60,7 +60,10 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5174/dashboard)",
       "Bash(curl -s http://localhost:5174/src/router.tsx)",
       "Bash(kill 13427)",
-      "Bash(git remote *)"
+      "Bash(git remote *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/next/package.json'\\).version\\)\")",
+      "Bash(kill -TERM 48461 48421 48420)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/ds-travel)"
     ]
   }
 }

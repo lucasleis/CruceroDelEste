@@ -3,6 +3,7 @@
 import { AmenityBadge } from "@/components/travel/AmenityBadge"
 import { SeatTypeBadge } from "@/components/travel/SeatTypeBadge"
 import { TripCard } from "@/components/travel/TripCard"
+import { FilterPanel } from "@/components/travel/FilterPanel"
 
 const AMENITY_TYPES = ["wifi", "ac", "usb", "bathroom", "entertainment"] as const
 const SEAT_TYPES = ["cama", "semi-cama", "ejecutivo"] as const
@@ -108,6 +109,11 @@ export default function DsTravelPage() {
             onSelect={() => alert(`Seleccionado: ${trip.origin} → ${trip.destination}`)}
           />
         ))}
+      </div>
+
+      <h2 style={{ ...groupTitleStyle, marginTop: "48px" }}>FilterPanel</h2>
+      <div style={{ background: "var(--color-surface)", padding: "24px" }}>
+        <FilterPanel />
       </div>
     </div>
   )
