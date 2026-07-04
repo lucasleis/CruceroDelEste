@@ -5,6 +5,8 @@ import AdminLayout from "@/components/AdminLayout";
 import TripsPage from "@/pages/TripsPage"
 import ConfiguracionPage from "@/pages/ConfiguracionPage";
 import TripDetailPage from "@/pages/TripDetailPage";
+import BookingsPage from "@/pages/BookingsPage";
+import BookingDetailPage from "@/pages/BookingDetailPage";
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const token = localStorage.getItem("admin_token");
@@ -59,7 +61,17 @@ export default function AppRouter() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <div className="p-8 text-2xl font-semibold">Reservas</div>
+              <BookingsPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reservas/:bookingId"
+        element={
+          <ProtectedRoute>
+            <AdminLayout>
+              <BookingDetailPage />
             </AdminLayout>
           </ProtectedRoute>
         }
