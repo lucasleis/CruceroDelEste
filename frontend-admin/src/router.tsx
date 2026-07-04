@@ -7,6 +7,7 @@ import ConfiguracionPage from "@/pages/ConfiguracionPage";
 import TripDetailPage from "@/pages/TripDetailPage";
 import BookingsPage from "@/pages/BookingsPage";
 import BookingDetailPage from "@/pages/BookingDetailPage";
+import RefundsPage from "@/pages/RefundsPage";
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const token = localStorage.getItem("admin_token");
@@ -81,7 +82,7 @@ export default function AppRouter() {
         element={
           <ProtectedRoute>
             <AdminLayout>
-              <div className="p-8 text-2xl font-semibold">Reembolsos</div>
+              <RefundsPage />
             </AdminLayout>
           </ProtectedRoute>
         }

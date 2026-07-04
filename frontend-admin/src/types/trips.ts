@@ -81,3 +81,11 @@ export interface AdminBookingRead {
   created_at: string;
   passengers: PassengerRead[];
 }
+
+export interface RefundRequestRead {
+  id: string;
+  booking_id: string;
+  requested_at: string;
+  email_used: string;
+  window_valid: boolean;
+}
