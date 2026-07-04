@@ -1,6 +1,6 @@
 "use client";
 
-import { Wifi, Wind, Usb, Bath, MonitorPlay, type LucideIcon } from "lucide-react";
+import { Wifi, Wind, Usb, MonitorPlay, type LucideIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -17,11 +17,30 @@ interface AmenityBadgeProps {
   className?: string;
 }
 
-const amenityIcon: Record<AmenityType, LucideIcon> = {
+function ToiletIcon({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 2.5h5a1 1 0 0 1 1 1V8H5V3.5a1 1 0 0 1 1-1Z" />
+      <path d="M4.5 8h8a1 1 0 0 1 1 1v.5a3.5 3.5 0 0 1-1.2 2.64V14a1 1 0 0 1-1 1h-4.6a1 1 0 0 1-1-1v-1.86A3.5 3.5 0 0 1 4.5 9.5V9a1 1 0 0 1 1-1Z" />
+      <path d="M7.5 15v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1" />
+    </svg>
+  );
+}
+
+const amenityIcon: Partial<Record<AmenityType, LucideIcon>> = {
   wifi: Wifi,
   ac: Wind,
   usb: Usb,
-  bathroom: Bath,
   entertainment: MonitorPlay,
 };
 
@@ -40,6 +59,13 @@ export function AmenityBadge({
 }: AmenityBadgeProps) {
   const Icon = amenityIcon[type];
   const label = amenityLabel[type];
+
+  const renderIcon = (size: number) =>
+    type === "bathroom" ? (
+      <ToiletIcon size={size} />
+    ) : (
+      Icon && <Icon size={size} aria-hidden="true" />
+    );
 
   const baseStyle: React.CSSProperties = {
     display: "inline-flex",
@@ -64,11 +90,9 @@ export function AmenityBadge({
                 borderRadius: "var(--radius-pill)",
               }}
             >
-              <Icon
-                size={16}
-                color="var(--color-primary)"
-                aria-hidden="true"
-              />
+              <span style={{ color: "var(--color-primary)", display: "inline-flex" }}>
+                {renderIcon(16)}
+              </span>
               <span className="sr-only">{label}</span>
             </span>
           </TooltipTrigger>
@@ -90,7 +114,9 @@ export function AmenityBadge({
         fontSize: "13px",
       }}
     >
-      <Icon size={16} color="var(--color-primary)" aria-hidden="true" />
+      <span style={{ color: "var(--color-primary)", display: "inline-flex" }}>
+        {renderIcon(16)}
+      </span>
       {label}
     </span>
   );
