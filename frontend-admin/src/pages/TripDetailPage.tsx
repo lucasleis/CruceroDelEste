@@ -29,50 +29,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getAdminTrip, getSeatLayouts } from "@/api/trips";
+import { getAdminTrip, getSeatLayouts, updateTrip } from "@/api/trips";
 import {
   getPriceTranches,
   createPriceTranche,
   deletePriceTranche,
 } from "@/api/priceTranches";
 import type { PriceTrancheRead, SeatTypeEnum, TripStatusEnum } from "@/types/trips";
+import { STATUS_BADGE, formatDate } from "@/lib/tripUtils";
 
-const STATUS_BADGE: Record<
-  TripStatusEnum,
-  { label: string; className: string }
-> = {
-  scheduled: {
-    label: "Programado",
-    className: "bg-[#E8EBFA] text-[#6B7FD4]",
-  },
-  completed: {
-    label: "Completado",
-    className: "bg-[#E8F5EE] text-[#6BBF8E]",
-  },
-  cancelled: {
-    label: "Cancelado",
-    className: "bg-[#FDEAEA] text-[#E87B7B]",
-  },
+const TRIP_STATUS_LABEL: Record<TripStatusEnum, string> = {
+  scheduled: "Programado",
+  completed: "Completado",
+  cancelled: "Cancelado",
 };
+
+function toBaDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", {
+    timeZone: "America/Buenos_Aires",
+  });
+}
+
+function toBaTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-GB", {
+    timeZone: "America/Buenos_Aires",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 const SEAT_TYPE_LABEL: Record<SeatTypeEnum, string> = {
   cama: "Cama",
   semi_cama: "Semi Cama",
 };
-
-const dateFormatter = new Intl.DateTimeFormat("es-AR", {
-  timeZone: "America/Buenos_Aires",
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-function formatDate(iso: string): string {
-  return dateFormatter.format(new Date(iso)).replace(",", "");
-}
 
 export default function TripDetailPage() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -88,6 +77,15 @@ export default function TripDetailPage() {
   const [price, setPrice] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDepartureDate, setEditDepartureDate] = useState("");
+  const [editDepartureTime, setEditDepartureTime] = useState("");
+  const [editArrivalDate, setEditArrivalDate] = useState("");
+  const [editArrivalTime, setEditArrivalTime] = useState("");
+  const [editStatus, setEditStatus] = useState<TripStatusEnum | "">("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   const tripQuery = useQuery({
     queryKey: ["admin", "trips", tripId],
@@ -176,6 +174,110 @@ export default function TripDetailPage() {
     }
   }
 
+  function openEditDialog() {
+    if (!tripQuery.data) return;
+    const trip = tripQuery.data;
+    setEditDepartureDate(toBaDate(trip.departure_at));
+    setEditDepartureTime(toBaTime(trip.departure_at));
+    setEditArrivalDate(toBaDate(trip.arrival_at));
+    setEditArrivalTime(toBaTime(trip.arrival_at));
+    setEditStatus(trip.status);
+    setEditError(null);
+    setEditOpen(true);
+  }
+
+  function resetEditForm() {
+    if (!tripQuery.data) return;
+    const trip = tripQuery.data;
+    setEditDepartureDate(toBaDate(trip.departure_at));
+    setEditDepartureTime(toBaTime(trip.departure_at));
+    setEditArrivalDate(toBaDate(trip.arrival_at));
+    setEditArrivalTime(toBaTime(trip.arrival_at));
+    setEditStatus(trip.status);
+    setEditError(null);
+  }
+
+  async function handleEditSubmit() {
+    if (
+      !tripId ||
+      !tripQuery.data ||
+      !editDepartureDate ||
+      !editDepartureTime ||
+      !editArrivalDate ||
+      !editArrivalTime ||
+      !editStatus
+    ) {
+      return;
+    }
+
+    const trip = tripQuery.data;
+    const newDepartureAt = `${editDepartureDate}T${editDepartureTime}:00-03:00`;
+    const newArrivalAt = `${editArrivalDate}T${editArrivalTime}:00-03:00`;
+
+    if (new Date(newArrivalAt).getTime() <= new Date(newDepartureAt).getTime()) {
+      setEditError("La llegada debe ser posterior a la salida.");
+      return;
+    }
+    setEditError(null);
+
+    const originalDepartureDate = toBaDate(trip.departure_at);
+    const originalDepartureTime = toBaTime(trip.departure_at);
+    const originalArrivalDate = toBaDate(trip.arrival_at);
+    const originalArrivalTime = toBaTime(trip.arrival_at);
+
+    const payload: {
+      departure_at?: string;
+      arrival_at?: string;
+      status?: TripStatusEnum;
+    } = {};
+
+    if (
+      editDepartureDate !== originalDepartureDate ||
+      editDepartureTime !== originalDepartureTime
+    ) {
+      payload.departure_at = newDepartureAt;
+    }
+    if (
+      editArrivalDate !== originalArrivalDate ||
+      editArrivalTime !== originalArrivalTime
+    ) {
+      payload.arrival_at = newArrivalAt;
+    }
+    if (editStatus !== trip.status) {
+      payload.status = editStatus;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      setEditOpen(false);
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      await updateTrip(tripId, payload);
+      toast.success("Viaje actualizado");
+      queryClient.invalidateQueries({ queryKey: ["admin", "trips", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+      setEditOpen(false);
+    } catch (error) {
+      const detail = (
+        error as { response?: { status?: number; data?: { detail?: string } } }
+      )?.response;
+      if (detail?.status === 422 && detail.data?.detail === "arrival_before_departure") {
+        toast.error("La llegada debe ser posterior a la salida.");
+      } else if (
+        detail?.status === 409 &&
+        detail.data?.detail === "trip_has_confirmed_bookings"
+      ) {
+        toast.error("No se puede cancelar: el viaje tiene reservas confirmadas.");
+      } else {
+        toast.error("Error al actualizar el viaje.");
+      }
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   if (tripQuery.isError) {
     return (
       <div className="max-w-6xl mx-auto px-6 py-8">
@@ -220,7 +322,12 @@ export default function TripDetailPage() {
             {trip.route.origin_stop.name} → {trip.route.destination_stop.name}
           </h1>
         </div>
-        <Badge className={status.className}>{status.label}</Badge>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={openEditDialog}>
+            Editar viaje
+          </Button>
+          <Badge className={status.className}>{status.label}</Badge>
+        </div>
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-4">
@@ -437,6 +544,104 @@ export default function TripDetailPage() {
               disabled={!seatType || !minSold || !maxSold || !price || saving}
             >
               {saving ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open);
+          if (!open) resetEditForm();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar viaje</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-neutral-600">
+                Salida
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={editDepartureDate}
+                  onChange={(e) => setEditDepartureDate(e.target.value)}
+                  required
+                />
+                <Input
+                  type="time"
+                  value={editDepartureTime}
+                  onChange={(e) => setEditDepartureTime(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-neutral-600">
+                Llegada
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={editArrivalDate}
+                  onChange={(e) => setEditArrivalDate(e.target.value)}
+                  required
+                />
+                <Input
+                  type="time"
+                  value={editArrivalTime}
+                  onChange={(e) => setEditArrivalTime(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-neutral-600">
+                Estado
+              </label>
+              <Select
+                value={editStatus}
+                onValueChange={(value) => setEditStatus(value as TripStatusEnum)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {editStatus ? TRIP_STATUS_LABEL[editStatus] : "Seleccionar estado"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="scheduled">Programado</SelectItem>
+                  <SelectItem value="completed">Completado</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {editError && <p className="text-sm text-[#E87B7B]">{editError}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleEditSubmit}
+              disabled={
+                !editDepartureDate ||
+                !editDepartureTime ||
+                !editArrivalDate ||
+                !editArrivalTime ||
+                !editStatus ||
+                editSaving
+              }
+            >
+              {editSaving ? "Guardando..." : "Guardar"}
             </Button>
           </DialogFooter>
         </DialogContent>

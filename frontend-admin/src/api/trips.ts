@@ -1,5 +1,5 @@
 import apiClient from "./client";
-import type { AdminTripRead, SeatLayoutRead } from "@/types/trips";
+import type { AdminTripRead, SeatLayoutRead, TripStatusEnum } from "@/types/trips";
 
 export async function getAdminTrips(): Promise<AdminTripRead[]> {
   const response = await apiClient.get<AdminTripRead[]>("/admin/trips");
@@ -18,6 +18,21 @@ export async function createTrip(data: {
   arrival_at: string;
 }): Promise<AdminTripRead> {
   const response = await apiClient.post<AdminTripRead>("/admin/trips", data);
+  return response.data;
+}
+
+export async function updateTrip(
+  id: string,
+  data: {
+    departure_at?: string;
+    arrival_at?: string;
+    status?: TripStatusEnum;
+  }
+): Promise<AdminTripRead> {
+  const response = await apiClient.patch<AdminTripRead>(
+    `/admin/trips/${id}`,
+    data
+  );
   return response.data;
 }
 
