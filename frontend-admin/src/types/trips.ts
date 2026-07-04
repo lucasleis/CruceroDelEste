@@ -89,3 +89,17 @@ export interface RefundRequestRead {
   email_used: string;
   window_valid: boolean;
 }
+
+export type ChargebackStatusEnum = "in_process" | "settled" | "reimbursed";
+
+export interface ChargebackRead {
+  id: string;
+  booking_id: string;
+  mp_payment_id: string;
+  mp_chargeback_id: string | null;
+  status: ChargebackStatusEnum;
+  status_detail: string | null;
+  date_documentation_deadline: string | null;
+  created_at: string;
+  updated_at: string;
+}
