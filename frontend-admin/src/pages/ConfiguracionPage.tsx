@@ -178,7 +178,7 @@ export default function ConfiguracionPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
-      <h1 className="text-2xl font-semibold text-neutral-900">Configuración</h1>
+      <h1 className="text-2xl font-semibold text-neutral-900">Catálogo</h1>
 
       <div className="mt-8">
         <div className="flex items-center justify-between">
@@ -194,9 +194,9 @@ export default function ConfiguracionPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>País</TableHead>
-                <TableHead>Acciones</TableHead>
+                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">Nombre</TableHead>
+                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">País</TableHead>
+                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -259,9 +259,9 @@ export default function ConfiguracionPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Origen</TableHead>
-                <TableHead>Destino</TableHead>
-                <TableHead>Acciones</TableHead>
+                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">Origen</TableHead>
+                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">Destino</TableHead>
+                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
