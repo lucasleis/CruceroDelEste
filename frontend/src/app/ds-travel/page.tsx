@@ -4,6 +4,7 @@ import { AmenityBadge } from "@/components/travel/AmenityBadge"
 import { SeatTypeBadge } from "@/components/travel/SeatTypeBadge"
 import { TripCard } from "@/components/travel/TripCard"
 import { FilterPanel } from "@/components/travel/FilterPanel"
+import { SearchSummaryBar } from "@/components/travel/SearchSummaryBar"
 
 const AMENITY_TYPES = ["wifi", "ac", "usb", "bathroom", "entertainment"] as const
 const SEAT_TYPES = ["cama", "semi-cama", "ejecutivo"] as const
@@ -63,7 +64,16 @@ const groupTitleStyle: React.CSSProperties = {
 
 export default function DsTravelPage() {
   return (
-    <div style={{ background: "white", padding: "48px" }}>
+    <div style={{ background: "white" }}>
+      <SearchSummaryBar
+        origin="Buenos Aires (Retiro)"
+        destination="Asunción (Terminal)"
+        date="Viernes 20 de junio, 2026"
+        passengerCount={1}
+        onEditClick={() => alert("Editar búsqueda")}
+      />
+
+      <div style={{ padding: "48px" }}>
       <h1
         style={{
           fontFamily: "var(--font-display)",
@@ -114,6 +124,7 @@ export default function DsTravelPage() {
       <h2 style={{ ...groupTitleStyle, marginTop: "48px" }}>FilterPanel</h2>
       <div style={{ background: "var(--color-surface)", padding: "24px" }}>
         <FilterPanel />
+      </div>
       </div>
     </div>
   )
