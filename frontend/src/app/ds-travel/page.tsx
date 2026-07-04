@@ -18,7 +18,7 @@ const TRIP_CARDS = [
     destination: "Rosario (Terminal)",
     durationMinutes: 210,
     isDirect: true,
-    seatType: "cama" as const,
+    seatTypes: ["cama", "semi-cama"] as const,
     amenities: ["wifi", "ac", "usb"] as const,
     priceFrom: 43900,
     availableSeats: 18,
@@ -32,7 +32,7 @@ const TRIP_CARDS = [
     destination: "Asunción (Terminal)",
     durationMinutes: 780,
     isDirect: false,
-    seatType: "semi-cama" as const,
+    seatTypes: ["semi-cama"] as const,
     amenities: ["wifi", "bathroom", "entertainment"] as const,
     priceFrom: 62500,
     availableSeats: 7,
@@ -46,7 +46,7 @@ const TRIP_CARDS = [
     destination: "Posadas (Terminal)",
     durationMinutes: 660,
     isDirect: true,
-    seatType: "ejecutivo" as const,
+    seatTypes: ["ejecutivo"] as const,
     amenities: ["wifi", "ac", "usb", "bathroom"] as const,
     priceFrom: 38900,
     availableSeats: 3,
@@ -115,6 +115,7 @@ export default function DsTravelPage() {
           <TripCard
             key={trip.departureTime}
             {...trip}
+            seatTypes={[...trip.seatTypes]}
             amenities={[...trip.amenities]}
             onSelect={() => alert(`Seleccionado: ${trip.origin} → ${trip.destination}`)}
           />

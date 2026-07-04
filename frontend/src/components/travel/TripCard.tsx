@@ -16,9 +16,9 @@ interface TripCardProps {
   destination: string;
   durationMinutes: number;
   isDirect: boolean;
-  seatType: SeatType;
+  seatTypes: SeatType[];
   amenities: AmenityType[];
-  priceFrom: number;
+  priceFrom: number | null;
   availableSeats: number;
   onSelect: () => void;
   className?: string;
@@ -47,7 +47,7 @@ export function TripCard({
   destination,
   durationMinutes,
   isDirect,
-  seatType,
+  seatTypes,
   amenities,
   priceFrom,
   availableSeats,
@@ -199,8 +199,10 @@ export function TripCard({
           <span>{isDirect ? "Directo" : "Con escala"}</span>
         </div>
 
-        <div>
-          <SeatTypeBadge type={seatType} />
+        <div style={{ display: "flex", gap: "6px" }}>
+          {seatTypes.map((seatType) => (
+            <SeatTypeBadge key={seatType} type={seatType} />
+          ))}
         </div>
 
         <div style={{ display: "flex", gap: "8px" }}>
@@ -233,16 +235,28 @@ export function TripCard({
         >
           Desde
         </span>
-        <span
-          style={{
-            fontFamily: "var(--font-display)",
-            color: "var(--color-text-primary)",
-            fontWeight: 700,
-            fontSize: "24px",
-          }}
-        >
-          ${priceFormatter.format(priceFrom)}
-        </span>
+        {priceFrom !== null ? (
+          <span
+            style={{
+              fontFamily: "var(--font-display)",
+              color: "var(--color-text-primary)",
+              fontWeight: 700,
+              fontSize: "24px",
+            }}
+          >
+            ${priceFormatter.format(priceFrom)}
+          </span>
+        ) : (
+          <span
+            style={{
+              fontFamily: "var(--font-body)",
+              color: "var(--color-text-muted)",
+              fontSize: "24px",
+            }}
+          >
+            Sin precio
+          </span>
+        )}
 
         {isUrgent ? (
           <span
