@@ -6,6 +6,16 @@ export async function getAdminTrips(): Promise<AdminTripRead[]> {
   return response.data;
 }
 
+export async function createTrip(data: {
+  route_id: string;
+  seat_layout_id: string;
+  departure_at: string;
+  arrival_at: string;
+}): Promise<AdminTripRead> {
+  const response = await apiClient.post<AdminTripRead>("/admin/trips", data);
+  return response.data;
+}
+
 export async function deleteTrip(id: string): Promise<void> {
   await apiClient.delete(`/admin/trips/${id}`);
 }
