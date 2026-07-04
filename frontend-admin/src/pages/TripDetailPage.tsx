@@ -36,13 +36,12 @@ import {
   deletePriceTranche,
 } from "@/api/priceTranches";
 import type { PriceTrancheRead, SeatTypeEnum, TripStatusEnum } from "@/types/trips";
-import { STATUS_BADGE, formatDate } from "@/lib/tripUtils";
-
-const TRIP_STATUS_LABEL: Record<TripStatusEnum, string> = {
-  scheduled: "Programado",
-  completed: "Completado",
-  cancelled: "Cancelado",
-};
+import {
+  STATUS_BADGE,
+  formatDate,
+  SEAT_TYPE_LABEL,
+  TRIP_STATUS_LABEL,
+} from "@/lib/tripUtils";
 
 function toBaDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-CA", {
@@ -57,11 +56,6 @@ function toBaTime(iso: string): string {
     minute: "2-digit",
   });
 }
-
-const SEAT_TYPE_LABEL: Record<SeatTypeEnum, string> = {
-  cama: "Cama",
-  semi_cama: "Semi Cama",
-};
 
 export default function TripDetailPage() {
   const { tripId } = useParams<{ tripId: string }>();

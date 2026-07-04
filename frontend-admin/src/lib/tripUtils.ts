@@ -1,4 +1,4 @@
-import type { TripStatusEnum } from "@/types/trips";
+import type { BookingStatusEnum, SeatTypeEnum, TripStatusEnum } from "@/types/trips";
 
 export const STATUS_BADGE: Record<
   TripStatusEnum,
@@ -31,3 +31,25 @@ export const dateFormatter = new Intl.DateTimeFormat("es-AR", {
 export function formatDate(iso: string): string {
   return dateFormatter.format(new Date(iso)).replace(",", "");
 }
+
+export const BOOKING_STATUS_BADGE: Record<
+  BookingStatusEnum,
+  { label: string; className: string }
+> = {
+  confirmed: { label: "Confirmada", className: "bg-[#E8F5EE] text-[#6BBF8E]" },
+  pending_payment: {
+    label: "Pago pendiente",
+    className: "bg-[#FEF9C3] text-[#854D0E]",
+  },
+  expired: { label: "Vencida", className: "bg-[#F4F5FB] text-neutral-600" },
+  refunded: { label: "Reembolsada", className: "bg-[#E8EBFA] text-[#6B7FD4]" },
+};
+
+export const SEAT_TYPE_LABEL: Record<SeatTypeEnum, string> = {
+  cama: "Cama",
+  semi_cama: "Semi Cama",
+};
+
+export const TRIP_STATUS_LABEL: Record<TripStatusEnum, string> = Object.fromEntries(
+  Object.entries(STATUS_BADGE).map(([k, v]) => [k, v.label])
+) as Record<TripStatusEnum, string>;

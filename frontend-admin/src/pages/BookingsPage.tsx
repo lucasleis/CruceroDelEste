@@ -13,29 +13,7 @@ import {
 } from "@/components/ui/table";
 import { getBookings } from "@/api/bookings";
 import type { BookingStatusEnum } from "@/types/trips";
-import { formatDate } from "@/lib/tripUtils";
-
-const STATUS_BADGE: Record<
-  BookingStatusEnum,
-  { label: string; className: string }
-> = {
-  confirmed: {
-    label: "Confirmada",
-    className: "bg-[#E8F5EE] text-[#6BBF8E]",
-  },
-  pending_payment: {
-    label: "Pago pendiente",
-    className: "bg-[#FEF9C3] text-[#854D0E]",
-  },
-  expired: {
-    label: "Vencida",
-    className: "bg-[#F4F5FB] text-neutral-600",
-  },
-  refunded: {
-    label: "Reembolsada",
-    className: "bg-[#E8EBFA] text-[#6B7FD4]",
-  },
-};
+import { formatDate, BOOKING_STATUS_BADGE } from "@/lib/tripUtils";
 
 const FILTERS: { label: string; value: BookingStatusEnum | "all" }[] = [
   { label: "Todas", value: "all" },
@@ -128,7 +106,7 @@ export default function BookingsPage() {
 
             {!bookingsQuery.isLoading &&
               bookings.map((booking) => {
-                const status = STATUS_BADGE[booking.status];
+                const status = BOOKING_STATUS_BADGE[booking.status];
                 return (
                   <TableRow
                     key={booking.id}
