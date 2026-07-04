@@ -59,7 +59,8 @@
       "Bash(rm -f /tmp/vite-dev4.log)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5174/dashboard)",
       "Bash(curl -s http://localhost:5174/src/router.tsx)",
-      "Bash(kill 13427)"
+      "Bash(kill 13427)",
+      "Bash(git remote *)"
     ]
   }
 }
