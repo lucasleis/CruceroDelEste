@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { Heading } from "@/components/core/Heading"
 import { Subheading } from "@/components/core/Subheading"
 import { FeatureItem } from "@/components/core/FeatureItem"
@@ -21,6 +22,22 @@ const ClockIcon = () => (
 )
 
 export function Hero() {
+  const router = useRouter()
+
+  function handleSearch(value: {
+    origin: string
+    destination: string
+    departureDate: Date | undefined
+    passengers: { adults: number; children: number }
+  }) {
+    const date = value.departureDate?.toISOString().split("T")[0]
+    if (!date) return
+    const passengers = value.passengers.adults + value.passengers.children
+    router.push(
+      `/resultados?origin=${value.origin}&destination=${value.destination}&date=${date}&passengers=${passengers}`
+    )
+  }
+
   return (
     <section style={{ width: "100%", minHeight: "80vh", position: "relative", overflow: "hidden" }}>
       {/* Background image */}
@@ -88,7 +105,7 @@ export function Hero() {
           zIndex: 20,
         }}
       >
-        <SearchBar onSearch={(value) => console.log(value)} />
+        <SearchBar onSearch={handleSearch} />
       </div>
     </section>
   )
