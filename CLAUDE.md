@@ -60,6 +60,52 @@ Ubicados en `frontend/src/types/`.
 
 ---
 
+## Proceso de trabajo
+
+Este proyecto usa un flujo de tres capas: **Claude** (arquitectura y revisión) → **Claude Code** (implementación) → **Lucas** (aprobación y merge).
+
+### Flujo estándar por ticket
+
+1. Claude genera un prompt optimizado para Claude Code
+2. Lucas ejecuta el prompt en Claude Code
+3. Claude Code propone — no implementa sin aprobación explícita
+4. Lucas pega la propuesta en el chat con Claude
+5. Claude evalúa críticamente la propuesta (no rubber-stamping)
+6. Si hay problemas: Claude los señala y corrige el prompt
+7. Si está bien: Lucas aprueba y Claude Code implementa
+8. Lucas revisa el código generado antes de commitear a main
+9. Claude actualiza Linear y CLAUDE.md
+
+### Reglas del proceso
+
+- **Propuesta antes de código** — Claude Code siempre anuncia qué va a hacer y espera aprobación explícita antes de escribir una línea
+- **Scope quirúrgico** — cada prompt tiene un scope acotado, sin refactoring fuera del ticket
+- **Validar antes de implementar** — confirmar que los endpoints existen, que los bugs son reales, que los archivos están donde se espera
+- **Un ticket a la vez** — no se mezclan cambios de distintos tickets en una misma sesión
+- **Claude Code nunca mergea a main** — Lucas revisa y commitea manualmente
+- **Preguntar antes de asumir** — si algo es ambiguo, Claude Code se detiene y consulta
+
+### Cómo arrancar una conversación nueva
+
+Decile a Claude: "Leé CLAUDE.md y continuamos. El próximo paso es [descripción breve]."
+Claude va a leer el archivo, entender el estado del proyecto, y retomar desde donde quedó sin necesidad de re-explicar nada.
+
+### Prompt de arranque para conversación nueva
+
+Copiar y pegar al inicio de cada conversación nueva:
+
+---
+Leé CLAUDE.md del proyecto (raíz del monorepo). Ese archivo tiene todo el contexto: stack, reglas de negocio, componentes construidos y proceso de trabajo.
+
+Una vez leído:
+1. Si tenés acceso a Linear (MCP conectado): buscá los tickets del proyecto "Expresio Rio Parana" en estado Todo o In Progress, analizá dependencias y bloqueantes, y proponé el próximo paso con justificación.
+2. Si no tenés acceso a Linear: indicalo y pedile a Lucas que describa qué sigue.
+
+No arranques a implementar nada hasta que Lucas apruebe explícitamente el paso propuesto.
+---
+
+---
+
 ## Reglas globales — NUNCA violarlas
 
 - **Nunca mergear a `main` directamente.** Todo el trabajo va en branches. El merge a main lo hace Lucas a mano después de revisar.
