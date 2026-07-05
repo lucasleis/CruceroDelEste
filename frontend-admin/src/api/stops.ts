@@ -9,6 +9,7 @@ export async function getStops(): Promise<StopRead[]> {
 export async function createStop(data: {
   name: string;
   country: CountryEnum;
+  province?: string;
 }): Promise<StopRead> {
   const response = await apiClient.post<StopRead>("/admin/stops", data);
   return response.data;

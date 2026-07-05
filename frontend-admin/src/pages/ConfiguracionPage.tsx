@@ -42,6 +42,7 @@ export default function ConfiguracionPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [country, setCountry] = useState<CountryEnum | "">("");
+  const [province, setProvince] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [routeToDelete, setRouteToDelete] = useState<RouteRead | null>(null);
@@ -89,13 +90,14 @@ export default function ConfiguracionPage() {
   function resetForm() {
     setName("");
     setCountry("");
+    setProvince("");
   }
 
   async function handleCreateSubmit() {
     if (!name || !country) return;
     setSaving(true);
     try {
-      await createStop({ name, country });
+      await createStop({ name, country, province: province || undefined });
       toast.success("Parada creada");
       queryClient.invalidateQueries({ queryKey: ["admin", "stops"] });
       setCreateOpen(false);
@@ -195,6 +197,7 @@ export default function ConfiguracionPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">Nombre</TableHead>
+                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">Provincia</TableHead>
                 <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">País</TableHead>
                 <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">Acciones</TableHead>
               </TableRow>
@@ -224,6 +227,9 @@ export default function ConfiguracionPage() {
                   <TableRow key={stop.id}>
                     <TableCell className="py-3 text-sm text-neutral-900">
                       {stop.name}
+                    </TableCell>
+                    <TableCell className="py-3 text-sm text-neutral-900">
+                      {stop.province ?? "—"}
                     </TableCell>
                     <TableCell className="py-3 text-sm text-neutral-900">
                       {COUNTRY_LABEL[stop.country]}
@@ -390,6 +396,22 @@ export default function ConfiguracionPage() {
                   <SelectItem value="PY">Paraguay</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="stop-province"
+                className="text-sm font-medium text-neutral-600"
+              >
+                Provincia
+              </label>
+              <Input
+                id="stop-province"
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+                maxLength={100}
+                placeholder="Ej: Buenos Aires"
+              />
             </div>
           </div>
 
