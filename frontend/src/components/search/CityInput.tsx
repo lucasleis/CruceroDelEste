@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import {
   Select,
   SelectContent,
@@ -11,10 +12,34 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-const CITIES: Record<string, string[]> = {
-  Argentina: ["Concordia", "Paraná", "Santa Fe", "Rosario", "Buenos Aires", "Corrientes", "Posadas"],
-  Paraguay: ["Asunción", "Encarnación", "Ciudad del Este"],
-  Brasil: ["Foz do Iguaçu"],
+interface StopRead {
+  id: string
+  name: string
+  country: "AR" | "PY"
+  province: string | null
+  created_at: string
+}
+
+type GroupedStops = Record<string, Record<string, StopRead[]>>
+
+const COUNTRY_ORDER: Array<StopRead["country"]> = ["AR", "PY"]
+
+const COUNTRY_LABELS: Record<StopRead["country"], string> = {
+  AR: "Argentina",
+  PY: "Paraguay",
+}
+
+const NO_PROVINCE_LABEL = "Otros"
+
+function groupStops(stops: StopRead[]): GroupedStops {
+  const grouped: GroupedStops = {}
+  for (const stop of stops) {
+    const province = stop.province ?? NO_PROVINCE_LABEL
+    grouped[stop.country] ??= {}
+    grouped[stop.country][province] ??= []
+    grouped[stop.country][province].push(stop)
+  }
+  return grouped
 }
 
 const PinIcon = () => (
@@ -40,8 +65,49 @@ interface CityInputProps {
 }
 
 export function CityInput({ label, value, onChange, icon }: CityInputProps) {
+  const [stops, setStops] = useState<StopRead[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchStops() {
+      setLoading(true)
+      setError(null)
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL
+        const response = await fetch(`${baseUrl}/stops`)
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`)
+        }
+        const data: StopRead[] = await response.json()
+        if (!cancelled) {
+          setStops(data)
+        }
+      } catch {
+        if (!cancelled) {
+          setError("error")
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchStops()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const grouped = groupStops(stops)
+  const placeholder = loading ? "Cargando..." : error ? "Error al cargar" : ""
+
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={onChange} disabled={loading || !!error}>
       <SelectTrigger style={{ border: "none", background: "none", padding: 0, paddingRight: "4px", height: "auto", width: "100%", cursor: "pointer", boxShadow: "none" }} className="[&>svg]:ml-2">
         <div style={{ display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -50,7 +116,7 @@ export function CityInput({ label, value, onChange, icon }: CityInputProps) {
               {label}
             </span>
           </div>
-          <SelectValue placeholder="" />
+          <SelectValue placeholder={placeholder} />
         </div>
       </SelectTrigger>
 
@@ -62,7 +128,7 @@ export function CityInput({ label, value, onChange, icon }: CityInputProps) {
           borderColor: "var(--color-border)",
         }}
       >
-        {Object.entries(CITIES).map(([country, cities], i) => (
+        {COUNTRY_ORDER.filter((country) => grouped[country]).map((country, i) => (
           <span key={country}>
             {i > 0 && <SelectSeparator />}
             <SelectGroup>
@@ -73,21 +139,39 @@ export function CityInput({ label, value, onChange, icon }: CityInputProps) {
                   color: "var(--color-text-muted)",
                 }}
               >
-                {country}
+                {COUNTRY_LABELS[country]}
               </SelectLabel>
-              {cities.map((city) => (
-                <SelectItem
-                  key={city}
-                  value={city}
-                  className="text-sm"
-                  style={{
-                    fontFamily: "var(--font-body)",
-                    color: "var(--color-navy)",
-                  }}
-                >
-                  {city}
-                </SelectItem>
-              ))}
+              {Object.entries(grouped[country])
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([province, provinceStops]) => (
+                  <span key={province}>
+                    <div
+                      className="text-xs"
+                      style={{
+                        fontFamily: "var(--font-body)",
+                        color: "var(--color-text-muted)",
+                        paddingLeft: "12px",
+                        opacity: 0.75,
+                      }}
+                    >
+                      {province}
+                    </div>
+                    {provinceStops.map((stop) => (
+                      <SelectItem
+                        key={stop.id}
+                        value={stop.name}
+                        className="text-sm"
+                        style={{
+                          fontFamily: "var(--font-body)",
+                          color: "var(--color-navy)",
+                          paddingLeft: "24px",
+                        }}
+                      >
+                        {stop.name}
+                      </SelectItem>
+                    ))}
+                  </span>
+                ))}
             </SelectGroup>
           </span>
         ))}
