@@ -12,6 +12,7 @@ class StopRead(BaseModel):
     id: UUID
     name: str
     country: CountryEnum
+    province: str | None = None
 
 
 class RouteRead(BaseModel):

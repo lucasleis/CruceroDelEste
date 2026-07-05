@@ -58,11 +58,13 @@ class SeatLayoutRead(BaseModel):
 class StopCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     country: CountryEnum
+    province: str | None = Field(default=None, max_length=100)
 
 
 class StopUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     country: CountryEnum | None = None
+    province: str | None = Field(default=None, max_length=100)
 
 
 class RouteCreate(BaseModel):

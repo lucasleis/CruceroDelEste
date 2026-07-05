@@ -31,6 +31,8 @@ stops_router = APIRouter(prefix="/stops", tags=["stops"])
 async def list_trips(
     origin: str | None = Query(default=None),
     destination: str | None = Query(default=None),
+    origin_province: str | None = Query(default=None),
+    destination_province: str | None = Query(default=None),
     departure_date: date | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> list[TripRead]:
@@ -49,9 +51,17 @@ async def list_trips(
         query = query.where(
             Trip.route.has(Route.origin_stop.has(Stop.name == origin))
         )
+    elif origin_province is not None:
+        query = query.where(
+            Trip.route.has(Route.origin_stop.has(Stop.province == origin_province))
+        )
     if destination is not None:
         query = query.where(
             Trip.route.has(Route.destination_stop.has(Stop.name == destination))
+        )
+    elif destination_province is not None:
+        query = query.where(
+            Trip.route.has(Route.destination_stop.has(Stop.province == destination_province))
         )
 
     if departure_date is not None:

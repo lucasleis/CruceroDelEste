@@ -64,7 +64,7 @@ async def create_stop(
             status_code=status.HTTP_409_CONFLICT,
             detail="stop_name_conflict",
         )
-    stop = Stop(name=body.name, country=body.country)
+    stop = Stop(name=body.name, country=body.country, province=body.province)
     db.add(stop)
     await db.commit()
     await db.refresh(stop)
@@ -105,6 +105,9 @@ async def update_stop(
                 detail="stop_in_use",
             )
         stop.country = body.country
+
+    if body.province is not None:
+        stop.province = body.province
 
     await db.commit()
     await db.refresh(stop)
