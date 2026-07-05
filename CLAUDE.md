@@ -17,13 +17,35 @@ Sistema de venta de pasajes online para **Expreso Río Paraná**, empresa argent
 ```
 CruceroDelEste/           ← nombre del repo (histórico, no modificar)
 ├── backend/              ← FastAPI + PostgreSQL. Ver backend/CLAUDE.md
-├── frontend-landing/     ← Next.js, landing pública SEO (a desarrollar)
+├── frontend/             ← Next.js, sitio público + flujo de compra. Ver frontend/CLAUDE.md
 ├── frontend-admin/       ← React + Vite, panel de administración. Ver frontend-admin/CLAUDE.md
 ├── specs/                ← Documentación del proyecto
 │   ├── Crucero Del Este - Presupuesto.pdf
 │   └── Crucero del Este - Modulos Extras.txt
 └── CLAUDE.md             ← este archivo
 ```
+
+---
+
+## Frontend — Componentes de travel
+
+Ubicados en `frontend/src/components/travel/`.
+
+| Componente | Archivo | Descripción |
+|------------|---------|-------------|
+| AmenityBadge | AmenityBadge.tsx | Ícono de servicio a bordo. Modos: icon-only (Tooltip shadcn), icon-label. Variantes: wifi, ac, usb, bathroom, entertainment |
+| SeatTypeBadge | SeatTypeBadge.tsx | Pill badge de clase de asiento. Variantes: cama (azul sólido), semi-cama (aqua sólido), ejecutivo (outline) |
+| TripCard | TripCard.tsx | Card de resultado de búsqueda. Consume AmenityBadge y SeatTypeBadge. Borde izquierdo por disponibilidad: aqua >10, primary 5-10, accent 1-4 + badge urgencia. priceFrom acepta null |
+| FilterPanel | FilterPanel.tsx | Panel de filtros visual completo. onFilterChange preparada pero desconectada — ver LLE-126 |
+| SearchSummaryBar | SearchSummaryBar.tsx | Barra de resumen de búsqueda activa. onEditClick delegado a la página padre |
+
+---
+
+## Frontend — Páginas
+
+| Página | Ruta | Archivo | Descripción |
+|--------|------|---------|-------------|
+| Resultados | /resultados | app/resultados/page.tsx | Fetch GET /trips, mapea TripRead a TripCard. Amenities hardcodeadas hasta que backend las devuelva. Ver LLE-132 |
 
 ---
 
@@ -89,3 +111,11 @@ El dueño está en un conflicto societario interno. El interlocutor real del pro
 - **Lucas (user ID):** `3a547502-c723-4bbb-a05d-b4165f836768`
 - **Estados:** Done, Todo, Backlog, Canceled
 - **Prioridades:** 1=urgente, 2=alto, 3=medio, 4=bajo
+
+---
+
+## Variables de entorno requeridas
+
+| Variable | Proyecto | Descripción |
+|----------|----------|-------------|
+| NEXT_PUBLIC_API_URL | frontend/ | URL base del backend. Ejemplo: http://localhost:8000. Definir en .env.local (no commitear) |
