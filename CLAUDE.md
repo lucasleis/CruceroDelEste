@@ -38,6 +38,7 @@ Ubicados en `frontend/src/components/travel/`.
 | TripCard | TripCard.tsx | Card de resultado de búsqueda. Consume AmenityBadge y SeatTypeBadge. Borde izquierdo por disponibilidad: aqua >10, primary 5-10, accent 1-4 + badge urgencia. priceFrom acepta null |
 | FilterPanel | FilterPanel.tsx | Panel de filtros visual completo. onFilterChange preparada pero desconectada — ver LLE-126 |
 | SearchSummaryBar | SearchSummaryBar.tsx | Barra de resumen de búsqueda activa. onEditClick delegado a la página padre |
+| CityInput | CityInput.tsx | Selector de origen/destino. Recibe stops como prop (no fetchea). Valores prefijados: "stop:Nombre" o "province:Nombre". Props: allowedStopIds, onStopSelected, onProvinceSelected |
 
 ---
 
@@ -46,6 +47,16 @@ Ubicados en `frontend/src/components/travel/`.
 | Página | Ruta | Archivo | Descripción |
 |--------|------|---------|-------------|
 | Resultados | /resultados | app/resultados/page.tsx | Fetch GET /trips, mapea TripRead a TripCard. Amenities hardcodeadas hasta que backend las devuelva. Ver LLE-132 |
+
+---
+
+## Frontend — Tipos compartidos
+
+Ubicados en `frontend/src/types/`.
+
+| Archivo | Exporta | Descripción |
+|---------|---------|-------------|
+| trips.ts | StopRead | Forma de una parada devuelta por GET /stops. Importar desde aquí, no desde componentes. |
 
 ---
 
@@ -75,6 +86,8 @@ Ubicados en `frontend/src/components/travel/`.
 ## Regla de negocio crítica — AR↔PY
 
 Los servicios son internacionales. **No se puede vender un tramo dentro del mismo país** (cabotaje extranjero prohibido). Cada parada está etiquetada con su país (`AR` o `PY`). Si el origen es Argentina, el destino solo puede ser Paraguay, y viceversa. Esta regla se valida tanto en frontend como en backend.
+
+Esta regla también está enforced en el frontend: al seleccionar un origen en SearchBar, el dropdown de destino filtra automáticamente las paradas del país opuesto. Si el origen es una parada específica, se llama GET /stops/{id}/valid-destinations. Si el origen es una provincia, se filtra en memoria por country opuesto.
 
 ---
 

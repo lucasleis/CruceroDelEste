@@ -156,3 +156,47 @@ cd frontend-landing
 - No modifiques ningún otro archivo
 - No agregues ni quites secciones — el contenido es exactamente el de arriba
 - Confirmá con ✅ /DEVELOPMENT.md — creado
+
+---
+
+## Levantar el entorno local
+
+### Backend
+```bash
+wsl
+cd backend
+source .venv/bin/activate
+uvicorn app.main:app --reload
+```
+
+### Frontend (público)
+```bash
+wsl
+cd frontend
+npm run dev
+```
+
+**Si hay redirect infinito:**
+```bash
+rm -rf .next
+npm run dev
+```
+
+### Frontend Admin
+```bash
+wsl
+cd frontend-admin
+npm run dev
+```
+
+### Base de datos (acceso directo)
+```bash
+docker exec -it crucero-pg psql -U crucero -d crucerodeleste
+```
+
+### Migraciones de base de datos
+```bash
+cd backend
+alembic upgrade head
+```
+Note: requires .env variables loaded. They load automatically via python-dotenv since LLE-133.
