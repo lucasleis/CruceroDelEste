@@ -68,6 +68,7 @@ export function CityInput({ label, value, onChange, icon }: CityInputProps) {
   const [stops, setStops] = useState<StopRead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -105,9 +106,14 @@ export function CityInput({ label, value, onChange, icon }: CityInputProps) {
 
   const grouped = groupStops(stops)
   const placeholder = loading ? "Cargando..." : error ? "Error al cargar" : ""
+  const displayValue = value.startsWith("province:")
+    ? value.slice(9)
+    : value.startsWith("stop:")
+      ? value.slice(5)
+      : ""
 
   return (
-    <Select value={value} onValueChange={onChange} disabled={loading || !!error}>
+    <Select value={value} onValueChange={onChange} open={open} onOpenChange={setOpen} disabled={loading || !!error}>
       <SelectTrigger style={{ border: "none", background: "none", padding: 0, paddingRight: "4px", height: "auto", width: "100%", cursor: "pointer", boxShadow: "none" }} className="[&>svg]:ml-2">
         <div style={{ display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -116,7 +122,9 @@ export function CityInput({ label, value, onChange, icon }: CityInputProps) {
               {label}
             </span>
           </div>
-          <SelectValue placeholder={placeholder} />
+          <SelectValue placeholder={placeholder}>
+            {displayValue || placeholder}
+          </SelectValue>
         </div>
       </SelectTrigger>
 
@@ -133,45 +141,59 @@ export function CityInput({ label, value, onChange, icon }: CityInputProps) {
             {i > 0 && <SelectSeparator />}
             <SelectGroup>
               <SelectLabel
-                className="text-xs uppercase tracking-wide"
+                className="text-xs uppercase tracking-wide pl-0"
                 style={{
                   fontFamily: "var(--font-body)",
                   color: "var(--color-text-muted)",
+                  paddingLeft: "0px",
                 }}
               >
                 {COUNTRY_LABELS[country]}
               </SelectLabel>
               {Object.entries(grouped[country])
                 .sort(([a], [b]) => a.localeCompare(b))
-                .map(([province, provinceStops]) => (
-                  <span key={province}>
-                    <div
-                      className="text-xs"
-                      style={{
-                        fontFamily: "var(--font-body)",
-                        color: "var(--color-text-muted)",
-                        paddingLeft: "12px",
-                        opacity: 0.75,
-                      }}
-                    >
-                      {province}
-                    </div>
-                    {provinceStops.map((stop) => (
-                      <SelectItem
-                        key={stop.id}
-                        value={stop.name}
-                        className="text-sm"
+                .map(([province, provinceStops]) => {
+                  const provinceValue = `province:${province}`
+                  return (
+                    <span key={province}>
+                      <div
+                        className="text-sm hover:underline hover:bg-black/[0.03]"
+                        onClick={() => {
+                          onChange(provinceValue)
+                          setOpen(false)
+                        }}
                         style={{
                           fontFamily: "var(--font-body)",
-                          color: "var(--color-navy)",
-                          paddingLeft: "24px",
+                          color: "var(--color-primary)",
+                          fontWeight: 600,
+                          paddingLeft: "16px",
+                          cursor: "pointer",
                         }}
                       >
-                        {stop.name}
-                      </SelectItem>
-                    ))}
-                  </span>
-                ))}
+                        {province}
+                      </div>
+                      {provinceStops.map((stop) => {
+                        const stopValue = `stop:${stop.name}`
+                        const isStopSelected = value === stopValue
+                        return (
+                          <SelectItem
+                            key={stop.id}
+                            value={stopValue}
+                            className="text-sm pl-0"
+                            style={{
+                              fontFamily: "var(--font-body)",
+                              color: isStopSelected ? "var(--color-primary)" : "var(--color-navy)",
+                              fontWeight: isStopSelected ? 600 : 400,
+                              paddingLeft: 0,
+                            }}
+                          >
+                            <span style={{ paddingLeft: "32px", display: "block" }}>└ {stop.name}</span>
+                          </SelectItem>
+                        )
+                      })}
+                    </span>
+                  )
+                })}
             </SelectGroup>
           </span>
         ))}

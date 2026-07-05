@@ -128,8 +128,10 @@ export function ResultadosContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const origin = searchParams.get("origin") ?? "";
-  const destination = searchParams.get("destination") ?? "";
+  const originStop = searchParams.get("origin") ?? "";
+  const originProvince = searchParams.get("origin_province") ?? "";
+  const destinationStop = searchParams.get("destination") ?? "";
+  const destinationProvince = searchParams.get("destination_province") ?? "";
   const date = searchParams.get("date") ?? "";
   const passengers = Number(searchParams.get("passengers") ?? "1");
 
@@ -145,11 +147,13 @@ export function ResultadosContent() {
       setError(null);
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-        const url = `${baseUrl}/trips?origin=${encodeURIComponent(
-          origin
-        )}&destination=${encodeURIComponent(
-          destination
-        )}&departure_date=${encodeURIComponent(date)}`;
+        const params = new URLSearchParams();
+        if (originProvince) params.set("origin_province", originProvince);
+        else if (originStop) params.set("origin", originStop);
+        if (destinationProvince) params.set("destination_province", destinationProvince);
+        else if (destinationStop) params.set("destination", destinationStop);
+        if (date) params.set("departure_date", date);
+        const url = `${baseUrl}/trips?${params.toString()}`;
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`Request failed with status ${response.status}`);
@@ -174,13 +178,13 @@ export function ResultadosContent() {
     return () => {
       cancelled = true;
     };
-  }, [origin, destination, date]);
+  }, [originStop, originProvince, destinationStop, destinationProvince, date]);
 
   return (
     <div style={{ background: "var(--color-surface)", minHeight: "100vh" }}>
       <SearchSummaryBar
-        origin={origin}
-        destination={destination}
+        origin={originProvince || originStop}
+        destination={destinationProvince || destinationStop}
         date={formatSearchDate(date)}
         passengerCount={passengers}
         onEditClick={() => router.back()}

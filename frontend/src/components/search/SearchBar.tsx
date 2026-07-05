@@ -18,8 +18,10 @@ interface PassengerValue {
 
 interface SearchParams {
   tripType: TripType
-  origin: string
-  destination: string
+  originStop?: string
+  originProvince?: string
+  destinationStop?: string
+  destinationProvince?: string
   departureDate: Date | undefined
   returnDate: Date | undefined
   passengers: PassengerValue
@@ -51,6 +53,27 @@ export function SearchBar({ onSearch }: SearchBarProps) {
   function handleTripTypeChange(value: TripType) {
     setTripType(value)
     if (value === "one-way") setReturnDate(undefined)
+  }
+
+  function parseCityValue(value: string): { stop?: string; province?: string } {
+    if (value.startsWith("province:")) return { province: value.slice(9) }
+    if (value.startsWith("stop:")) return { stop: value.slice(5) }
+    return {}
+  }
+
+  function handleSearchClick() {
+    const originParsed = parseCityValue(origin)
+    const destinationParsed = parseCityValue(destination)
+    onSearch({
+      tripType,
+      originStop: originParsed.stop,
+      originProvince: originParsed.province,
+      destinationStop: destinationParsed.stop,
+      destinationProvince: destinationParsed.province,
+      departureDate,
+      returnDate,
+      passengers,
+    })
   }
 
   return (
@@ -108,7 +131,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
           variant="navy"
           leftIcon={<SearchIcon />}
           style={{ fontSize: "14px", padding: "10px 20px" }}
-          onClick={() => onSearch({ tripType, origin, destination, departureDate, returnDate, passengers })}
+          onClick={handleSearchClick}
         >
           Buscar
         </BlueButton>
