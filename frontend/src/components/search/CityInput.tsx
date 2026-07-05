@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import {
   Select,
   SelectContent,
@@ -11,14 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-
-interface StopRead {
-  id: string
-  name: string
-  country: "AR" | "PY"
-  province: string | null
-  created_at: string
-}
+import { StopRead } from "@/types/trips"
 
 type GroupedStops = Record<string, Record<string, StopRead[]>>
 
@@ -31,9 +24,13 @@ const COUNTRY_LABELS: Record<StopRead["country"], string> = {
 
 const NO_PROVINCE_LABEL = "Otros"
 
-function groupStops(stops: StopRead[]): GroupedStops {
+function groupStops(stops: StopRead[], allowedStopIds?: Set<string>): GroupedStops {
   const grouped: GroupedStops = {}
-  for (const stop of stops) {
+  const filtered =
+    allowedStopIds && allowedStopIds.size > 0
+      ? stops.filter((stop) => allowedStopIds.has(stop.id))
+      : stops
+  for (const stop of filtered) {
     const province = stop.province ?? NO_PROVINCE_LABEL
     grouped[stop.country] ??= {}
     grouped[stop.country][province] ??= []
@@ -62,58 +59,51 @@ interface CityInputProps {
   value: string
   onChange: (value: string) => void
   icon: "pin" | "arrows"
+  stops: StopRead[]
+  loadingStops?: boolean
+  errorStops?: boolean
+  allowedStopIds?: Set<string>
+  onStopSelected?: (stop: StopRead | null) => void
+  onProvinceSelected?: (country: "AR" | "PY") => void
 }
 
-export function CityInput({ label, value, onChange, icon }: CityInputProps) {
-  const [stops, setStops] = useState<StopRead[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export function CityInput({
+  label,
+  value,
+  onChange,
+  icon,
+  stops,
+  loadingStops,
+  errorStops,
+  allowedStopIds,
+  onStopSelected,
+  onProvinceSelected,
+}: CityInputProps) {
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function fetchStops() {
-      setLoading(true)
-      setError(null)
-      try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL
-        const response = await fetch(`${baseUrl}/stops`)
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`)
-        }
-        const data: StopRead[] = await response.json()
-        if (!cancelled) {
-          setStops(data)
-        }
-      } catch {
-        if (!cancelled) {
-          setError("error")
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchStops()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const grouped = groupStops(stops)
-  const placeholder = loading ? "Cargando..." : error ? "Error al cargar" : ""
+  const grouped = groupStops(stops, allowedStopIds)
+  const placeholder = loadingStops ? "Cargando..." : errorStops ? "Error al cargar" : ""
   const displayValue = value.startsWith("province:")
     ? value.slice(9)
     : value.startsWith("stop:")
       ? value.slice(5)
       : ""
 
+  function handleValueChange(newValue: string) {
+    onChange(newValue)
+    if (newValue === "") {
+      onStopSelected?.(null)
+      return
+    }
+    if (newValue.startsWith("stop:")) {
+      const stopName = newValue.slice(5)
+      const stop = stops.find((s) => s.name === stopName) ?? null
+      onStopSelected?.(stop)
+    }
+  }
+
   return (
-    <Select value={value} onValueChange={onChange} open={open} onOpenChange={setOpen} disabled={loading || !!error}>
+    <Select value={value} onValueChange={handleValueChange} open={open} onOpenChange={setOpen} disabled={!!loadingStops || !!errorStops}>
       <SelectTrigger style={{ border: "none", background: "none", padding: 0, paddingRight: "4px", height: "auto", width: "100%", cursor: "pointer", boxShadow: "none" }} className="[&>svg]:ml-2">
         <div style={{ display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -160,6 +150,8 @@ export function CityInput({ label, value, onChange, icon }: CityInputProps) {
                         className="text-sm hover:underline hover:bg-black/[0.03]"
                         onClick={() => {
                           onChange(provinceValue)
+                          onStopSelected?.(null)
+                          onProvinceSelected?.(country)
                           setOpen(false)
                         }}
                         style={{
