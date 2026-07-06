@@ -118,7 +118,13 @@ function mapTripToCardProps(trip: TripRead) {
     durationMinutes,
     isDirect: true,
     seatTypes,
-    amenities: ["wifi", "ac", "usb", "bathroom", "entertainment"] as const,
+    amenities: ["wifi", "ac", "usb", "bathroom", "entertainment"] as (
+      | "wifi"
+      | "ac"
+      | "usb"
+      | "bathroom"
+      | "entertainment"
+    )[],
     priceFrom: prices.length > 0 ? Math.min(...prices) : null,
     availableSeats: trip.available_seats_count,
   };
