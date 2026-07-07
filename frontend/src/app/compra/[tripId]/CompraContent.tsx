@@ -31,8 +31,14 @@ const FIELD_LABELS: Record<keyof PassengerForm, string> = {
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DNI_REGEX = /^\d{7,8}$/;
+const PHONE_REGEX = /^\+?\d{8,15}$/;
 
-function validatePassenger(passenger: PassengerForm): PassengerErrors {
+function validatePassenger(
+  passenger: PassengerForm,
+  index: number,
+  allPassengers: PassengerForm[]
+): PassengerErrors {
   const errors: PassengerErrors = {};
   (Object.keys(FIELD_LABELS) as (keyof PassengerForm)[]).forEach((field) => {
     const value = passenger[field].trim();
@@ -42,6 +48,19 @@ function validatePassenger(passenger: PassengerForm): PassengerErrors {
     }
     if (field === "email" && !EMAIL_REGEX.test(value)) {
       errors[field] = "Email inválido";
+    }
+    if (field === "dni" && !DNI_REGEX.test(value)) {
+      errors[field] = "DNI inválido (7 u 8 dígitos)";
+    }
+    if (
+      field === "dni" &&
+      !errors.dni &&
+      allPassengers.some((other, otherIndex) => otherIndex !== index && other.dni.trim() === value)
+    ) {
+      errors[field] = "Este DNI ya fue ingresado para otro pasajero";
+    }
+    if (field === "telefono" && !PHONE_REGEX.test(value.replace(/[\s\-()]/g, ""))) {
+      errors[field] = "Teléfono inválido";
     }
   });
   return errors;
@@ -92,12 +111,21 @@ export function CompraContent({ tripId }: CompraContentProps) {
     setPassengers((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
+      if (submitAttempted) {
+        setErrors((prevErrors) => {
+          const nextErrors = [...prevErrors];
+          nextErrors[index] = validatePassenger(next[index], index, next);
+          return nextErrors;
+        });
+      }
       return next;
     });
   }
 
   function handleContinuar() {
-    const nextErrors = passengers.map(validatePassenger);
+    const nextErrors = passengers.map((passenger, index) =>
+      validatePassenger(passenger, index, passengers)
+    );
     setErrors(nextErrors);
     setSubmitAttempted(true);
 
