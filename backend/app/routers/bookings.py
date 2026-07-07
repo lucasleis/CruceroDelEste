@@ -201,7 +201,15 @@ async def get_booking(
 ) -> BookingRead:
     result = await db.execute(
         select(Booking)
-        .options(selectinload(Booking.passengers))
+        .options(
+            selectinload(Booking.trip)
+            .selectinload(Trip.route)
+            .options(
+                selectinload(Route.origin_stop),
+                selectinload(Route.destination_stop),
+            ),
+            selectinload(Booking.passengers),
+        )
         .where(Booking.id == booking_id)
     )
     booking = result.scalar_one_or_none()

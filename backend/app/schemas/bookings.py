@@ -4,6 +4,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from app.models.booking import BookingStatusEnum
+from app.models.trip import TripStatusEnum
+from app.schemas.trips import RouteRead
 
 
 class PassengerCreate(BaseModel):
@@ -50,6 +52,16 @@ class BookingCreate(BaseModel):
         return self
 
 
+class TripSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    route: RouteRead
+    departure_at: datetime
+    arrival_at: datetime
+    status: TripStatusEnum
+
+
 class BookingRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -60,6 +72,7 @@ class BookingRead(BaseModel):
     total_amount: int
     expires_at: datetime
     confirmed_at: datetime | None
+    trip: TripSummary
     passengers: list[PassengerRead]
 
 
