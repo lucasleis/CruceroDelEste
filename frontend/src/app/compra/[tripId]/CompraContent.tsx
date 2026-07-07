@@ -30,7 +30,7 @@ const FIELD_LABELS: Record<keyof PassengerForm, string> = {
   telefono: "Teléfono",
 };
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const DNI_REGEX = /^\d{7,8}$/;
 const PHONE_REGEX = /^\+?\d{8,15}$/;
 
@@ -49,15 +49,14 @@ function validatePassenger(
     if (field === "email" && !EMAIL_REGEX.test(value)) {
       errors[field] = "Email inválido";
     }
-    if (field === "dni" && !DNI_REGEX.test(value)) {
-      errors[field] = "DNI inválido (7 u 8 dígitos)";
-    }
-    if (
-      field === "dni" &&
-      !errors.dni &&
-      allPassengers.some((other, otherIndex) => otherIndex !== index && other.dni.trim() === value)
-    ) {
-      errors[field] = "Este DNI ya fue ingresado para otro pasajero";
+    if (field === "dni") {
+      if (!DNI_REGEX.test(value)) {
+        errors[field] = "DNI inválido (7 u 8 dígitos)";
+      } else if (
+        allPassengers.some((other, otherIndex) => otherIndex !== index && other.dni.trim() === value)
+      ) {
+        errors[field] = "Este DNI ya fue ingresado para otro pasajero";
+      }
     }
     if (field === "telefono" && !PHONE_REGEX.test(value.replace(/[\s\-()]/g, ""))) {
       errors[field] = "Teléfono inválido";
