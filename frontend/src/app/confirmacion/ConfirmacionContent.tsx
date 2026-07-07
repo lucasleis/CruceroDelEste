@@ -1,5 +1,18 @@
 "use client";
 
+/*
+ * URLs de prueba local:
+ *
+ * Aprobado (requiere booking real en DB):
+ * http://localhost:3000/confirmacion?status=approved&external_reference=27b21b15-4fed-4d26-b38c-8c6fa8bf9419&payment_id=123
+ *
+ * Pendiente:
+ * http://localhost:3000/confirmacion?status=pending&payment_id=123
+ *
+ * Fallo:
+ * http://localhost:3000/confirmacion?status=failure&payment_id=123
+ */
+
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -128,7 +141,7 @@ export function ConfirmacionContent() {
     >
       <div
         style={{
-          maxWidth: "720px",
+          maxWidth: "860px",
           margin: "0 auto",
           display: "flex",
           flexDirection: "column",
@@ -174,7 +187,7 @@ export function ConfirmacionContent() {
                   fontFamily: "var(--font-display)",
                   color: "var(--color-text-primary)",
                   fontWeight: 700,
-                  fontSize: "22px",
+                  fontSize: "32px",
                   margin: 0,
                 }}
               >
@@ -184,7 +197,7 @@ export function ConfirmacionContent() {
                 style={{
                   fontFamily: "var(--font-body)",
                   color: "var(--color-text-muted)",
-                  fontSize: "14px",
+                  fontSize: "16px",
                   margin: 0,
                 }}
               >
@@ -194,21 +207,22 @@ export function ConfirmacionContent() {
                 style={{
                   fontFamily: "var(--font-body)",
                   color: "var(--color-text-body)",
-                  fontSize: "13px",
+                  fontSize: "14px",
                   margin: 0,
+                  marginTop: "12px",
                 }}
               >
                 Reserva Nº {booking.id.slice(0, 8).toUpperCase()}
               </p>
             </div>
 
-            <div style={cardStyle}>
+            <div style={{ ...cardStyle, padding: "24px 28px" }}>
               <h2
                 style={{
                   fontFamily: "var(--font-display)",
                   color: "var(--color-text-primary)",
                   fontWeight: 700,
-                  fontSize: "16px",
+                  fontSize: "18px",
                   margin: 0,
                 }}
               >
@@ -217,43 +231,64 @@ export function ConfirmacionContent() {
               <p
                 style={{
                   fontFamily: "var(--font-body)",
-                  color: "var(--color-text-body)",
-                  fontSize: "14px",
+                  color: "var(--color-text-primary)",
+                  fontWeight: 600,
+                  fontSize: "16px",
                   margin: 0,
                 }}
               >
                 {booking.trip.route.origin_stop.name} → {booking.trip.route.destination_stop.name}
               </p>
-              <p
-                style={{
-                  fontFamily: "var(--font-body)",
-                  color: "var(--color-text-muted)",
-                  fontSize: "13px",
-                  margin: 0,
-                }}
-              >
-                Salida: {toArDateTime(booking.trip.departure_at)}
+              <p style={{ margin: 0 }}>
+                <span
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-muted)",
+                    fontSize: "15px",
+                  }}
+                >
+                  Salida:{" "}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-body)",
+                    fontSize: "15px",
+                  }}
+                >
+                  {toArDateTime(booking.trip.departure_at)}
+                </span>
               </p>
-              <p
-                style={{
-                  fontFamily: "var(--font-body)",
-                  color: "var(--color-text-muted)",
-                  fontSize: "13px",
-                  margin: 0,
-                }}
-              >
-                Llegada: {toArDateTime(booking.trip.arrival_at)}
+              <p style={{ margin: 0 }}>
+                <span
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-muted)",
+                    fontSize: "15px",
+                  }}
+                >
+                  Llegada:{" "}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-body)",
+                    fontSize: "15px",
+                  }}
+                >
+                  {toArDateTime(booking.trip.arrival_at)}
+                </span>
               </p>
             </div>
 
             {booking.passengers.map((passenger, index) => (
-              <div key={passenger.id} style={cardStyle}>
+              <div key={passenger.id} style={{ ...cardStyle, padding: "24px 28px" }}>
                 <h2
                   style={{
                     fontFamily: "var(--font-display)",
                     color: "var(--color-text-primary)",
                     fontWeight: 700,
-                    fontSize: "16px",
+                    fontSize: "18px",
                     margin: 0,
                   }}
                 >
@@ -262,32 +297,53 @@ export function ConfirmacionContent() {
                 <p
                   style={{
                     fontFamily: "var(--font-body)",
-                    color: "var(--color-text-body)",
-                    fontSize: "14px",
+                    color: "var(--color-text-primary)",
+                    fontWeight: 600,
+                    fontSize: "16px",
                     margin: 0,
                   }}
                 >
                   {passenger.first_name} {passenger.last_name}
                 </p>
-                <p
-                  style={{
-                    fontFamily: "var(--font-body)",
-                    color: "var(--color-text-muted)",
-                    fontSize: "13px",
-                    margin: 0,
-                  }}
-                >
-                  DNI: {passenger.dni}
+                <p style={{ margin: 0 }}>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      color: "var(--color-text-muted)",
+                      fontSize: "13px",
+                    }}
+                  >
+                    DNI:{" "}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      color: "var(--color-text-body)",
+                      fontSize: "15px",
+                    }}
+                  >
+                    {passenger.dni}
+                  </span>
                 </p>
-                <p
-                  style={{
-                    fontFamily: "var(--font-body)",
-                    color: "var(--color-text-muted)",
-                    fontSize: "13px",
-                    margin: 0,
-                  }}
-                >
-                  Email: {passenger.email}
+                <p style={{ margin: 0 }}>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      color: "var(--color-text-muted)",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Email:{" "}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      color: "var(--color-text-body)",
+                      fontSize: "15px",
+                    }}
+                  >
+                    {passenger.email}
+                  </span>
                 </p>
               </div>
             ))}
