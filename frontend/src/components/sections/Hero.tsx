@@ -109,6 +109,7 @@ export function Hero() {
 
       {/* SearchBar */}
       <div
+        id="buscar"
         style={{
           position: "absolute",
           bottom: "32px",

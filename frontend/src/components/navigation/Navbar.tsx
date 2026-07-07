@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { BlueButton } from "@/components/core/BlueButton";
 
 interface NavbarProps {
@@ -10,12 +11,24 @@ interface NavbarProps {
 }
 
 const NAV_LINKS = [
-  { label: "Estado del viaje", href: "#" },
-  { label: "Información de viaje", href: "#" },
-  { label: "Preguntas frecuentes", href: "#" },
+  { label: "Destinos", href: "/#destinos" },
+  { label: "Estado del viaje", href: "/estado-viaje" },
+  { label: "Mis reservas", href: "/mis-reservas" },
+  { label: "Preguntas frecuentes", href: "/preguntas-frecuentes" },
 ];
 
 export function Navbar({ transparent = true, static: isStatic = false }: NavbarProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleCTAClick = () => {
+    if (pathname === "/") {
+      document.getElementById("buscar")?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      router.push("/#buscar");
+    }
+  };
+
   const background = transparent
     ? "rgba(0,0,0,0.20)"
     : "var(--color-primary)";
@@ -73,7 +86,7 @@ export function Navbar({ transparent = true, static: isStatic = false }: NavbarP
         ))}
       </div>
 
-      <BlueButton variant="blue" onClick={() => {}}>
+      <BlueButton variant="blue" onClick={handleCTAClick}>
         Comprar pasajes
       </BlueButton>
 
