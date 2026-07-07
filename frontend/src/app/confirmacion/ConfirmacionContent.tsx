@@ -1,0 +1,351 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+
+interface StopRead {
+  id: string;
+  name: string;
+  country: string;
+}
+
+interface RouteRead {
+  id: string;
+  origin_stop: StopRead;
+  destination_stop: StopRead;
+}
+
+interface TripSummary {
+  id: string;
+  route: RouteRead;
+  departure_at: string;
+  arrival_at: string;
+  status: string;
+}
+
+interface PassengerRead {
+  id: string;
+  seat_id: string;
+  first_name: string;
+  last_name: string;
+  dni: string;
+  email: string;
+  phone: string | null;
+}
+
+interface BookingRead {
+  id: string;
+  trip: TripSummary;
+  status: string;
+  contact_email: string;
+  total_amount: number;
+  passengers: PassengerRead[];
+}
+
+function toArDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+const cardStyle: React.CSSProperties = {
+  background: "var(--color-white)",
+  boxShadow: "var(--shadow-sm)",
+  borderRadius: "var(--radius-md)",
+  padding: "20px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+};
+
+const CheckIcon = () => (
+  <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--color-white)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" fill="var(--color-primary)" stroke="none" />
+    <path d="M8 12.5l2.5 2.5L16 9.5" />
+  </svg>
+);
+
+export function ConfirmacionContent() {
+  const searchParams = useSearchParams();
+
+  const status = searchParams.get("status") ?? "";
+  const externalReference = searchParams.get("external_reference") ?? "";
+  const paymentId = searchParams.get("payment_id") ?? "";
+
+  const [booking, setBooking] = useState<BookingRead | null>(null);
+  const [loading, setLoading] = useState(status === "approved");
+  const [fetchError, setFetchError] = useState(false);
+
+  useEffect(() => {
+    if (status !== "approved") return;
+
+    let cancelled = false;
+
+    async function fetchBooking() {
+      setLoading(true);
+      setFetchError(false);
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+        const response = await fetch(`${baseUrl}/bookings/${externalReference}`);
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        const data: BookingRead = await response.json();
+        if (!cancelled) {
+          setBooking(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setFetchError(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchBooking();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, externalReference]);
+
+  return (
+    <div
+      style={{
+        background: "var(--color-surface)",
+        minHeight: "100vh",
+        padding: "24px",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: "720px",
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px",
+        }}
+      >
+        {status === "approved" && loading && (
+          <div style={cardStyle}>
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                color: "var(--color-text-muted)",
+                textAlign: "center",
+                margin: 0,
+              }}
+            >
+              Cargando tu comprobante...
+            </p>
+          </div>
+        )}
+
+        {status === "approved" && !loading && fetchError && (
+          <div style={cardStyle}>
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                color: "var(--color-text-body)",
+                margin: 0,
+              }}
+            >
+              Ocurrió un error al cargar tu comprobante. Por favor contactá a soporte
+              {paymentId ? ` con el ID de pago ${paymentId}` : ""}.
+            </p>
+          </div>
+        )}
+
+        {status === "approved" && !loading && !fetchError && booking && (
+          <>
+            <div style={{ ...cardStyle, alignItems: "center", textAlign: "center" }}>
+              <CheckIcon />
+              <h1
+                style={{
+                  fontFamily: "var(--font-display)",
+                  color: "var(--color-text-primary)",
+                  fontWeight: 700,
+                  fontSize: "22px",
+                  margin: 0,
+                }}
+              >
+                ¡Compra confirmada!
+              </h1>
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text-muted)",
+                  fontSize: "14px",
+                  margin: 0,
+                }}
+              >
+                Tu pasaje fue enviado a {booking.contact_email}
+              </p>
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text-body)",
+                  fontSize: "13px",
+                  margin: 0,
+                }}
+              >
+                Reserva Nº {booking.id.slice(0, 8).toUpperCase()}
+              </p>
+            </div>
+
+            <div style={cardStyle}>
+              <h2
+                style={{
+                  fontFamily: "var(--font-display)",
+                  color: "var(--color-text-primary)",
+                  fontWeight: 700,
+                  fontSize: "16px",
+                  margin: 0,
+                }}
+              >
+                Datos del viaje
+              </h2>
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text-body)",
+                  fontSize: "14px",
+                  margin: 0,
+                }}
+              >
+                {booking.trip.route.origin_stop.name} → {booking.trip.route.destination_stop.name}
+              </p>
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text-muted)",
+                  fontSize: "13px",
+                  margin: 0,
+                }}
+              >
+                Salida: {toArDateTime(booking.trip.departure_at)}
+              </p>
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text-muted)",
+                  fontSize: "13px",
+                  margin: 0,
+                }}
+              >
+                Llegada: {toArDateTime(booking.trip.arrival_at)}
+              </p>
+            </div>
+
+            {booking.passengers.map((passenger, index) => (
+              <div key={passenger.id} style={cardStyle}>
+                <h2
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    color: "var(--color-text-primary)",
+                    fontWeight: 700,
+                    fontSize: "16px",
+                    margin: 0,
+                  }}
+                >
+                  Pasajero {index + 1}
+                </h2>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-body)",
+                    fontSize: "14px",
+                    margin: 0,
+                  }}
+                >
+                  {passenger.first_name} {passenger.last_name}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-muted)",
+                    fontSize: "13px",
+                    margin: 0,
+                  }}
+                >
+                  DNI: {passenger.dni}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-muted)",
+                    fontSize: "13px",
+                    margin: 0,
+                  }}
+                >
+                  Email: {passenger.email}
+                </p>
+              </div>
+            ))}
+          </>
+        )}
+
+        {status === "pending" && (
+          <div style={cardStyle}>
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                color: "var(--color-text-body)",
+                margin: 0,
+              }}
+            >
+              Tu pago está siendo procesado. Te avisaremos por email cuando se confirme.
+            </p>
+            {paymentId && (
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text-muted)",
+                  fontSize: "13px",
+                  margin: 0,
+                }}
+              >
+                ID de pago: {paymentId}
+              </p>
+            )}
+          </div>
+        )}
+
+        {status !== "approved" && status !== "pending" && (
+          <div style={cardStyle}>
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                color: "var(--color-accent)",
+                margin: 0,
+              }}
+            >
+              Hubo un problema con tu pago. Por favor intentá de nuevo o contactá a soporte.
+            </p>
+            {paymentId && (
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text-muted)",
+                  fontSize: "13px",
+                  margin: 0,
+                }}
+              >
+                ID de pago: {paymentId}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
