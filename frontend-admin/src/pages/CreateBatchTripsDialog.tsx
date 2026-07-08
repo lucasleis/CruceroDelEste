@@ -201,6 +201,7 @@ export default function CreateBatchTripsDialog({
       const arrivalAt = `${arrivalDate}T${arrivalTime}:00-03:00`;
 
       try {
+        setProgress({ current: created + 1, total: generatedDates.length });
         await createTrip({
           route_id: seriesRouteId,
           seat_layout_id: seriesSeatLayoutId,
@@ -208,7 +209,6 @@ export default function CreateBatchTripsDialog({
           arrival_at: arrivalAt,
         });
         created++;
-        setProgress({ current: created, total: generatedDates.length });
       } catch {
         setErrorInfo({ date, created, total: generatedDates.length });
         setStep("error");
@@ -485,7 +485,7 @@ export default function CreateBatchTripsDialog({
         {step === "creating" && (
           <div className="space-y-3">
             <p className="text-sm text-neutral-900">
-              Creando viaje {progress.current + 1} de {progress.total}...
+              Creando viaje {progress.current} de {progress.total}...
             </p>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
               <div
