@@ -84,6 +84,20 @@ const CheckIcon = () => (
   </svg>
 );
 
+const ClockIcon = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+);
+
+const XIcon = () => (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9 9l6 6M15 9l-6 6" />
+  </svg>
+);
+
 export function ConfirmacionContent() {
   const searchParams = useSearchParams();
 
@@ -165,16 +179,46 @@ export function ConfirmacionContent() {
 
         {status === "approved" && !loading && fetchError && (
           <div style={cardStyle}>
-            <p
-              style={{
-                fontFamily: "var(--font-body)",
-                color: "var(--color-text-body)",
-                margin: 0,
-              }}
-            >
-              Ocurrió un error al cargar tu comprobante. Por favor contactá a soporte
-              {paymentId ? ` con el ID de pago ${paymentId}` : ""}.
-            </p>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+              <XIcon />
+              <h1
+                style={{
+                  fontFamily: "var(--font-display)",
+                  color: "var(--color-accent)",
+                  fontWeight: 700,
+                  fontSize: "28px",
+                  textAlign: "center",
+                  margin: 0,
+                }}
+              >
+                ¡Compra registrada!
+              </h1>
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text-muted)",
+                  fontSize: "16px",
+                  textAlign: "center",
+                  margin: 0,
+                }}
+              >
+                En breve vas a recibir un email con los datos de tu pasaje. Si no llega en 10 minutos, contactá a soporte con el ID de pago.
+              </p>
+              {paymentId && (
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-muted)",
+                    fontSize: "14px",
+                    textAlign: "center",
+                    margin: 0,
+                    marginTop: "12px",
+                  }}
+                >
+                  ID de pago: {paymentId}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
@@ -352,53 +396,91 @@ export function ConfirmacionContent() {
 
         {status === "pending" && (
           <div style={cardStyle}>
-            <p
-              style={{
-                fontFamily: "var(--font-body)",
-                color: "var(--color-text-body)",
-                margin: 0,
-              }}
-            >
-              Tu pago está siendo procesado. Te avisaremos por email cuando se confirme.
-            </p>
-            {paymentId && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+              <ClockIcon />
+              <h1
+                style={{
+                  fontFamily: "var(--font-display)",
+                  color: "var(--color-text-primary)",
+                  fontWeight: 700,
+                  fontSize: "28px",
+                  textAlign: "center",
+                  margin: 0,
+                }}
+              >
+                Pago en proceso
+              </h1>
               <p
                 style={{
                   fontFamily: "var(--font-body)",
                   color: "var(--color-text-muted)",
-                  fontSize: "13px",
+                  fontSize: "16px",
+                  textAlign: "center",
                   margin: 0,
                 }}
               >
-                ID de pago: {paymentId}
+                Tu pago está siendo procesado. Te avisaremos por email cuando se confirme.
               </p>
-            )}
+              {paymentId && (
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-muted)",
+                    fontSize: "14px",
+                    textAlign: "center",
+                    margin: 0,
+                    marginTop: "12px",
+                  }}
+                >
+                  ID de pago: {paymentId}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
         {status !== "approved" && status !== "pending" && (
           <div style={cardStyle}>
-            <p
-              style={{
-                fontFamily: "var(--font-body)",
-                color: "var(--color-accent)",
-                margin: 0,
-              }}
-            >
-              Hubo un problema con tu pago. Por favor intentá de nuevo o contactá a soporte.
-            </p>
-            {paymentId && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+              <XIcon />
+              <h1
+                style={{
+                  fontFamily: "var(--font-display)",
+                  color: "var(--color-accent)",
+                  fontWeight: 700,
+                  fontSize: "28px",
+                  textAlign: "center",
+                  margin: 0,
+                }}
+              >
+                Hubo un problema con tu pago
+              </h1>
               <p
                 style={{
                   fontFamily: "var(--font-body)",
                   color: "var(--color-text-muted)",
-                  fontSize: "13px",
+                  fontSize: "16px",
+                  textAlign: "center",
                   margin: 0,
                 }}
               >
-                ID de pago: {paymentId}
+                Por favor intentá de nuevo o contactá a soporte.
               </p>
-            )}
+              {paymentId && (
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-muted)",
+                    fontSize: "14px",
+                    textAlign: "center",
+                    margin: 0,
+                    marginTop: "12px",
+                  }}
+                >
+                  ID de pago: {paymentId}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>
