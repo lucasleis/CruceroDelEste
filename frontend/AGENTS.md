@@ -53,7 +53,7 @@ src/
 ## Flujo de compra (estado actual)
 
 /resultados         → lista de viajes (construido)
-/asientos/[tripId]  → selector de asientos (PENDIENTE — esperar plano del cliente)
+/asientos/[tripId]  → selector de asientos (construido — LLE-145)
 /compra/[tripId]    → formulario de datos de pasajeros (construido)
 /pago               → integración MercadoPago (pendiente)
 /confirmacion       → pantalla de confirmación (pendiente)
@@ -90,17 +90,21 @@ Enforced en:
 GET /stops — SearchBar, carga todas las paradas al montar
 GET /stops/{id}/valid-destinations — SearchBar, filtra destinos válidos al seleccionar origen
 GET /trips — ResultadosContent, búsqueda de viajes con filtros
-GET /trips/{tripId}/seats — SeatSelector (pendiente), lista de asientos con estado y tipo
+GET /trips/{tripId}/seats — AsientosContent, lista de asientos con estado y tipo
 
 Base URL: process.env.NEXT_PUBLIC_API_URL (definir en .env.local, no commitear)
 
 ---
 
-## Selector de asientos — bloqueado, no implementar
+## Selector de asientos — implementado (LLE-145)
 
-/asientos/[tripId] está pendiente hasta recibir el plano físico del bus del cliente (esperado ~09/07/2026). Ver LLE-12 para el análisis técnico completo.
+/asientos/[tripId] está implementado. Layout real del cliente cargado (Standard - 2 Pisos, 12 Cama Ejecutivo + 48 Semi Cama).
 
-No arrancar sin el plano. El layout del bus no es un componente genérico — requiere conocer la distribución real de asientos por piso.
+Componente: src/app/asientos/[tripId]/AsientosContent.tsx
+- PLANTA_ALTA y PLANTA_BAJA hardcodeados como grids (string | null)[][]
+- Fetch: GET /trips/{tripId}/seats con el mismo patrón de ResultadosContent.tsx
+- Selección múltiple via useState<Set<string>>
+- Navegación a /compra/[tripId]?seats=NUMBERS&passengers=N al confirmar
 
 ---
 
