@@ -90,12 +90,29 @@ export function Hero() {
           maxWidth: "520px",
         }}
       >
+        <p style={{
+          fontFamily: "var(--font-body)",
+          fontSize: "0.85rem",
+          fontWeight: 600,
+          color: "white",
+          margin: 0,
+          letterSpacing: "0.03em",
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+        }}>
+          Conectamos Argentina
+          <img src="/assets/flags/ar.svg" alt="Argentina" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
+          y Paraguay
+          <img src="/assets/flags/py.svg" alt="Paraguay" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
+        </p>
+
         <Heading as="h1" size="xl" color="white">
           Pasajes baratos, comprá y viajá más.
         </Heading>
 
         <Subheading color="white" size="md">
-          Conectamos Argentina y Paraguay cada día con vos.
+          Cada día, miles de personas viajan con nosotros.
         </Subheading>
 
         <FeatureItem color="white" icon={<ShieldIcon />}>
