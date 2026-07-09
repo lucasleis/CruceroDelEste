@@ -178,6 +178,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         minWidth: "clamp(600px, 85vw, 1100px)",
         fontSize: "clamp(11px, 1.1vw, 14px)",
         padding: "clamp(8px, 1vw, 16px) clamp(12px, 2vw, 24px)",
+        paddingBottom: "clamp(8px, 1vw, 16px)",
         background: "white",
         boxShadow: "var(--shadow-md)",
         borderRadius: "var(--radius-lg)",
@@ -202,8 +203,9 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         {originError && (
           <span style={{
             position: "absolute",
-            top: "calc(100% + 2px)",
+            top: "calc(100% + 4px)",
             left: 0,
+            display: "block",
             fontSize: "0.7rem",
             color: "#e53e3e",
             fontFamily: "var(--font-body)",
@@ -228,8 +230,9 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         {destinationError && (
           <span style={{
             position: "absolute",
-            top: "calc(100% + 2px)",
+            top: "calc(100% + 4px)",
             left: 0,
+            display: "block",
             fontSize: "0.7rem",
             color: "#e53e3e",
             fontFamily: "var(--font-body)",
@@ -252,14 +255,15 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         {departureDateError && (
           <span style={{
             position: "absolute",
-            top: "calc(100% + 2px)",
+            top: "calc(100% + 4px)",
             left: 0,
+            display: "block",
             fontSize: "0.7rem",
             color: "#e53e3e",
             fontFamily: "var(--font-body)",
             whiteSpace: "nowrap",
           }}>
-            Seleccioná una fecha de ida
+            Seleccioná una fecha
           </span>
         )}
       </div>
@@ -276,14 +280,15 @@ export function SearchBar({ onSearch }: SearchBarProps) {
           {returnDateError && (
             <span style={{
               position: "absolute",
-              top: "calc(100% + 2px)",
+              top: "calc(100% + 4px)",
               left: 0,
+              display: "block",
               fontSize: "0.7rem",
               color: "#e53e3e",
               fontFamily: "var(--font-body)",
               whiteSpace: "nowrap",
             }}>
-              Seleccioná una fecha de vuelta
+              Seleccioná una fecha
             </span>
           )}
         </div>
