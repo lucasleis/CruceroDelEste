@@ -1,5 +1,10 @@
 import apiClient from "./client";
-import type { AdminTripRead, SeatLayoutRead, TripStatusEnum } from "@/types/trips";
+import type {
+  AdminTripRead,
+  RouteStopRead,
+  SeatLayoutRead,
+  TripStatusEnum,
+} from "@/types/trips";
 
 export async function getAdminTrips(): Promise<AdminTripRead[]> {
   const response = await apiClient.get<AdminTripRead[]>("/admin/trips");
@@ -42,5 +47,10 @@ export async function deleteTrip(id: string): Promise<void> {
 
 export async function getSeatLayouts(): Promise<SeatLayoutRead[]> {
   const response = await apiClient.get<SeatLayoutRead[]>("/admin/seat-layouts");
+  return response.data;
+}
+
+export async function getRouteStops(routeId: string): Promise<RouteStopRead[]> {
+  const response = await apiClient.get<RouteStopRead[]>(`/admin/routes/${routeId}/stops`);
   return response.data;
 }

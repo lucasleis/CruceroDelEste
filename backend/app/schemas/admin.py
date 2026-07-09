@@ -72,6 +72,13 @@ class RouteCreate(BaseModel):
     destination_stop_id: UUID
 
 
+class RouteStopRead(BaseModel):
+    order: int
+    stop_id: UUID
+    name: str
+    country: str
+
+
 class TripCreate(BaseModel):
     route_id: UUID
     departure_at: datetime

@@ -14,6 +14,13 @@ export interface RouteRead {
   destination_stop: StopRead;
 }
 
+export interface RouteStopRead {
+  order: number;
+  stop_id: string;
+  name: string;
+  country: "AR" | "PY";
+}
+
 export interface SeatLayoutRead {
   id: string;
   name: string;

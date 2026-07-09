@@ -11,6 +11,7 @@ from app.errors import NotFoundError
 from app.models.booking import AdminUser, Booking, BookingStatusEnum
 from app.models.trip import (
     Route,
+    RouteStop,
     Seat,
     SeatLayout,
     SeatStatusEnum,
@@ -22,6 +23,7 @@ from app.models.trip import (
 from app.schemas.admin import (
     AdminTripRead,
     RouteCreate,
+    RouteStopRead,
     SeatLayoutRead,
     StopCreate,
     StopUpdate,
@@ -209,6 +211,28 @@ async def create_route(
         .where(Route.id == route_id)
     )
     return result.scalar_one()
+
+
+@router.get("/routes/{route_id}/stops", response_model=list[RouteStopRead])
+async def get_route_stops(
+    route_id: UUID,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[RouteStopRead]:
+    route = await db.get(Route, route_id)
+    if route is None:
+        raise NotFoundError()
+
+    result = await db.execute(
+        select(RouteStop.order, Stop.id, Stop.name, Stop.country)
+        .join(Stop, RouteStop.stop_id == Stop.id)
+        .where(RouteStop.route_id == route_id)
+        .order_by(RouteStop.order.asc())
+    )
+    return [
+        RouteStopRead(order=order, stop_id=stop_id, name=name, country=country)
+        for order, stop_id, name, country in result.all()
+    ]
 
 
 @router.delete("/routes/{route_id}", status_code=status.HTTP_204_NO_CONTENT)

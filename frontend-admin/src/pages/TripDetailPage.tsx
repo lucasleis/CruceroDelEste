@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getAdminTrip, getSeatLayouts, updateTrip } from "@/api/trips";
+import { getAdminTrip, getRouteStops, getSeatLayouts, updateTrip } from "@/api/trips";
 import {
   getPriceTranches,
   createPriceTranche,
@@ -81,6 +81,8 @@ export default function TripDetailPage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
+  const [stopsOpen, setStopsOpen] = useState(false);
+
   const tripQuery = useQuery({
     queryKey: ["admin", "trips", tripId],
     queryFn: () => getAdminTrip(tripId as string),
@@ -96,6 +98,12 @@ export default function TripDetailPage() {
   const seatLayoutsQuery = useQuery({
     queryKey: ["admin", "seat-layouts"],
     queryFn: getSeatLayouts,
+  });
+
+  const routeStopsQuery = useQuery({
+    queryKey: ["admin", "routes", tripQuery.data?.route?.id, "stops"],
+    queryFn: () => getRouteStops(tripQuery.data!.route.id),
+    enabled: !!tripQuery.data?.route?.id,
   });
 
   const isLoading =
@@ -317,6 +325,9 @@ export default function TripDetailPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setStopsOpen(true)}>
+            Ver paradas
+          </Button>
           <Button variant="outline" size="sm" onClick={openEditDialog}>
             Editar viaje
           </Button>
@@ -636,6 +647,48 @@ export default function TripDetailPage() {
               }
             >
               {editSaving ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={stopsOpen} onOpenChange={setStopsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Paradas — {trip.route.origin_stop.name} → {trip.route.destination_stop.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          {routeStopsQuery.isLoading && (
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          )}
+
+          {!routeStopsQuery.isLoading && routeStopsQuery.data?.length === 0 && (
+            <p className="text-sm text-neutral-600">Sin paradas registradas.</p>
+          )}
+
+          {!routeStopsQuery.isLoading && routeStopsQuery.data && routeStopsQuery.data.length > 0 && (
+            <ol className="space-y-1 max-h-96 overflow-y-auto">
+              {routeStopsQuery.data.map((stop) => (
+                <li key={stop.stop_id} className="flex items-center gap-2 text-sm text-neutral-900">
+                  <span className="text-neutral-400 w-6 text-right shrink-0">{stop.order + 1}.</span>
+                  <span className="flex-1">{stop.name}</span>
+                  <Badge className={stop.country === "AR" ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"}>
+                    {stop.country}
+                  </Badge>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStopsOpen(false)}>
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>
