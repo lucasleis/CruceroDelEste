@@ -51,7 +51,7 @@ export function Hero() {
   }
 
   return (
-    <section style={{ width: "100%", minHeight: "80vh", position: "relative", overflow: "hidden" }}>
+    <section style={{ width: "100%", minHeight: "80vh", position: "relative" }}>
       {/* Background image */}
       <Image
         src="/secciones/Hero.png"

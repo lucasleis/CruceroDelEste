@@ -151,6 +151,8 @@ export function SearchBar({ onSearch }: SearchBarProps) {
       className="items-center"
       style={{
         display: "inline-flex",
+        position: "relative",
+        overflow: "visible",
         minWidth: "clamp(600px, 85vw, 1100px)",
         fontSize: "clamp(11px, 1.1vw, 14px)",
         padding: "clamp(8px, 1vw, 16px) clamp(12px, 2vw, 24px)",

@@ -1,16 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { useState, useRef, useEffect } from "react"
 import { StopRead } from "@/types/trips"
 
 type GroupedStops = Record<string, Record<string, StopRead[]>>
@@ -80,8 +70,11 @@ export function CityInput({
   onProvinceSelected,
 }: CityInputProps) {
   const [open, setOpen] = useState(false)
+  const [filter, setFilter] = useState("")
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  const grouped = groupStops(stops, allowedStopIds)
+  const disabled = !!loadingStops || !!errorStops
   const placeholder = loadingStops ? "Cargando..." : errorStops ? "Error al cargar" : ""
   const displayValue = value.startsWith("province:")
     ? value.slice(9)
@@ -89,76 +82,173 @@ export function CityInput({
       ? value.slice(5)
       : ""
 
-  function handleValueChange(newValue: string) {
-    onChange(newValue)
-    if (newValue === "") {
-      onStopSelected?.(null)
-      return
+  const filteredStops =
+    filter.length >= 3
+      ? stops.filter((s) => s.name.toLowerCase().includes(filter.toLowerCase()))
+      : stops
+  const grouped = groupStops(filteredStops, allowedStopIds)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setFilter("")
+      }
     }
-    if (newValue.startsWith("stop:")) {
-      const stopName = newValue.slice(5)
-      const stop = stops.find((s) => s.name === stopName) ?? null
-      onStopSelected?.(stop)
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 0)
     }
+  }, [open])
+
+  function toggleOpen() {
+    if (disabled) return
+    setOpen((prev) => !prev)
+  }
+
+  function handleProvinceClick(country: "AR" | "PY", province: string) {
+    const provinceValue = `province:${province}`
+    onChange(provinceValue)
+    onStopSelected?.(null)
+    onProvinceSelected?.(country)
+    setOpen(false)
+    setFilter("")
+  }
+
+  function handleStopClick(stop: StopRead) {
+    const stopValue = `stop:${stop.name}`
+    onChange(stopValue)
+    onStopSelected?.(stop)
+    setOpen(false)
+    setFilter("")
   }
 
   return (
-    <Select value={value} onValueChange={handleValueChange} open={open} onOpenChange={setOpen} disabled={!!loadingStops || !!errorStops}>
-      <SelectTrigger style={{ border: "none", background: "none", padding: 0, paddingRight: "4px", height: "auto", width: "100%", cursor: "pointer", boxShadow: "none" }} className="[&>svg]:ml-2">
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            {icon === "pin" ? <PinIcon /> : <ArrowsIcon />}
-            <span style={{ fontFamily: "var(--font-body)", fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-muted)" }}>
-              {label}
-            </span>
-          </div>
-          <SelectValue placeholder={placeholder}>
-            {displayValue || placeholder}
-          </SelectValue>
-        </div>
-      </SelectTrigger>
-
-      <SelectContent
-        className="border"
+    <div ref={containerRef} style={{ position: "relative", width: "100%" }}>
+      <div
+        onClick={toggleOpen}
         style={{
-          background: "white",
-          boxShadow: "var(--shadow-md)",
-          borderColor: "var(--color-border)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "2px",
+          textAlign: "left",
+          cursor: disabled ? "default" : "pointer",
+          opacity: disabled ? 0.6 : 1,
         }}
       >
-        {COUNTRY_ORDER.filter((country) => grouped[country]).map((country, i) => (
-          <span key={country}>
-            {i > 0 && <SelectSeparator />}
-            <SelectGroup>
-              <SelectLabel
-                className="text-xs uppercase tracking-wide pl-0"
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          {icon === "pin" ? <PinIcon /> : <ArrowsIcon />}
+          <span style={{ fontFamily: "var(--font-body)", fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-muted)" }}>
+            {label}
+          </span>
+        </div>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: "0.875rem", color: displayValue ? "var(--color-navy)" : "var(--color-text-muted)" }}>
+          {displayValue || placeholder}
+        </span>
+      </div>
+
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 8px)",
+            left: 0,
+            zIndex: 1000,
+            background: "white",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            boxShadow: "var(--shadow-md)",
+            minWidth: "260px",
+            maxHeight: "320px",
+            overflowY: "auto",
+            padding: "8px 0",
+          }}
+        >
+          <div style={{ padding: "0 8px 4px" }}>
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Buscar parada..."
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "6px 10px",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-sm)",
+                fontFamily: "var(--font-body)",
+                fontSize: "0.875rem",
+                color: "var(--color-text-primary)",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {filter.length > 0 && filter.length < 3 && (
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "0.75rem",
+                color: "var(--color-text-muted)",
+                padding: "4px 10px",
+                margin: 0,
+              }}
+            >
+              Ingresá al menos 3 letras para buscar
+            </p>
+          )}
+
+          {filter.length >= 3 && Object.keys(grouped).length === 0 && (
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "0.875rem",
+                color: "var(--color-text-muted)",
+                padding: "8px 10px",
+                margin: 0,
+              }}
+            >
+              No se encontraron paradas
+            </p>
+          )}
+
+          {COUNTRY_ORDER.filter((country) => grouped[country]).map((country, i) => (
+            <div key={country}>
+              {i > 0 && <hr style={{ margin: "4px 0", border: "none", borderTop: "1px solid var(--color-border)" }} />}
+              <div
                 style={{
                   fontFamily: "var(--font-body)",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
                   color: "var(--color-text-muted)",
-                  paddingLeft: "0px",
+                  padding: "8px 16px 2px",
                 }}
               >
                 {COUNTRY_LABELS[country]}
-              </SelectLabel>
+              </div>
               {Object.entries(grouped[country])
                 .sort(([a], [b]) => a.localeCompare(b))
                 .map(([province, provinceStops]) => {
                   const provinceValue = `province:${province}`
                   return (
-                    <span key={province}>
+                    <div key={province}>
                       <div
-                        className="text-sm hover:underline hover:bg-black/[0.03]"
-                        onClick={() => {
-                          onChange(provinceValue)
-                          onStopSelected?.(null)
-                          onProvinceSelected?.(country)
-                          setOpen(false)
-                        }}
+                        onClick={() => handleProvinceClick(country, province)}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.03)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                         style={{
                           fontFamily: "var(--font-body)",
+                          fontSize: "0.875rem",
                           color: "var(--color-primary)",
                           fontWeight: 600,
-                          paddingLeft: "16px",
+                          padding: "4px 16px",
                           cursor: "pointer",
                         }}
                       >
@@ -168,28 +258,31 @@ export function CityInput({
                         const stopValue = `stop:${stop.name}`
                         const isStopSelected = value === stopValue
                         return (
-                          <SelectItem
+                          <div
                             key={stop.id}
-                            value={stopValue}
-                            className="text-sm pl-0"
+                            onClick={() => handleStopClick(stop)}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.03)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                             style={{
                               fontFamily: "var(--font-body)",
+                              fontSize: "0.875rem",
                               color: isStopSelected ? "var(--color-primary)" : "var(--color-navy)",
                               fontWeight: isStopSelected ? 600 : 400,
-                              paddingLeft: 0,
+                              padding: "4px 16px 4px 32px",
+                              cursor: "pointer",
                             }}
                           >
-                            <span style={{ paddingLeft: "32px", display: "block" }}>└ {stop.name}</span>
-                          </SelectItem>
+                            └ {stop.name}
+                          </div>
                         )
                       })}
-                    </span>
+                    </div>
                   )
                 })}
-            </SelectGroup>
-          </span>
-        ))}
-      </SelectContent>
-    </Select>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
