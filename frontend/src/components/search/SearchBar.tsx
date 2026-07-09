@@ -57,6 +57,11 @@ export function SearchBar({ onSearch }: SearchBarProps) {
 
   const [allowedDestinationIds, setAllowedDestinationIds] = useState<Set<string> | undefined>(undefined)
 
+  const [originError, setOriginError] = useState(false)
+  const [destinationError, setDestinationError] = useState(false)
+  const [departureDateError, setDepartureDateError] = useState(false)
+  const [returnDateError, setReturnDateError] = useState(false)
+
   useEffect(() => {
     let cancelled = false
 
@@ -93,7 +98,10 @@ export function SearchBar({ onSearch }: SearchBarProps) {
 
   function handleTripTypeChange(value: TripType) {
     setTripType(value)
-    if (value === "one-way") setReturnDate(undefined)
+    if (value === "one-way") {
+      setReturnDate(undefined)
+      setReturnDateError(false)
+    }
   }
 
   function parseCityValue(value: string): { stop?: string; province?: string } {
@@ -104,6 +112,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
 
   function handleOriginChange(value: string) {
     setOrigin(value)
+    if (value !== "") setOriginError(false)
     if (value === "") {
       setAllowedDestinationIds(undefined)
       setDestination("")
@@ -133,6 +142,19 @@ export function SearchBar({ onSearch }: SearchBarProps) {
   function handleSearchClick() {
     const originParsed = parseCityValue(origin)
     const destinationParsed = parseCityValue(destination)
+
+    const hasOrigin = !!(originParsed.stop || originParsed.province)
+    const hasDestination = !!(destinationParsed.stop || destinationParsed.province)
+    const hasDepartureDate = !!departureDate
+    const hasReturnDate = tripType === "one-way" || !!returnDate
+
+    setOriginError(!hasOrigin)
+    setDestinationError(!hasDestination)
+    setDepartureDateError(!hasDepartureDate)
+    setReturnDateError(!hasReturnDate)
+
+    if (!hasOrigin || !hasDestination || !hasDepartureDate || !hasReturnDate) return
+
     onSearch({
       tripType,
       originStop: originParsed.stop,
@@ -165,7 +187,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
 
       <Divider />
 
-      <div style={{ minWidth: 0, flex: 1 }}>
+      <div style={{ minWidth: 0, flex: 1, position: "relative" }}>
         <CityInput
           label="Origen"
           value={origin}
@@ -177,36 +199,93 @@ export function SearchBar({ onSearch }: SearchBarProps) {
           onStopSelected={handleOriginStopSelected}
           onProvinceSelected={handleOriginProvinceSelected}
         />
+        {originError && (
+          <span style={{
+            position: "absolute",
+            top: "calc(100% + 2px)",
+            left: 0,
+            fontSize: "0.7rem",
+            color: "#e53e3e",
+            fontFamily: "var(--font-body)",
+            whiteSpace: "nowrap",
+          }}>
+            Seleccioná un origen
+          </span>
+        )}
       </div>
       <div style={{ width: "12px", flexShrink: 0 }} />
-      <div style={{ minWidth: 0, flex: 1 }}>
+      <div style={{ minWidth: 0, flex: 1, position: "relative" }}>
         <CityInput
           label="Destino"
           value={destination}
-          onChange={setDestination}
-          icon="arrows"
+          onChange={(value) => { setDestination(value); if (value !== "") setDestinationError(false) }}
+          icon="pin-filled"
           stops={stops}
           loadingStops={loadingStops}
           errorStops={errorStops}
           allowedStopIds={allowedDestinationIds}
         />
+        {destinationError && (
+          <span style={{
+            position: "absolute",
+            top: "calc(100% + 2px)",
+            left: 0,
+            fontSize: "0.7rem",
+            color: "#e53e3e",
+            fontFamily: "var(--font-body)",
+            whiteSpace: "nowrap",
+          }}>
+            Seleccioná un destino
+          </span>
+        )}
       </div>
 
       <Divider />
 
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <DateInput label="Fecha de ida" value={departureDate} onChange={setDepartureDate} mode={tripType} />
+      <div style={{ minWidth: 0, flex: 1, position: "relative" }}>
+        <DateInput
+          label="Fecha de ida"
+          value={departureDate}
+          onChange={(date) => { setDepartureDate(date); if (date) setDepartureDateError(false) }}
+          mode={tripType}
+        />
+        {departureDateError && (
+          <span style={{
+            position: "absolute",
+            top: "calc(100% + 2px)",
+            left: 0,
+            fontSize: "0.7rem",
+            color: "#e53e3e",
+            fontFamily: "var(--font-body)",
+            whiteSpace: "nowrap",
+          }}>
+            Seleccioná una fecha de ida
+          </span>
+        )}
       </div>
       {tripType === "round-trip" && (
-        <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ minWidth: 0, flex: 1, position: "relative" }}>
           <DateInput
             label="Fecha de vuelta"
             value={returnDate}
-            onChange={setReturnDate}
+            onChange={(date) => { setReturnDate(date); if (date) setReturnDateError(false) }}
             mode={tripType}
             minDate={departureDate}
             defaultMonth={departureDate}
           />
+          {returnDateError && (
+            <span style={{
+              position: "absolute",
+              top: "calc(100% + 2px)",
+              left: 0,
+              fontSize: "0.7rem",
+              color: "#e53e3e",
+              fontFamily: "var(--font-body)",
+              whiteSpace: "nowrap",
+            }}>
+              Seleccioná una fecha de vuelta
+            </span>
+          )}
         </div>
       )}
 

@@ -36,6 +36,13 @@ const PinIcon = () => (
   </svg>
 )
 
+const PinIconFilled = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--color-primary)" stroke="var(--color-primary)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+    <circle cx="12" cy="10" r="3" fill="white" stroke="white"/>
+  </svg>
+)
+
 const ArrowsIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
     <path d="M7 16V4m0 0L3 8m4-4l4 4"/>
@@ -48,7 +55,7 @@ interface CityInputProps {
   placeholder?: string
   value: string
   onChange: (value: string) => void
-  icon: "pin" | "arrows"
+  icon: "pin" | "pin-filled" | "arrows"
   stops: StopRead[]
   loadingStops?: boolean
   errorStops?: boolean
@@ -141,7 +148,7 @@ export function CityInput({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          {icon === "pin" ? <PinIcon /> : <ArrowsIcon />}
+          {icon === "pin" ? <PinIcon /> : icon === "pin-filled" ? <PinIconFilled /> : <ArrowsIcon />}
           <span style={{ fontFamily: "var(--font-body)", fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-muted)" }}>
             {label}
           </span>
