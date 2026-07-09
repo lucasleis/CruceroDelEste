@@ -33,6 +33,7 @@ import { getAdminTrips, getSeatLayouts, deleteTrip, createTrip } from "@/api/tri
 import { getRoutes } from "@/api/routes";
 import type { AdminTripRead } from "@/types/trips";
 import { STATUS_BADGE, formatDate } from "@/lib/tripUtils";
+import CreateBatchTripsDialog from "./CreateBatchTripsDialog";
 
 export default function TripsPage() {
   const navigate = useNavigate();
@@ -40,6 +41,7 @@ export default function TripsPage() {
   const [tripToDelete, setTripToDelete] = useState<AdminTripRead | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [seriesOpen, setSeriesOpen] = useState(false);
   const [routeId, setRouteId] = useState("");
   const [seatLayoutId, setSeatLayoutId] = useState("");
   const [departureDate, setDepartureDate] = useState("");
@@ -158,7 +160,12 @@ export default function TripsPage() {
     <div className="max-w-6xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-neutral-900">Viajes</h1>
-        <Button onClick={() => setCreateOpen(true)}>Nuevo viaje</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setSeriesOpen(true)}>
+            Viajes en serie
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>Nuevo viaje</Button>
+        </div>
       </div>
 
       <div className="mt-6">
@@ -410,6 +417,15 @@ export default function TripsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CreateBatchTripsDialog
+        open={seriesOpen}
+        onOpenChange={setSeriesOpen}
+        routes={routes}
+        seatLayouts={seatLayouts}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ["admin", "trips"] })
+        }
+      />
     </div>
   );
 }
