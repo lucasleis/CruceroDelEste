@@ -76,6 +76,26 @@ class Route(Base):
     origin_stop = relationship("Stop", foreign_keys=[origin_stop_id], back_populates="origin_routes")
     destination_stop = relationship("Stop", foreign_keys=[destination_stop_id], back_populates="destination_routes")
     trips = relationship("Trip", back_populates="route")
+    route_stops = relationship("RouteStop", back_populates="route", order_by="RouteStop.order", cascade="all, delete-orphan")
+
+
+class RouteStop(Base):
+    __tablename__ = "route_stops"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id", ondelete="CASCADE"), nullable=False)
+    stop_id = Column(UUID(as_uuid=True), ForeignKey("stops.id"), nullable=False)
+    order = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("route_id", "order", name="uq_route_stops_route_order"),
+        UniqueConstraint("route_id", "stop_id", name="uq_route_stops_route_stop"),
+        Index("idx_route_stops_route_id", "route_id", "order"),
+    )
+
+    route = relationship("Route", back_populates="route_stops")
+    stop = relationship("Stop")
 
 
 class SeatLayout(Base):

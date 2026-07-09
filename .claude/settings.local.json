@@ -67,7 +67,9 @@
       "Bash(git rm *)",
       "Bash(uv add *)",
       "Bash(uv sync *)",
-      "Bash(docker exec crucero-pg *)"
+      "Bash(docker exec crucero-pg *)",
+      "Bash(alembic upgrade *)",
+      "Bash(.venv/bin/alembic upgrade *)"
     ]
   }
 }
