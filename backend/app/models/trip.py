@@ -138,8 +138,8 @@ class Trip(Base):
 
     route = relationship("Route", back_populates="trips")
     seat_layout = relationship("SeatLayout", back_populates="trips")
-    seats = relationship("Seat", back_populates="trip")
-    price_tranches = relationship("PriceTranche", back_populates="trip")
+    seats = relationship("Seat", back_populates="trip", cascade="all, delete-orphan")
+    price_tranches = relationship("PriceTranche", back_populates="trip", cascade="all, delete-orphan")
     bookings = relationship("Booking", back_populates="trip")
 
 

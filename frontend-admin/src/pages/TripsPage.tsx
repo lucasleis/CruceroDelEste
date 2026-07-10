@@ -40,6 +40,13 @@ export default function TripsPage() {
   const queryClient = useQueryClient();
   const [tripToDelete, setTripToDelete] = useState<AdminTripRead | null>(null);
   const [expandedRoutes, setExpandedRoutes] = useState<Set<string>>(new Set());
+  const [batchDeleteRouteId, setBatchDeleteRouteId] = useState<string | null>(null);
+  const [batchDeleteRouteName, setBatchDeleteRouteName] = useState("");
+  const [batchDeleting, setBatchDeleting] = useState(false);
+  const [batchDeleteResult, setBatchDeleteResult] = useState<{
+    deleted: number;
+    skipped: { tripId: string; departure_at: string }[];
+  } | null>(null);
 
   function toggleRoute(routeId: string) {
     setExpandedRoutes((prev) => {
@@ -96,6 +103,44 @@ export default function TripsPage() {
     } finally {
       setTripToDelete(null);
     }
+  }
+
+  async function handleBatchDelete() {
+    if (!batchDeleteRouteId) return;
+    setBatchDeleting(true);
+
+    const group = routeGroups.find((g) => g.routeId === batchDeleteRouteId);
+    if (!group) return;
+
+    const now = new Date();
+    const futureTrips = group.trips.filter(
+      (t) => new Date(t.departure_at) > now && t.status !== "cancelled"
+    );
+
+    let deleted = 0;
+    const skipped: { tripId: string; departure_at: string }[] = [];
+
+    for (const trip of futureTrips) {
+      try {
+        await deleteTrip(trip.id);
+        deleted++;
+      } catch (error) {
+        const status = (
+          error as { response?: { status?: number; data?: { detail?: string } } }
+        )?.response;
+        if (
+          status?.status === 409 &&
+          (status.data?.detail === "trip_has_confirmed_bookings" ||
+            status.data?.detail === "trip_has_bookings")
+        ) {
+          skipped.push({ tripId: trip.id, departure_at: trip.departure_at });
+        }
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
+    setBatchDeleting(false);
+    setBatchDeleteResult({ deleted, skipped });
   }
 
   function resetCreateForm() {
@@ -242,20 +287,35 @@ export default function TripsPage() {
                         {group.trips.length === 1 ? "viaje" : "viajes"}
                       </Badge>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleRoute(group.routeId);
-                      }}
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="size-4" />
-                      ) : (
-                        <ChevronDown className="size-4" />
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-[#E87B7B] shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBatchDeleteRouteId(group.routeId);
+                          setBatchDeleteRouteName(group.routeName);
+                          setBatchDeleteResult(null);
+                        }}
+                      >
+                        Eliminar futuros
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleRoute(group.routeId);
+                        }}
+                      >
+                        {isExpanded ? (
+                          <ChevronUp className="size-4" />
+                        ) : (
+                          <ChevronDown className="size-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
 
                   {isExpanded && (
@@ -506,6 +566,92 @@ export default function TripsPage() {
           queryClient.invalidateQueries({ queryKey: ["admin", "trips"] })
         }
       />
+
+      <Dialog
+        open={batchDeleteRouteId !== null}
+        onOpenChange={(open) => {
+          if (!open && !batchDeleting) {
+            setBatchDeleteRouteId(null);
+            setBatchDeleteRouteName("");
+            setBatchDeleteResult(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar viajes futuros</DialogTitle>
+          </DialogHeader>
+
+          {!batchDeleting && !batchDeleteResult && (
+            <>
+              <p className="text-sm text-neutral-600">
+                Se eliminarán todos los viajes futuros de la ruta{" "}
+                <span className="font-semibold">{batchDeleteRouteName}</span> que no
+                tengan reservas confirmadas. Esta acción no se puede deshacer.
+              </p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setBatchDeleteRouteId(null)}>
+                  Cancelar
+                </Button>
+                <Button variant="destructive" onClick={handleBatchDelete}>
+                  Eliminar
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {batchDeleting && (
+            <p className="text-sm text-neutral-600">Eliminando viajes...</p>
+          )}
+
+          {batchDeleteResult && (
+            <>
+              <div className="space-y-3">
+                <p className="text-sm text-neutral-900">
+                  Se eliminaron{" "}
+                  <span className="font-semibold">{batchDeleteResult.deleted}</span>{" "}
+                  viaje{batchDeleteResult.deleted !== 1 ? "s" : ""}.
+                </p>
+                {batchDeleteResult.skipped.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-sm text-[#E87B7B]">
+                      No se pudieron eliminar{" "}
+                      <span className="font-semibold">
+                        {batchDeleteResult.skipped.length}
+                      </span>{" "}
+                      viaje{batchDeleteResult.skipped.length !== 1 ? "s" : ""} por
+                      tener reservas confirmadas:
+                    </p>
+                    <ul className="space-y-1 text-sm text-neutral-600">
+                      {batchDeleteResult.skipped.map((t) => (
+                        <li key={t.tripId}>
+                          • {formatDate(t.departure_at)}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-neutral-500">
+                      Para eliminarlos, primero cancelá las reservas desde el detalle
+                      de cada viaje.
+                    </p>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setBatchDeleteRouteId(null);
+                    setBatchDeleteRouteName("");
+                    setBatchDeleteResult(null);
+                  }}
+                >
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
