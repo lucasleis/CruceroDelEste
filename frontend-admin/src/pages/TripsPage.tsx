@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,6 +39,19 @@ export default function TripsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [tripToDelete, setTripToDelete] = useState<AdminTripRead | null>(null);
+  const [expandedRoutes, setExpandedRoutes] = useState<Set<string>>(new Set());
+
+  function toggleRoute(routeId: string) {
+    setExpandedRoutes((prev) => {
+      const next = new Set(prev);
+      if (next.has(routeId)) {
+        next.delete(routeId);
+      } else {
+        next.add(routeId);
+      }
+      return next;
+    });
+  }
 
   const [createOpen, setCreateOpen] = useState(false);
   const [seriesOpen, setSeriesOpen] = useState(false);
@@ -156,6 +169,33 @@ export default function TripsPage() {
   const routes = routesQuery.data ?? [];
   const isLoading = tripsQuery.isLoading || seatLayoutsQuery.isLoading;
 
+  type RouteGroup = {
+    routeId: string;
+    routeName: string;
+    trips: AdminTripRead[];
+  };
+
+  const routeGroups: RouteGroup[] = Object.values(
+    trips.reduce<Record<string, RouteGroup>>((acc, trip) => {
+      const routeId = trip.route.id;
+      if (!acc[routeId]) {
+        acc[routeId] = {
+          routeId,
+          routeName: `${trip.route.origin_stop.name} → ${trip.route.destination_stop.name}`,
+          trips: [],
+        };
+      }
+      acc[routeId].trips.push(trip);
+      return acc;
+    }, {})
+  );
+
+  routeGroups.forEach((group) => {
+    group.trips.sort(
+      (a, b) => new Date(a.departure_at).getTime() - new Date(b.departure_at).getTime()
+    );
+  });
+
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between">
@@ -169,92 +209,132 @@ export default function TripsPage() {
       </div>
 
       <div className="mt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Ruta</TableHead>
-              <TableHead>Salida</TableHead>
-              <TableHead>Llegada</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Layout</TableHead>
-              <TableHead>Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading &&
-              Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={index}>
-                  <TableCell className="py-3" colSpan={6}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))}
+        {isLoading && (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-12 w-full" />
+            ))}
+          </div>
+        )}
 
-            {!isLoading && trips.length === 0 && (
-              <TableRow>
-                <TableCell className="py-3" colSpan={6}>
-                  <p className="text-center text-sm text-neutral-600">
-                    No hay viajes registrados.
-                  </p>
-                </TableCell>
-              </TableRow>
-            )}
+        {!isLoading && trips.length === 0 && (
+          <p className="text-center text-sm text-neutral-600">
+            No hay viajes registrados.
+          </p>
+        )}
 
-            {!isLoading &&
-              trips.map((trip) => {
-                const status = STATUS_BADGE[trip.status];
-                const layout = seatLayouts.find(
-                  (l) => l.id === trip.seat_layout_id
-                );
-
-                return (
-                  <TableRow
-                    key={trip.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/viajes/${trip.id}`)}
+        {!isLoading && trips.length > 0 && (
+          <div className="space-y-3">
+            {routeGroups.map((group) => {
+              const isExpanded = expandedRoutes.has(group.routeId);
+              return (
+                <div key={group.routeId}>
+                  <div
+                    className="flex items-center justify-between bg-neutral-50 border rounded-lg px-4 py-3 cursor-pointer"
+                    onClick={() => toggleRoute(group.routeId)}
                   >
-                    <TableCell className="py-3">
-                      <div className="text-sm text-neutral-900">
-                        {trip.route.origin_stop.name} →{" "}
-                        {trip.route.destination_stop.name}
-                      </div>
-                      <div className="text-xs text-neutral-600">
-                        {trip.route.origin_stop.country} →{" "}
-                        {trip.route.destination_stop.country}
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3 text-sm text-neutral-900">
-                      {formatDate(trip.departure_at)}
-                    </TableCell>
-                    <TableCell className="py-3 text-sm text-neutral-900">
-                      {formatDate(trip.arrival_at)}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Badge className={status.className}>{status.label}</Badge>
-                    </TableCell>
-                    <TableCell className="py-3 text-sm text-neutral-900">
-                      {layout
-                        ? `${layout.name} · ${layout.total_cama}C / ${layout.total_semi_cama}SC`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-[#E87B7B]"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTripToDelete(trip);
-                        }}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-          </TableBody>
-        </Table>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-neutral-900">
+                        {group.routeName}
+                      </span>
+                      <Badge variant="outline">
+                        {group.trips.length}{" "}
+                        {group.trips.length === 1 ? "viaje" : "viajes"}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleRoute(group.routeId);
+                      }}
+                    >
+                      {isExpanded ? (
+                        <ChevronUp className="size-4" />
+                      ) : (
+                        <ChevronDown className="size-4" />
+                      )}
+                    </Button>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="ml-4 border-l-2 border-neutral-200 pl-4 mt-1">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Ruta</TableHead>
+                            <TableHead>Salida</TableHead>
+                            <TableHead>Llegada</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead>Layout</TableHead>
+                            <TableHead>Acciones</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {group.trips.map((trip) => {
+                            const status = STATUS_BADGE[trip.status];
+                            const layout = seatLayouts.find(
+                              (l) => l.id === trip.seat_layout_id
+                            );
+
+                            return (
+                              <TableRow
+                                key={trip.id}
+                                className="cursor-pointer"
+                                onClick={() => navigate(`/viajes/${trip.id}`)}
+                              >
+                                <TableCell className="py-3">
+                                  <div className="text-sm text-neutral-900">
+                                    {trip.route.origin_stop.name} →{" "}
+                                    {trip.route.destination_stop.name}
+                                  </div>
+                                  <div className="text-xs text-neutral-600">
+                                    {trip.route.origin_stop.country} →{" "}
+                                    {trip.route.destination_stop.country}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-3 text-sm text-neutral-900">
+                                  {formatDate(trip.departure_at)}
+                                </TableCell>
+                                <TableCell className="py-3 text-sm text-neutral-900">
+                                  {formatDate(trip.arrival_at)}
+                                </TableCell>
+                                <TableCell className="py-3">
+                                  <Badge className={status.className}>
+                                    {status.label}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="py-3 text-sm text-neutral-900">
+                                  {layout
+                                    ? `${layout.name} · ${layout.total_cama}C / ${layout.total_semi_cama}SC`
+                                    : "—"}
+                                </TableCell>
+                                <TableCell className="py-3">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    className="text-[#E87B7B]"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setTripToDelete(trip);
+                                    }}
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <Dialog
