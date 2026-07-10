@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from app.models.booking import BookingStatusEnum, ChargebackStatusEnum
-from app.models.trip import CountryEnum, SeatTypeEnum, TripStatusEnum
+from app.models.trip import CountryEnum, SeatStatusEnum, SeatTypeEnum, TripStatusEnum
 from app.schemas.bookings import PassengerRead
 from app.schemas.trips import RouteRead
 
@@ -115,6 +115,18 @@ class AdminTripRead(BaseModel):
     seat_layout_id: UUID | None
     created_at: datetime
     price_tranches_summary: PriceTrancheSummary
+
+
+class AdminSeatRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    seat_number: str
+    seat_type: SeatTypeEnum
+    status: SeatStatusEnum
+
+
+class AdminSeatStatusUpdate(BaseModel):
+    status: Literal["blocked", "available"]
 
 
 class ChargebackRead(BaseModel):

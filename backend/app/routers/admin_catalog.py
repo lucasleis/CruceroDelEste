@@ -14,6 +14,7 @@ from app.models.trip import (
     RouteStop,
     Seat,
     SeatLayout,
+    SeatLayoutSeat,
     SeatStatusEnum,
     SeatTypeEnum,
     Stop,
@@ -21,6 +22,8 @@ from app.models.trip import (
     TripStatusEnum,
 )
 from app.schemas.admin import (
+    AdminSeatRead,
+    AdminSeatStatusUpdate,
     AdminTripRead,
     PriceTrancheSummary,
     RouteCreate,
@@ -387,18 +390,25 @@ async def create_trip(
     await db.flush()
     trip_id = trip.id
 
-    for i in range(1, layout.total_cama + 1):
+    # Load seat definitions from seat_layout_seats
+    layout_seats_result = await db.execute(
+        select(SeatLayoutSeat)
+        .where(SeatLayoutSeat.seat_layout_id == body.seat_layout_id)
+        .order_by(SeatLayoutSeat.display_order.asc())
+    )
+    layout_seats = layout_seats_result.scalars().all()
+
+    if not layout_seats:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="seat_layout_has_no_seats",
+        )
+
+    for ls in layout_seats:
         db.add(Seat(
             trip_id=trip_id,
-            seat_number=f"C{i:02d}",
-            seat_type=SeatTypeEnum.cama,
-            status=SeatStatusEnum.available,
-        ))
-    for i in range(1, layout.total_semi_cama + 1):
-        db.add(Seat(
-            trip_id=trip_id,
-            seat_number=f"S{i:02d}",
-            seat_type=SeatTypeEnum.semi_cama,
+            seat_number=ls.seat_number,
+            seat_type=ls.seat_type,
             status=SeatStatusEnum.available,
         ))
 
@@ -505,3 +515,70 @@ async def delete_trip(
 
     await db.delete(trip)
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Trip seats
+# ---------------------------------------------------------------------------
+
+
+@router.get("/trips/{trip_id}/seats", response_model=list[AdminSeatRead])
+async def get_trip_seats(
+    trip_id: UUID,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[AdminSeatRead]:
+    trip = await db.get(Trip, trip_id)
+    if trip is None:
+        raise NotFoundError()
+
+    result = await db.execute(
+        select(Seat)
+        .outerjoin(
+            SeatLayoutSeat,
+            (SeatLayoutSeat.seat_layout_id == trip.seat_layout_id)
+            & (SeatLayoutSeat.seat_number == Seat.seat_number),
+        )
+        .where(Seat.trip_id == trip_id)
+        .order_by(SeatLayoutSeat.display_order.asc().nullslast(), Seat.seat_number.asc())
+    )
+    return list(result.scalars().all())
+
+
+@router.patch("/trips/{trip_id}/seats/{seat_number}", response_model=AdminSeatRead)
+async def update_seat_status(
+    trip_id: UUID,
+    seat_number: str,
+    body: AdminSeatStatusUpdate,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AdminSeatRead:
+    trip = await db.get(Trip, trip_id)
+    if trip is None:
+        raise NotFoundError()
+
+    result = await db.execute(
+        select(Seat).where(Seat.trip_id == trip_id, Seat.seat_number == seat_number)
+    )
+    seat = result.scalar_one_or_none()
+    if seat is None:
+        raise NotFoundError()
+
+    if body.status == "blocked":
+        if seat.status != SeatStatusEnum.available:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="seat_not_available",
+            )
+        seat.status = SeatStatusEnum.blocked
+    else:
+        if seat.status != SeatStatusEnum.blocked:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="seat_not_blocked",
+            )
+        seat.status = SeatStatusEnum.available
+
+    await db.commit()
+    await db.refresh(seat)
+    return seat

@@ -34,6 +34,7 @@ class SeatStatusEnum(str, enum.Enum):
     available = "available"
     reserved = "reserved"
     sold = "sold"
+    blocked = "blocked"
 
 
 class TripStatusEnum(str, enum.Enum):
@@ -114,6 +115,25 @@ class SeatLayout(Base):
     )
 
     trips = relationship("Trip", back_populates="seat_layout")
+    seats = relationship("SeatLayoutSeat", back_populates="layout", order_by="SeatLayoutSeat.display_order", cascade="all, delete-orphan")
+
+
+class SeatLayoutSeat(Base):
+    __tablename__ = "seat_layout_seats"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    seat_layout_id = Column(UUID(as_uuid=True), ForeignKey("seat_layouts.id", ondelete="CASCADE"), nullable=False)
+    seat_number = Column(String(4), nullable=False)
+    seat_type = Column(Enum(SeatTypeEnum, name="seat_type"), nullable=False)
+    display_order = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("seat_layout_id", "seat_number", name="uq_seat_layout_seats_number"),
+        Index("idx_seat_layout_seats_layout", "seat_layout_id", "display_order"),
+    )
+
+    layout = relationship("SeatLayout", back_populates="seats")
 
 
 class Trip(Base):

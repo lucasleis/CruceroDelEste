@@ -69,7 +69,8 @@
       "Bash(uv sync *)",
       "Bash(docker exec crucero-pg *)",
       "Bash(alembic upgrade *)",
-      "Bash(.venv/bin/alembic upgrade *)"
+      "Bash(.venv/bin/alembic upgrade *)",
+      "Bash(curl *)"
     ]
   }
 }
