@@ -54,3 +54,27 @@ export async function getRouteStops(routeId: string): Promise<RouteStopRead[]> {
   const response = await apiClient.get<RouteStopRead[]>(`/admin/routes/${routeId}/stops`);
   return response.data;
 }
+
+export interface AdminSeatRead {
+  id: string;
+  seat_number: string;
+  seat_type: "cama" | "semi_cama";
+  status: "available" | "reserved" | "sold" | "blocked";
+}
+
+export async function getTripSeats(tripId: string): Promise<AdminSeatRead[]> {
+  const response = await apiClient.get<AdminSeatRead[]>(`/admin/trips/${tripId}/seats`);
+  return response.data;
+}
+
+export async function updateSeatStatus(
+  tripId: string,
+  seatNumber: string,
+  status: "blocked" | "available"
+): Promise<AdminSeatRead> {
+  const response = await apiClient.patch<AdminSeatRead>(
+    `/admin/trips/${tripId}/seats/${seatNumber}`,
+    { status }
+  );
+  return response.data;
+}
