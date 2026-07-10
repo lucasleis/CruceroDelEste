@@ -192,6 +192,16 @@ async def create_price_tranche(
         max_sold=body.max_sold,
         price=body.price,
     )
+
+    all_tranches = existing + [new_tranche]
+    sorted_tranches = sorted(all_tranches, key=lambda t: t.min_sold)
+    for i in range(1, len(sorted_tranches)):
+        if sorted_tranches[i].min_sold > sorted_tranches[i - 1].max_sold + 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="tranche_gap",
+            )
+
     db.add(new_tranche)
     await db.commit()
     await db.refresh(new_tranche)

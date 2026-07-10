@@ -22,17 +22,54 @@ from app.models.trip import (
 )
 from app.schemas.admin import (
     AdminTripRead,
+    PriceTrancheSummary,
     RouteCreate,
     RouteStopRead,
     SeatLayoutRead,
     StopCreate,
     StopUpdate,
+    TrancheCoverage,
     TripCreate,
     TripUpdate,
 )
 from app.schemas.trips import RouteRead, StopRead
 
 router = APIRouter(prefix="/admin", tags=["admin-catalog"])
+
+
+def compute_coverage(
+    tranches: list, seat_type: SeatTypeEnum, total: int
+) -> TrancheCoverage:
+    if total == 0:
+        return TrancheCoverage(is_complete=False, first_gap=None, total=0)
+
+    relevant = sorted(
+        [t for t in tranches if t.seat_type == seat_type],
+        key=lambda t: t.min_sold,
+    )
+    expected = 1
+    for t in relevant:
+        if t.min_sold > expected:
+            return TrancheCoverage(is_complete=False, first_gap=expected, total=total)
+        expected = max(expected, t.max_sold + 1)
+
+    is_complete = expected > total
+    return TrancheCoverage(
+        is_complete=is_complete,
+        first_gap=None if is_complete else expected,
+        total=total,
+    )
+
+
+def build_tranche_summary(trip: Trip, layout: SeatLayout | None) -> PriceTrancheSummary:
+    total_cama = layout.total_cama if layout else 0
+    total_semi_cama = layout.total_semi_cama if layout else 0
+    return PriceTrancheSummary(
+        cama=compute_coverage(trip.price_tranches, SeatTypeEnum.cama, total_cama),
+        semi_cama=compute_coverage(
+            trip.price_tranches, SeatTypeEnum.semi_cama, total_semi_cama
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -270,10 +307,22 @@ async def list_admin_trips(
 ) -> list[AdminTripRead]:
     result = await db.execute(
         select(Trip)
-        .options(trip_load_options())
+        .options(
+            trip_load_options(),
+            selectinload(Trip.price_tranches),
+            selectinload(Trip.seat_layout),
+        )
         .order_by(Trip.departure_at.asc())
     )
-    return list(result.scalars().all())
+    trips = result.scalars().all()
+    return [
+        AdminTripRead.model_validate({
+            **trip.__dict__,
+            "route": trip.route,
+            "price_tranches_summary": build_tranche_summary(trip, trip.seat_layout),
+        })
+        for trip in trips
+    ]
 
 
 @router.get("/trips/{trip_id}", response_model=AdminTripRead)
@@ -283,12 +332,22 @@ async def get_admin_trip(
     db: AsyncSession = Depends(get_db),
 ) -> AdminTripRead:
     result = await db.execute(
-        select(Trip).options(trip_load_options()).where(Trip.id == trip_id)
+        select(Trip)
+        .options(
+            trip_load_options(),
+            selectinload(Trip.price_tranches),
+            selectinload(Trip.seat_layout),
+        )
+        .where(Trip.id == trip_id)
     )
     trip = result.scalar_one_or_none()
     if trip is None:
         raise NotFoundError()
-    return trip
+    return AdminTripRead.model_validate({
+        **trip.__dict__,
+        "route": trip.route,
+        "price_tranches_summary": build_tranche_summary(trip, trip.seat_layout),
+    })
 
 
 @router.post("/trips", response_model=AdminTripRead, status_code=status.HTTP_201_CREATED)
@@ -346,9 +405,20 @@ async def create_trip(
     await db.commit()
 
     result = await db.execute(
-        select(Trip).options(trip_load_options()).where(Trip.id == trip_id)
+        select(Trip)
+        .options(
+            trip_load_options(),
+            selectinload(Trip.price_tranches),
+            selectinload(Trip.seat_layout),
+        )
+        .where(Trip.id == trip_id)
     )
-    return result.scalar_one()
+    trip = result.scalar_one()
+    return AdminTripRead.model_validate({
+        **trip.__dict__,
+        "route": trip.route,
+        "price_tranches_summary": build_tranche_summary(trip, trip.seat_layout),
+    })
 
 
 @router.patch("/trips/{trip_id}", response_model=AdminTripRead)
@@ -398,9 +468,20 @@ async def update_trip(
     await db.commit()
 
     result = await db.execute(
-        select(Trip).options(trip_load_options()).where(Trip.id == trip_id)
+        select(Trip)
+        .options(
+            trip_load_options(),
+            selectinload(Trip.price_tranches),
+            selectinload(Trip.seat_layout),
+        )
+        .where(Trip.id == trip_id)
     )
-    return result.scalar_one()
+    trip = result.scalar_one()
+    return AdminTripRead.model_validate({
+        **trip.__dict__,
+        "route": trip.route,
+        "price_tranches_summary": build_tranche_summary(trip, trip.seat_layout),
+    })
 
 
 @router.delete("/trips/{trip_id}", status_code=status.HTTP_204_NO_CONTENT)

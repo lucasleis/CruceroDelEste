@@ -29,6 +29,17 @@ export interface SeatLayoutRead {
   description: string | null;
 }
 
+export interface TrancheCoverage {
+  is_complete: boolean;
+  first_gap: number | null;
+  total: number;
+}
+
+export interface PriceTrancheSummary {
+  cama: TrancheCoverage;
+  semi_cama: TrancheCoverage;
+}
+
 export interface AdminTripRead {
   id: string;
   route: RouteRead;
@@ -37,6 +48,7 @@ export interface AdminTripRead {
   status: TripStatusEnum;
   seat_layout_id: string | null;
   created_at: string;
+  price_tranches_summary: PriceTrancheSummary;
 }
 
 export interface PriceTrancheRead {

@@ -92,6 +92,18 @@ class TripUpdate(BaseModel):
     status: TripStatusEnum | None = None
 
 
+class TrancheCoverage(BaseModel):
+    is_complete: bool
+    first_gap: int | None  # first uncovered seat number, None if complete
+    total: int  # total seats of this type in the layout
+
+
+class PriceTrancheSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    cama: TrancheCoverage
+    semi_cama: TrancheCoverage
+
+
 class AdminTripRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -102,6 +114,7 @@ class AdminTripRead(BaseModel):
     status: TripStatusEnum
     seat_layout_id: UUID | None
     created_at: datetime
+    price_tranches_summary: PriceTrancheSummary
 
 
 class ChargebackRead(BaseModel):

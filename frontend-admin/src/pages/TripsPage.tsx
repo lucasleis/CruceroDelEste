@@ -327,6 +327,7 @@ export default function TripsPage() {
                             <TableHead>Salida</TableHead>
                             <TableHead>Llegada</TableHead>
                             <TableHead>Estado</TableHead>
+                            <TableHead>Precios</TableHead>
                             <TableHead>Layout</TableHead>
                             <TableHead>Acciones</TableHead>
                           </TableRow>
@@ -364,6 +365,24 @@ export default function TripsPage() {
                                   <Badge className={status.className}>
                                     {status.label}
                                   </Badge>
+                                </TableCell>
+                                <TableCell className="py-3">
+                                  {trip.price_tranches_summary.cama.is_complete &&
+                                  trip.price_tranches_summary.semi_cama.is_complete ? (
+                                    <Badge className="bg-[#6BBF8E] text-white">
+                                      Completo
+                                    </Badge>
+                                  ) : !trip.price_tranches_summary.cama.is_complete &&
+                                    !trip.price_tranches_summary.semi_cama.is_complete &&
+                                    trip.price_tranches_summary.cama.total === 0 ? (
+                                    <Badge className="bg-neutral-400 text-white">
+                                      Sin layout
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-amber-500 text-white">
+                                      Incompleto
+                                    </Badge>
+                                  )}
                                 </TableCell>
                                 <TableCell className="py-3 text-sm text-neutral-900">
                                   {layout

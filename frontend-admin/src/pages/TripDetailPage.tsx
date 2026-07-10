@@ -35,7 +35,11 @@ import {
   createPriceTranche,
   deletePriceTranche,
 } from "@/api/priceTranches";
-import type { PriceTrancheRead, SeatTypeEnum, TripStatusEnum } from "@/types/trips";
+import type {
+  PriceTrancheRead,
+  SeatTypeEnum,
+  TripStatusEnum,
+} from "@/types/trips";
 import {
   STATUS_BADGE,
   formatDate,
@@ -47,6 +51,34 @@ function toBaDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-CA", {
     timeZone: "America/Buenos_Aires",
   });
+}
+
+function computeAllGaps(
+  tranches: PriceTrancheRead[],
+  seatType: "cama" | "semi_cama",
+  total: number
+): { from: number; to: number }[] {
+  if (total === 0) return [];
+
+  const relevant = tranches
+    .filter((t) => t.seat_type === seatType)
+    .sort((a, b) => a.min_sold - b.min_sold);
+
+  const gaps: { from: number; to: number }[] = [];
+  let expected = 1;
+
+  for (const t of relevant) {
+    if (t.min_sold > expected) {
+      gaps.push({ from: expected, to: t.min_sold - 1 });
+    }
+    expected = Math.max(expected, t.max_sold + 1);
+  }
+
+  if (expected <= total) {
+    gaps.push({ from: expected, to: total });
+  }
+
+  return gaps;
 }
 
 function toBaTime(iso: string): string {
@@ -308,6 +340,10 @@ export default function TripDetailPage() {
   const seatLayouts = seatLayoutsQuery.data ?? [];
   const status = STATUS_BADGE[trip.status];
   const layout = seatLayouts.find((l) => l.id === trip.seat_layout_id);
+  const camaTotal = layout?.total_cama ?? 0;
+  const semiCamaTotal = layout?.total_semi_cama ?? 0;
+  const camaGaps = computeAllGaps(tranches, "cama", camaTotal);
+  const semiCamaGaps = computeAllGaps(tranches, "semi_cama", semiCamaTotal);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
@@ -381,6 +417,32 @@ export default function TripDetailPage() {
             Agregar tramo
           </Button>
         </div>
+
+        {camaGaps.length > 0 && (
+          <div className="mt-3 rounded-md border border-[#E87B7B] bg-[#FBEAEA] px-4 py-3">
+            <p className="text-sm text-[#E87B7B]">Cama Ejecutivo — faltan tramos en:</p>
+            <ul className="mt-1 space-y-0.5">
+              {camaGaps.map((g, i) => (
+                <li key={i} className="text-sm text-[#E87B7B]">
+                  Asientos {g.from} – {g.to}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {semiCamaGaps.length > 0 && (
+          <div className="mt-3 rounded-md border border-[#E87B7B] bg-[#FBEAEA] px-4 py-3">
+            <p className="text-sm text-[#E87B7B]">Semi Cama — faltan tramos en:</p>
+            <ul className="mt-1 space-y-0.5">
+              {semiCamaGaps.map((g, i) => (
+                <li key={i} className="text-sm text-[#E87B7B]">
+                  Asientos {g.from} – {g.to}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-3">
           <Table>
