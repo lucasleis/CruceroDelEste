@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronUp, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -114,6 +114,8 @@ export default function TripDetailPage() {
   const [editSaving, setEditSaving] = useState(false);
 
   const [stopsOpen, setStopsOpen] = useState(false);
+  const [camaOpen, setCamaOpen] = useState(false);
+  const [semiCamaOpen, setSemiCamaOpen] = useState(false);
 
   const tripQuery = useQuery({
     queryKey: ["admin", "trips", tripId],
@@ -344,6 +346,12 @@ export default function TripDetailPage() {
   const semiCamaTotal = layout?.total_semi_cama ?? 0;
   const camaGaps = computeAllGaps(tranches, "cama", camaTotal);
   const semiCamaGaps = computeAllGaps(tranches, "semi_cama", semiCamaTotal);
+  const camaTransches = tranches
+    .filter((t) => t.seat_type === "cama")
+    .sort((a, b) => a.min_sold - b.min_sold);
+  const semiCamaTranches = tranches
+    .filter((t) => t.seat_type === "semi_cama")
+    .sort((a, b) => a.min_sold - b.min_sold);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
@@ -444,59 +452,119 @@ export default function TripDetailPage() {
           </div>
         )}
 
-        <div className="mt-3">
+        <div className="mt-4">
           <Table>
-            <TableHeader>
+            <TableHeader
+              className="cursor-pointer select-none"
+              onClick={() => setCamaOpen((prev) => !prev)}
+            >
               <TableRow>
-                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">
-                  Tipo
+                <TableHead
+                  colSpan={2}
+                  className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]"
+                >
+                  Cama Ejecutivo ({camaTransches.length})
                 </TableHead>
-                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">
-                  Pasajes vendidos
-                </TableHead>
-                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">
-                  Precio
-                </TableHead>
-                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">
-                  Acciones
+                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A] text-right">
+                  {camaOpen ? (
+                    <ChevronUp className="size-3.5 ml-auto" />
+                  ) : (
+                    <ChevronDown className="size-3.5 ml-auto" />
+                  )}
                 </TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {tranches.length === 0 && (
-                <TableRow>
-                  <TableCell className="py-3" colSpan={4}>
-                    <p className="text-center text-sm text-neutral-600">
-                      No hay tramos configurados.
-                    </p>
-                  </TableCell>
-                </TableRow>
-              )}
+            {camaOpen && (
+              <TableBody>
+                {camaTransches.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3}>
+                      <p className="text-center text-sm text-neutral-600">
+                        Sin tramos configurados.
+                      </p>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {camaTransches.map((tranche) => (
+                  <TableRow key={tranche.id}>
+                    <TableCell className="py-3 text-sm text-neutral-900">
+                      {tranche.min_sold} – {tranche.max_sold}
+                    </TableCell>
+                    <TableCell className="py-3 text-sm text-neutral-900">
+                      $ {tranche.price.toLocaleString("es-AR")}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-[#E87B7B]"
+                        onClick={() => setTrancheToDelete(tranche)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            )}
+          </Table>
+        </div>
 
-              {tranches.map((tranche) => (
-                <TableRow key={tranche.id}>
-                  <TableCell className="py-3 text-sm text-neutral-900">
-                    {SEAT_TYPE_LABEL[tranche.seat_type]}
-                  </TableCell>
-                  <TableCell className="py-3 text-sm text-neutral-900">
-                    {tranche.min_sold} – {tranche.max_sold}
-                  </TableCell>
-                  <TableCell className="py-3 text-sm text-neutral-900">
-                    $ {tranche.price.toLocaleString("es-AR")}
-                  </TableCell>
-                  <TableCell className="py-3">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-[#E87B7B]"
-                      onClick={() => setTrancheToDelete(tranche)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
+        <div className="mt-4">
+          <Table>
+            <TableHeader
+              className="cursor-pointer select-none"
+              onClick={() => setSemiCamaOpen((prev) => !prev)}
+            >
+              <TableRow>
+                <TableHead
+                  colSpan={2}
+                  className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]"
+                >
+                  Semi Cama ({semiCamaTranches.length})
+                </TableHead>
+                <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A] text-right">
+                  {semiCamaOpen ? (
+                    <ChevronUp className="size-3.5 ml-auto" />
+                  ) : (
+                    <ChevronDown className="size-3.5 ml-auto" />
+                  )}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            {semiCamaOpen && (
+              <TableBody>
+                {semiCamaTranches.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3}>
+                      <p className="text-center text-sm text-neutral-600">
+                        Sin tramos configurados.
+                      </p>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {semiCamaTranches.map((tranche) => (
+                  <TableRow key={tranche.id}>
+                    <TableCell className="py-3 text-sm text-neutral-900">
+                      {tranche.min_sold} – {tranche.max_sold}
+                    </TableCell>
+                    <TableCell className="py-3 text-sm text-neutral-900">
+                      $ {tranche.price.toLocaleString("es-AR")}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-[#E87B7B]"
+                        onClick={() => setTrancheToDelete(tranche)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            )}
           </Table>
         </div>
       </div>
