@@ -223,6 +223,8 @@ export default function TripDetailPage() {
         toast.error("Hay un hueco entre este tramo y el anterior.");
       } else if (detail === "trip_has_no_seat_layout") {
         toast.error("Este viaje no tiene un layout de asientos asignado.");
+      } else if (detail === "tranche_must_start_at_zero") {
+        toast.error("El primer tramo debe arrancar desde 0 asientos vendidos.");
       } else {
         toast.error("Error al crear el tramo.");
       }

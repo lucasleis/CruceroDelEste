@@ -221,6 +221,11 @@ async def create_price_tranche(
 
     all_tranches = existing + [new_tranche]
     sorted_tranches = sorted(all_tranches, key=lambda t: t.min_sold)
+    if sorted_tranches[0].min_sold != 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="tranche_must_start_at_zero",
+        )
     for i in range(1, len(sorted_tranches)):
         if sorted_tranches[i].min_sold > sorted_tranches[i - 1].max_sold + 1:
             raise HTTPException(
