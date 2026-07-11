@@ -20,7 +20,7 @@ from app.models.booking import (
     ChargebackStatusEnum,
     RefundRequest,
 )
-from app.models.trip import PriceTranche, Trip
+from app.models.trip import PriceTranche, SeatLayout, SeatTypeEnum, Trip
 from app.schemas.admin import (
     AdminLoginRequest,
     AdminLoginResponse,
@@ -159,9 +159,18 @@ async def create_price_tranche(
     _admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ) -> PriceTrancheRead:
-    trip = await db.get(Trip, trip_id)
+    result = await db.execute(
+        select(Trip).options(selectinload(Trip.seat_layout)).where(Trip.id == trip_id)
+    )
+    trip = result.scalar_one_or_none()
     if trip is None:
         raise NotFoundError()
+
+    if trip.seat_layout is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="trip_has_no_seat_layout",
+        )
 
     await db.execute(
         text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
@@ -177,6 +186,23 @@ async def create_price_tranche(
         .with_for_update()
     )
     existing = list(result.scalars().all())
+
+    if len(existing) >= 5:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="tranche_limit_exceeded",
+        )
+
+    seat_capacity = (
+        trip.seat_layout.total_cama
+        if body.seat_type == SeatTypeEnum.cama
+        else trip.seat_layout.total_semi_cama
+    )
+    if body.max_sold > seat_capacity:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="tranche_exceeds_seat_capacity",
+        )
 
     for tranche in existing:
         if body.min_sold < tranche.max_sold and body.max_sold > tranche.min_sold:

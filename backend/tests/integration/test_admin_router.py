@@ -13,6 +13,7 @@ from app.models.trip import (
     PriceTranche,
     Route,
     Seat,
+    SeatLayout,
     SeatStatusEnum,
     SeatTypeEnum,
     Stop,
@@ -51,6 +52,17 @@ def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
+async def _make_layout(
+    db: AsyncSession,
+    total_cama: int = 12,
+    total_semi_cama: int = 48,
+) -> SeatLayout:
+    layout = SeatLayout(name=f"Test Layout {uuid.uuid4()}", total_cama=total_cama, total_semi_cama=total_semi_cama)
+    db.add(layout)
+    await db.flush()
+    return layout
+
+
 async def _make_trip(db: AsyncSession) -> Trip:
     origin_stop = Stop(name="Retiro", country=CountryEnum.AR)
     destination_stop = Stop(name="Asunción", country=CountryEnum.PY)
@@ -60,12 +72,14 @@ async def _make_trip(db: AsyncSession) -> Trip:
     route = Route(origin_stop_id=origin_stop.id, destination_stop_id=destination_stop.id)
     db.add(route)
     await db.flush()
+    layout = await _make_layout(db)
     now = datetime.now(timezone.utc)
     trip = Trip(
         route_id=route.id,
         departure_at=now + timedelta(days=1),
         arrival_at=now + timedelta(days=1, hours=4),
         status=TripStatusEnum.scheduled,
+        seat_layout_id=layout.id,
     )
     db.add(trip)
     await db.flush()
@@ -484,7 +498,7 @@ async def test_create_price_tranche_happy_path_returns_201(
     resp = await client.post(
         f"/admin/trips/{trip.id}/price-tranches",
         headers=_auth(token),
-        json={"seat_type": "cama", "min_sold": 0, "max_sold": 50, "price": 24500},
+        json={"seat_type": "cama", "min_sold": 0, "max_sold": 12, "price": 24500},
     )
 
     assert resp.status_code == 201
@@ -492,7 +506,7 @@ async def test_create_price_tranche_happy_path_returns_201(
     assert data["trip_id"] == str(trip.id)
     assert data["seat_type"] == "cama"
     assert data["min_sold"] == 0
-    assert data["max_sold"] == 50
+    assert data["max_sold"] == 12
     assert data["price"] == 24500
     assert "id" in data
     assert "created_at" in data
@@ -503,15 +517,15 @@ async def test_create_price_tranche_overlap_returns_409(
 ):
     await _make_admin(db)
     trip = await _make_trip(db)
-    # Existing tranche: [0, 50)
-    await _make_tranche(db, trip, SeatTypeEnum.cama, min_sold=0, max_sold=50, price=24500)
+    # Existing tranche: [0, 8)
+    await _make_tranche(db, trip, SeatTypeEnum.cama, min_sold=0, max_sold=8, price=24500)
     token = await _login(client, "admin@test.com", "secret")
 
-    # New tranche [25, 75) overlaps [0, 50): 25 < 50 AND 75 > 0 → True
+    # New tranche [5, 12) overlaps [0, 8): 5 < 8 AND 12 > 0 → True
     resp = await client.post(
         f"/admin/trips/{trip.id}/price-tranches",
         headers=_auth(token),
-        json={"seat_type": "cama", "min_sold": 25, "max_sold": 75, "price": 25000},
+        json={"seat_type": "cama", "min_sold": 5, "max_sold": 12, "price": 25000},
     )
 
     assert resp.status_code == 409
@@ -523,14 +537,14 @@ async def test_create_price_tranche_adjacent_ranges_do_not_overlap(
 ):
     await _make_admin(db)
     trip = await _make_trip(db)
-    await _make_tranche(db, trip, SeatTypeEnum.cama, min_sold=0, max_sold=50, price=24500)
+    await _make_tranche(db, trip, SeatTypeEnum.cama, min_sold=0, max_sold=6, price=24500)
     token = await _login(client, "admin@test.com", "secret")
 
-    # [50, 100) starts exactly where [0, 50) ends — not an overlap
+    # [6, 12) starts exactly where [0, 6) ends — not an overlap
     resp = await client.post(
         f"/admin/trips/{trip.id}/price-tranches",
         headers=_auth(token),
-        json={"seat_type": "cama", "min_sold": 50, "max_sold": 100, "price": 26000},
+        json={"seat_type": "cama", "min_sold": 6, "max_sold": 12, "price": 26000},
     )
 
     assert resp.status_code == 201
@@ -541,14 +555,14 @@ async def test_create_price_tranche_different_seat_type_does_not_conflict(
 ):
     await _make_admin(db)
     trip = await _make_trip(db)
-    # Existing cama [0, 50) — should NOT block semi_cama [0, 50)
-    await _make_tranche(db, trip, SeatTypeEnum.cama, min_sold=0, max_sold=50, price=24500)
+    # Existing cama [0, 12) — should NOT block semi_cama [0, 48)
+    await _make_tranche(db, trip, SeatTypeEnum.cama, min_sold=0, max_sold=12, price=24500)
     token = await _login(client, "admin@test.com", "secret")
 
     resp = await client.post(
         f"/admin/trips/{trip.id}/price-tranches",
         headers=_auth(token),
-        json={"seat_type": "semi_cama", "min_sold": 0, "max_sold": 50, "price": 23300},
+        json={"seat_type": "semi_cama", "min_sold": 0, "max_sold": 48, "price": 23300},
     )
 
     assert resp.status_code == 201
