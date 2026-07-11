@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { BlueButton } from "@/components/core/BlueButton";
 import type { StopRead } from "@/types/trips";
 
@@ -200,6 +201,11 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
   }
 
   function handleContinuar() {
+    if (passengerCount !== null && selected.length !== passengerCount) {
+      toast.error(`Seleccioná exactamente ${passengerCount} asiento${passengerCount === 1 ? "" : "s"} para continuar.`);
+      return;
+    }
+
     const params = new URLSearchParams();
     params.set("seats", selected.join(","));
     if (passengerCount !== null) {
@@ -416,10 +422,6 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
 
               {renderGrid(activeFloor === "alta" ? PLANTA_ALTA : PLANTA_BAJA)}
             </div>
-
-            <BlueButton variant="blue" onClick={handleContinuar} disabled={selected.length === 0} arrow>
-              Continuar
-            </BlueButton>
           </>
         )}
       </div>
@@ -509,6 +511,14 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
             </>
           )}
         </div>
+
+        {!loading && !error && seats.length > 0 && (
+          <div style={{ marginTop: "16px", width: "100%" }}>
+            <BlueButton variant="blue" onClick={handleContinuar} disabled={selected.length === 0} arrow style={{ width: "100%" }}>
+              Continuar
+            </BlueButton>
+          </div>
+        )}
       </div>
       </div>
     </div>
