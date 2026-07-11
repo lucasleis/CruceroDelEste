@@ -57,7 +57,7 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeFloor, setActiveFloor] = useState<Floor>("alta");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,20 +101,19 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
     if (!seat || seat.status !== "available") return;
 
     setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(seatNumber)) {
-        next.delete(seatNumber);
-      } else {
-        if (passengerCount !== null && next.size >= passengerCount) return prev;
-        next.add(seatNumber);
+      if (prev.includes(seatNumber)) {
+        return prev.filter((s) => s !== seatNumber);
       }
-      return next;
+      if (passengerCount !== null && prev.length >= passengerCount) {
+        return [...prev.slice(1), seatNumber];
+      }
+      return [...prev, seatNumber];
     });
   }
 
   function handleContinuar() {
     const params = new URLSearchParams();
-    params.set("seats", Array.from(selected).join(","));
+    params.set("seats", selected.join(","));
     if (passengerCount !== null) {
       params.set("passengers", String(passengerCount));
     }
@@ -164,7 +163,7 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
               const seatNumber = cell;
               const seat = seatsByNumber.get(seatNumber);
               const isOccupied = !seat || seat.status !== "available";
-              const isSelected = selected.has(seatNumber);
+              const isSelected = selected.includes(seatNumber);
 
               const seatStyle: React.CSSProperties = isSelected
                 ? {
@@ -259,7 +258,7 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
                 margin: 0,
               }}
             >
-              {selected.size} de {passengerCount} asientos seleccionados
+              {selected.length} de {passengerCount} asientos seleccionados
             </p>
           )}
         </div>
@@ -329,7 +328,7 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
               {renderGrid(activeFloor === "alta" ? PLANTA_ALTA : PLANTA_BAJA)}
             </div>
 
-            <BlueButton variant="blue" onClick={handleContinuar} disabled={selected.size === 0} arrow>
+            <BlueButton variant="blue" onClick={handleContinuar} disabled={selected.length === 0} arrow>
               Continuar
             </BlueButton>
           </>
