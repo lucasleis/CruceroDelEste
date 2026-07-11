@@ -588,6 +588,7 @@ async def test_chargeback_webhook_updates_to_settled(
 
     assert resp.status_code == 200
 
+    booking_id = booking.id
     db.expire_all()
     result = await db.execute(
         select(Chargeback).where(Chargeback.mp_payment_id == mp_payment_id)
@@ -595,7 +596,7 @@ async def test_chargeback_webhook_updates_to_settled(
     cb = result.scalar_one()
     assert cb.status == ChargebackStatusEnum.settled
 
-    refreshed = await db.get(Booking, booking.id)
+    refreshed = await db.get(Booking, booking_id)
     assert refreshed.status == BookingStatusEnum.confirmed
 
 
@@ -633,6 +634,7 @@ async def test_chargeback_webhook_updates_to_reimbursed(
 
     assert resp.status_code == 200
 
+    booking_id = booking.id
     db.expire_all()
     result = await db.execute(
         select(Chargeback).where(Chargeback.mp_payment_id == mp_payment_id)
@@ -640,7 +642,7 @@ async def test_chargeback_webhook_updates_to_reimbursed(
     cb = result.scalar_one()
     assert cb.status == ChargebackStatusEnum.reimbursed
 
-    refreshed = await db.get(Booking, booking.id)
+    refreshed = await db.get(Booking, booking_id)
     assert refreshed.status == BookingStatusEnum.confirmed
 
 
