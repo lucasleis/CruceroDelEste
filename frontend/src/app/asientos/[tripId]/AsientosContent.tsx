@@ -105,6 +105,7 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
       if (next.has(seatNumber)) {
         next.delete(seatNumber);
       } else {
+        if (passengerCount !== null && next.size >= passengerCount) return prev;
         next.add(seatNumber);
       }
       return next;

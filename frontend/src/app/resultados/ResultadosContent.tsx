@@ -252,7 +252,7 @@ export function ResultadosContent() {
               <TripCard
                 key={trip.id}
                 {...mapTripToCardProps(trip)}
-                onSelect={() => router.push(`/asientos/${trip.id}`)}
+                onSelect={() => router.push(`/asientos/${trip.id}?passengers=${passengers}`)}
               />
             ))}
         </div>
