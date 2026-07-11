@@ -212,10 +212,17 @@ export default function TripDetailPage() {
       setCreateOpen(false);
       resetForm();
     } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response
-        ?.status;
-      if (status === 409) {
-        toast.error("Este tramo se superpone con uno existente.");
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      if (detail === "tranche_overlap") {
+        toast.error("Este rango se superpone con un tramo existente.");
+      } else if (detail === "tranche_limit_exceeded") {
+        toast.error("Ya hay 5 tramos configurados para este tipo de asiento.");
+      } else if (detail === "tranche_exceeds_seat_capacity") {
+        toast.error("El rango supera la cantidad de asientos disponibles para este tipo.");
+      } else if (detail === "tranche_gap") {
+        toast.error("Hay un hueco entre este tramo y el anterior.");
+      } else if (detail === "trip_has_no_seat_layout") {
+        toast.error("Este viaje no tiene un layout de asientos asignado.");
       } else {
         toast.error("Error al crear el tramo.");
       }
