@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BlueButton } from "@/components/core/BlueButton";
 
-type SeatApiStatus = "available" | "reserved" | "sold";
+type SeatApiStatus = "available" | "reserved" | "sold" | "blocked";
 
 interface SeatRead {
   id: string;
