@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BlueButton } from "@/components/core/BlueButton";
+import type { StopRead } from "@/types/trips";
 
 type SeatApiStatus = "available" | "reserved" | "sold" | "blocked";
 
@@ -11,6 +12,19 @@ interface SeatRead {
   seat_number: string;
   seat_type: "cama" | "semi_cama";
   status: SeatApiStatus;
+}
+
+interface RouteRead {
+  origin_stop: StopRead;
+  destination_stop: StopRead;
+}
+
+interface TripRead {
+  route: RouteRead;
+  departure_at: string;
+  arrival_at: string;
+  current_price_cama: number | null;
+  current_price_semi_cama: number | null;
 }
 
 type Floor = "alta" | "baja";
@@ -58,6 +72,44 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
   const [error, setError] = useState<string | null>(null);
   const [activeFloor, setActiveFloor] = useState<Floor>("alta");
   const [selected, setSelected] = useState<string[]>([]);
+  const [trip, setTrip] = useState<TripRead | null>(null);
+  const [tripLoading, setTripLoading] = useState(true);
+  const [tripError, setTripError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchTrip() {
+      setTripLoading(true);
+      setTripError(null);
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+        const url = `${baseUrl}/trips/${tripId}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        const data: TripRead = await response.json();
+        if (!cancelled) {
+          setTrip(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setTripError("error");
+        }
+      } finally {
+        if (!cancelled) {
+          setTripLoading(false);
+        }
+      }
+    }
+
+    fetchTrip();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +147,42 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
   }, [tripId]);
 
   const seatsByNumber = new Map(seats.map((seat) => [seat.seat_number, seat]));
+
+  function formatDateTime(iso: string): string {
+    const date = new Date(iso);
+    const datePart = date
+      .toLocaleDateString("es-AR", {
+        timeZone: "America/Argentina/Buenos_Aires",
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+      })
+      .replace(".", "");
+    const timePart = date.toLocaleTimeString("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    return `${datePart} · ${timePart}`;
+  }
+
+  function seatTypeLabel(seatType: SeatRead["seat_type"]): string {
+    return seatType === "cama" ? "Cama Ejecutivo" : "Semi Cama";
+  }
+
+  function seatPrice(seatType: SeatRead["seat_type"]): number | null {
+    if (!trip) return null;
+    return seatType === "cama" ? trip.current_price_cama : trip.current_price_semi_cama;
+  }
+
+  const selectedSeatDetails = selected.map((seatNumber) => {
+    const seat = seatsByNumber.get(seatNumber);
+    const price = seat ? seatPrice(seat.seat_type) : null;
+    return { seatNumber, seat, price };
+  });
+
+  const total = selectedSeatDetails.reduce((sum, { price }) => sum + (price ?? 0), 0);
 
   function toggleSeat(seatNumber: string) {
     const seat = seatsByNumber.get(seatNumber);
@@ -226,7 +314,8 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
 
   return (
     <div style={{ background: "var(--color-surface)", minHeight: "100vh", padding: "24px" }}>
-      <div style={{ maxWidth: "720px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div style={{ display: "flex", gap: "24px", maxWidth: "1200px", margin: "0 auto", alignItems: "flex-start" }}>
+      <div style={{ flex: "1", minWidth: 0, display: "flex", flexDirection: "column", gap: "16px" }}>
         <div
           style={{
             background: "var(--color-white)",
@@ -333,6 +422,94 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
             </BlueButton>
           </>
         )}
+      </div>
+
+      <div style={{ width: "320px", flexShrink: 0 }}>
+        <div
+          style={{
+            background: "var(--color-white)",
+            boxShadow: "var(--shadow-sm)",
+            borderRadius: "12px",
+            padding: "20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+          }}
+        >
+          <h2
+            style={{
+              fontFamily: "var(--font-body)",
+              color: "var(--color-text-primary)",
+              fontSize: "16px",
+              fontWeight: 600,
+              margin: 0,
+            }}
+          >
+            Resumen
+          </h2>
+
+          {tripLoading && (
+            <p style={{ fontFamily: "var(--font-body)", color: "var(--color-text-muted)", fontSize: "14px", margin: 0 }}>
+              Cargando...
+            </p>
+          )}
+
+          {!tripLoading && (tripError || !trip) && (
+            <p style={{ fontFamily: "var(--font-body)", color: "var(--color-text-muted)", fontSize: "14px", margin: 0 }}>
+              No se pudo cargar la información del viaje.
+            </p>
+          )}
+
+          {!tripLoading && trip && (
+            <>
+              <div style={{ borderTop: "1px solid var(--color-border)" }} />
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <p style={{ fontFamily: "var(--font-body)", color: "var(--color-text-primary)", fontSize: "14px", fontWeight: 600, margin: 0 }}>
+                  {trip.route.origin_stop.name} → {trip.route.destination_stop.name}
+                </p>
+                <p style={{ fontFamily: "var(--font-body)", color: "var(--color-text-muted)", fontSize: "13px", margin: 0 }}>
+                  Salida: {formatDateTime(trip.departure_at)}
+                </p>
+                <p style={{ fontFamily: "var(--font-body)", color: "var(--color-text-muted)", fontSize: "13px", margin: 0 }}>
+                  Llegada: {formatDateTime(trip.arrival_at)}
+                </p>
+              </div>
+
+              <div style={{ borderTop: "1px solid var(--color-border)" }} />
+
+              {selectedSeatDetails.length === 0 ? (
+                <p style={{ fontFamily: "var(--font-body)", color: "var(--color-text-muted)", fontSize: "14px", margin: 0 }}>
+                  Ningún asiento seleccionado
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {selectedSeatDetails.map(({ seatNumber, seat, price }) => (
+                    <div
+                      key={seatNumber}
+                      style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--font-body)", fontSize: "13px", color: "var(--color-text-primary)" }}
+                    >
+                      <span>
+                        {seatNumber} — {seat ? seatTypeLabel(seat.seat_type) : ""}
+                      </span>
+                      <span>{price !== null ? `$${price.toLocaleString("es-AR")}` : "Sin precio"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ borderTop: "1px solid var(--color-border)" }} />
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontFamily: "var(--font-body)", color: "var(--color-text-primary)", fontSize: "14px" }}>Total</span>
+                <span style={{ fontFamily: "var(--font-display)", color: "var(--color-text-primary)", fontSize: "20px", fontWeight: 600 }}>
+                  ${total.toLocaleString("es-AR")}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
       </div>
     </div>
   );

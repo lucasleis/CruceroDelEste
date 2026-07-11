@@ -102,6 +102,34 @@ async def list_trips(
     ]
 
 
+@router.get("/{trip_id}", response_model=TripRead)
+async def get_trip(
+    trip_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> TripRead:
+    result = await db.execute(
+        select(Trip).options(trip_load_options()).where(Trip.id == trip_id)
+    )
+    trip = result.scalar_one_or_none()
+    if trip is None:
+        raise NotFoundError()
+
+    trip_ids = [trip.id]
+    counts = await _available_counts(db, trip_ids)
+    prices = await _current_prices(db, trip_ids)
+
+    return TripRead(
+        id=trip.id,
+        route=trip.route,
+        departure_at=trip.departure_at,
+        arrival_at=trip.arrival_at,
+        status=trip.status,
+        available_seats_count=counts.get(trip.id, 0),
+        current_price_cama=prices.get(trip.id, {}).get(SeatTypeEnum.cama),
+        current_price_semi_cama=prices.get(trip.id, {}).get(SeatTypeEnum.semi_cama),
+    )
+
+
 @router.get("/{trip_id}/seats", response_model=list[SeatRead])
 async def list_trip_seats(
     trip_id: UUID,
