@@ -341,7 +341,7 @@ async def test_get_stops_returns_correct_shape(client: AsyncClient, db: AsyncSes
     assert data[0]["country"] == "PY"
     assert data[1]["name"] == "Retiro"
     assert data[1]["country"] == "AR"
-    assert set(data[0].keys()) == {"id", "name", "country"}
+    assert set(data[0].keys()) == {"id", "name", "country", "province"}
 
 
 # ---------------------------------------------------------------------------
