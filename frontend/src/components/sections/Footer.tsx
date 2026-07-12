@@ -1,4 +1,5 @@
 import Image from "next/image"
+import Link from "next/link"
 import { Heading } from "@/components/core/Heading"
 
 const ArrowUpRight = () => (
@@ -27,9 +28,13 @@ const COLUMNS = [
   },
   {
     label: "INFORMACIÓN",
-    links: ["Tarifas", "Preguntas frecuentes", "Términos y condiciones", "Política de privacidad"],
+    links: ["Tarifas", "Preguntas frecuentes", "Términos y condiciones", "Política de privacidad", "Botón de arrepentimiento"],
   },
 ]
+
+const LINK_HREFS: Record<string, string> = {
+  "Botón de arrepentimiento": "/arrepentimiento",
+}
 
 const WhatsAppIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -110,9 +115,9 @@ export function Footer() {
                 {col.label}
               </span>
               {col.links.map((link) => (
-                <a key={link} href="#" className="footer-link">
+                <Link key={link} href={LINK_HREFS[link] ?? "#"} className="footer-link">
                   {link}
-                </a>
+                </Link>
               ))}
             </div>
           ))}

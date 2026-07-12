@@ -1,7 +1,12 @@
+"use client"
+
+import { useRouter } from "next/navigation"
 import { BodyText } from "@/components/core/BodyText"
 import { BlueButton } from "@/components/core/BlueButton"
 
 export function Arrepentimiento() {
+  const router = useRouter()
+
   return (
     <section
       style={{
@@ -36,7 +41,9 @@ export function Arrepentimiento() {
 
         {/* Right — button */}
         <div style={{ flexShrink: 0 }}>
-          <BlueButton variant="danger">Botón de arrepentimiento</BlueButton>
+          <BlueButton variant="danger" onClick={() => router.push("/arrepentimiento")}>
+            Botón de arrepentimiento
+          </BlueButton>
         </div>
       </div>
     </section>

@@ -1,9 +1,10 @@
-import { Arrepentimiento } from "@/components/sections/Arrepentimiento"
+import { Suspense } from "react";
+import { ArrepentimientoContent } from "./ArrepentimientoContent";
 
 export default function ArrepentimientoPage() {
   return (
-    <div style={{ background: "white" }}>
-      <Arrepentimiento />
-    </div>
-  )
+    <Suspense fallback={null}>
+      <ArrepentimientoContent />
+    </Suspense>
+  );
 }
