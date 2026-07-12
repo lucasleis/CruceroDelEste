@@ -154,14 +154,16 @@ function FaqAccordionItem({
 }
 
 export default function FaqContent() {
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
     <main
       style={{
         minHeight: "100vh",
         backgroundColor: "var(--color-surface)",
-        padding: "48px 16px 80px",
+        padding: "16px 16px 0",
+        paddingTop: "calc(clamp(52px, 6vw, 72px) + 32px)",
+        paddingBottom: "64px",
       }}
     >
       <div style={{ maxWidth: "760px", margin: "0 auto" }}>
@@ -202,6 +204,60 @@ export default function FaqContent() {
               }
             />
           ))}
+        </div>
+
+        <div
+          style={{
+            marginTop: "32px",
+            backgroundColor: "var(--color-primary)",
+            color: "var(--color-white)",
+            borderRadius: "var(--radius-lg)",
+            padding: "32px",
+            textAlign: "center",
+          }}
+        >
+          <h2
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "22px",
+              fontWeight: 700,
+              color: "var(--color-white)",
+              margin: "0 0 8px",
+            }}
+          >
+            ¿No encontraste lo que buscabas?
+          </h2>
+          <p
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "16px",
+              lineHeight: 1.6,
+              color: "var(--color-white)",
+              margin: "0 0 20px",
+            }}
+          >
+            Contactanos y te ayudamos.
+          </p>
+          <a
+            href="https://wa.me/5491100000000"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "var(--color-white)",
+              color: "var(--color-primary)",
+              borderRadius: "var(--radius-md)",
+              padding: "12px 24px",
+              fontFamily: "var(--font-body)",
+              fontSize: "15px",
+              fontWeight: 700,
+              textDecoration: "none",
+            }}
+          >
+            Contactar por WhatsApp
+          </a>
         </div>
       </div>
     </main>
