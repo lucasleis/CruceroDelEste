@@ -456,7 +456,7 @@ export default function TripsPage() {
               <label className="text-sm font-medium text-neutral-600">
                 Ruta
               </label>
-              <Select value={routeId} onValueChange={(value) => setRouteId(value)}>
+              <Select value={routeId} onValueChange={(value) => setRouteId(value ?? "")}>
                 <SelectTrigger className="w-full">
                   <SelectValue>
                     {routeId
@@ -486,7 +486,7 @@ export default function TripsPage() {
               </label>
               <Select
                 value={seatLayoutId}
-                onValueChange={(value) => setSeatLayoutId(value)}
+                onValueChange={(value) => setSeatLayoutId(value ?? "")}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue>

@@ -472,7 +472,7 @@ export default function ConfiguracionPage() {
               </label>
               <Select
                 value={originStopId}
-                onValueChange={(value) => setOriginStopId(value)}
+                onValueChange={(value) => setOriginStopId(value ?? "")}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue>
@@ -497,7 +497,7 @@ export default function ConfiguracionPage() {
               </label>
               <Select
                 value={destinationStopId}
-                onValueChange={(value) => setDestinationStopId(value)}
+                onValueChange={(value) => setDestinationStopId(value ?? "")}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue>

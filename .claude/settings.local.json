@@ -78,7 +78,18 @@
       "Bash(docker run *)",
       "Bash(docker exec *)",
       "Bash(TEST_DATABASE_URL=\"postgresql://test:test@localhost:55432/test\" .venv312/bin/python -m pytest tests/integration/test_payments_router.py::test_chargeback_webhook_updates_to_settled -x)",
-      "Bash(docker stop *)"
+      "Bash(docker stop *)",
+      "Bash(docker volume *)",
+      "Bash(docker network *)",
+      "Bash(systemctl list-units *)",
+      "Bash(command -v pm2)",
+      "Bash(pm2 list *)",
+      "Bash(screen -ls)",
+      "Bash(tmux ls *)",
+      "Read(//etc/nginx/**)",
+      "Read(//etc/**)",
+      "Bash(docker start *)",
+      "Bash(docker compose *)"
     ]
   }
 }

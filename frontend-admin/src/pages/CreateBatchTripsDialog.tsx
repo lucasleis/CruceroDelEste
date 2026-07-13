@@ -267,7 +267,7 @@ export default function CreateBatchTripsDialog({
                 <label className="text-sm font-medium text-neutral-600">
                   Ruta
                 </label>
-                <Select value={seriesRouteId} onValueChange={setSeriesRouteId}>
+                <Select value={seriesRouteId} onValueChange={(value) => setSeriesRouteId(value ?? "")}>
                   <SelectTrigger className="w-full">
                     <SelectValue>
                       {seriesRouteId
@@ -300,7 +300,7 @@ export default function CreateBatchTripsDialog({
                 </label>
                 <Select
                   value={seriesSeatLayoutId}
-                  onValueChange={setSeriesSeatLayoutId}
+                  onValueChange={(value) => setSeriesSeatLayoutId(value ?? "")}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue>

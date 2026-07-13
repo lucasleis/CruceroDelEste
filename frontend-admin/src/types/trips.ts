@@ -6,6 +6,7 @@ export interface StopRead {
   id: string;
   name: string;
   country: CountryEnum;
+  province: string | null;
 }
 
 export interface RouteRead {
