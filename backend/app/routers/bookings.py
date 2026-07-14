@@ -130,8 +130,8 @@ async def create_booking_endpoint(
     )
 
 
-@limiter.limit("5/minute")
 @router.post("/{booking_id}/refund-request", response_model=RefundRequestRead, status_code=201)
+@limiter.limit("5/minute")
 async def create_refund_request_endpoint(
     request: Request,
     booking_id: UUID,
