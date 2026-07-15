@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import type { ReactElement } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import LoginPage from "@/pages/LoginPage";
 import AdminLayout from "@/components/AdminLayout";
 import TripsPage from "@/pages/TripsPage"
@@ -11,16 +12,22 @@ import RefundsPage from "@/pages/RefundsPage";
 import ChargebacksPage from "@/pages/ChargebacksPage";
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
-  const token = localStorage.getItem("admin_token");
-  if (!token) {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center">Cargando...</div>;
+  }
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
   return children;
 }
 
 function RootRedirect() {
-  const token = localStorage.getItem("admin_token");
-  return <Navigate to={token ? "/dashboard" : "/login"} replace />;
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center">Cargando...</div>;
+  }
+  return <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />;
 }
 
 export default function AppRouter() {

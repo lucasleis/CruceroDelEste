@@ -20,6 +20,11 @@ class AdminLoginResponse(BaseModel):
     token_type: Literal["bearer"] = "bearer"
 
 
+class AdminMeResponse(BaseModel):
+    id: UUID
+    email: EmailStr
+
+
 class PriceTrancheCreate(BaseModel):
     seat_type: SeatTypeEnum
     min_sold: int = Field(ge=0)

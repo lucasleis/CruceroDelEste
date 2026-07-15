@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { label: "Dashboard", to: "/dashboard" },
@@ -10,11 +11,10 @@ const navItems = [
 ];
 
 export default function Sidebar() {
-  const navigate = useNavigate();
+  const { logout } = useAuth();
 
-  function handleLogout() {
-    localStorage.removeItem("admin_token");
-    navigate("/login", { replace: true });
+  async function handleLogout() {
+    await logout();
   }
 
   return (

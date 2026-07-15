@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from passlib.context import CryptContext
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,7 @@ from app.models.trip import PriceTranche, SeatLayout, SeatTypeEnum, Trip
 from app.schemas.admin import (
     AdminLoginRequest,
     AdminLoginResponse,
+    AdminMeResponse,
     PriceTrancheCreate,
     PriceTrancheRead,
     AdminBookingRead,
@@ -39,7 +40,12 @@ _DUMMY_HASH = _pwd_context.hash("dummy")
 
 @router.post("/login", response_model=AdminLoginResponse)
 @limiter.limit("10/minute")
-async def login(request: Request, body: AdminLoginRequest, db: AsyncSession = Depends(get_db)) -> AdminLoginResponse:
+async def login(
+    request: Request,
+    response: Response,
+    body: AdminLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> AdminLoginResponse:
     result = await db.execute(select(AdminUser).where(AdminUser.email == body.email))
     admin = result.scalar_one_or_none()
 
@@ -65,7 +71,30 @@ async def login(request: Request, body: AdminLoginRequest, db: AsyncSession = De
     }
     token = jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
+    response.set_cookie(
+        key="admin_token",
+        value=token,
+        httponly=True,
+        secure=(settings.environment == "production"),
+        samesite="strict",
+        max_age=settings.jwt_expiry_minutes * 60,
+    )
+
     return AdminLoginResponse(access_token=token, token_type="bearer")
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(
+    response: Response,
+    _admin: AdminUser = Depends(get_current_admin),
+) -> dict:
+    response.delete_cookie("admin_token")
+    return {"ok": True}
+
+
+@router.get("/me", response_model=AdminMeResponse)
+async def me(_admin: AdminUser = Depends(get_current_admin)) -> AdminMeResponse:
+    return AdminMeResponse(id=_admin.id, email=_admin.email)
 
 
 @router.get("/bookings", response_model=list[AdminBookingRead])

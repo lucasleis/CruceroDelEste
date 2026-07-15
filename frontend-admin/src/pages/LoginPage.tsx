@@ -1,30 +1,26 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { login } from "@/api/auth";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { setAuthenticated } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (localStorage.getItem("admin_token")) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [navigate]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const { access_token } = await login(email, password);
-      localStorage.setItem("admin_token", access_token);
+      await login(email, password);
+      setAuthenticated(true);
       navigate("/dashboard", { replace: true });
     } catch {
       setError("Email o contraseña incorrectos.");

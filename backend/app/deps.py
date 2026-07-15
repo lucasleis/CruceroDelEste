@@ -1,5 +1,4 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, Request, status
 import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,21 +11,21 @@ from app.models.trip import Route, Trip
 
 __all__ = ["get_db", "get_current_admin", "trip_load_options"]
 
-_bearer = HTTPBearer()
-
 
 async def get_current_admin(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> AdminUser:
     invalid = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired token",
-        headers={"WWW-Authenticate": "Bearer"},
     )
+    token = request.cookies.get("admin_token")
+    if token is None:
+        raise invalid
     try:
         payload = jwt.decode(
-            credentials.credentials,
+            token,
             settings.secret_key,
             algorithms=["HS256"],
             audience="crucero-admin-api",
