@@ -41,7 +41,9 @@ router = APIRouter(prefix="/bookings", tags=["bookings"])
 
 
 @router.post("", response_model=BookingCreateResponse, status_code=201)
+@limiter.limit("10/minute")
 async def create_booking_endpoint(
+    request: Request,
     booking_in: BookingCreate,
     db: AsyncSession = Depends(get_db),
 ) -> BookingCreateResponse:
