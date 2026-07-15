@@ -84,6 +84,7 @@ Este proyecto usa un flujo de tres capas: **Claude** (arquitectura y revisión) 
 - **Un ticket a la vez** — no se mezclan cambios de distintos tickets en una misma sesión
 - **Claude Code nunca mergea a main** — Lucas revisa y commitea manualmente
 - **Preguntar antes de asumir** — si algo es ambiguo, Claude Code se detiene y consulta
+- **Sin infraestructura sin autorización** — si Claude Code necesita un servicio externo para completar una tarea (Docker, Postgres, Redis, etc.) y no está disponible en el entorno, debe detenerse y preguntar explícitamente: "No tengo Docker disponible. ¿Querés que levante un Postgres local, o preferís que reporte solo los unit tests?" No instala ni levanta servicios por su cuenta.
 
 ### Cómo arrancar una conversación nueva
 
@@ -113,6 +114,7 @@ No arranques a implementar nada hasta que Lucas apruebe explícitamente el paso 
 - **Antes de escribir código:** anunciá qué vas a implementar, listá las decisiones de diseño que necesitás tomar, esperá aprobación explícita.
 - **Después de cada archivo completado:** output `✅ [nombre del archivo] — [descripción en una línea]`.
 - **Si encontrás algo ambiguo o no especificado:** detenete y consultá. No asumas.
+- **Si necesitás infraestructura no disponible:** detenete y consultá. No instales ni levantes servicios por tu cuenta (ver "Sin infraestructura sin autorización" en Reglas del proceso).
 
 ---
 
