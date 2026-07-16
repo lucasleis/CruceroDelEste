@@ -152,11 +152,11 @@ async def create_refund_request_endpoint(
         .where(Booking.id == booking_id)
     )
     booking = result.scalar_one_or_none()
-    if booking is None:
-        raise NotFoundError()
-
-    if booking.status != BookingStatusEnum.confirmed:
-        raise HTTPException(status_code=409, detail="booking_not_refundable")
+    if booking is None or booking.status != BookingStatusEnum.confirmed:
+        raise HTTPException(
+            status_code=403,
+            detail="forbidden",
+        )
 
     # Accept the booking's contact_email (buyer) in addition to any passenger email.
     # The buyer may not be a passenger themselves but must be able to request a refund.
