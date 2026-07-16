@@ -5,14 +5,22 @@ from uuid import UUID
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from passlib.context import CryptContext
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.deps import get_current_admin, get_db
 from app.limiter import limiter
-from app.errors import NotFoundError
+from app.errors import (
+    NotFoundError,
+    TrancheExceedsSeatCapacityError,
+    TrancheGapError,
+    TrancheLimitExceededError,
+    TrancheMustStartAtZeroError,
+    TrancheOverlapError,
+    TripHasNoSeatLayoutError,
+)
 from app.models.booking import (
     AdminUser,
     Booking,
@@ -21,7 +29,8 @@ from app.models.booking import (
     ChargebackStatusEnum,
     RefundRequest,
 )
-from app.models.trip import PriceTranche, SeatLayout, SeatTypeEnum, Trip
+from app.models.trip import PriceTranche, SeatTypeEnum, Trip
+from app.services.pricing import add_price_tranche
 from app.schemas.admin import (
     AdminLoginRequest,
     AdminLoginResponse,
@@ -192,81 +201,26 @@ async def create_price_tranche(
     _admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ) -> PriceTrancheRead:
-    result = await db.execute(
-        select(Trip).options(selectinload(Trip.seat_layout)).where(Trip.id == trip_id)
-    )
-    trip = result.scalar_one_or_none()
-    if trip is None:
-        raise NotFoundError()
-
-    if trip.seat_layout is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="trip_has_no_seat_layout",
+    try:
+        new_tranche = await add_price_tranche(
+            db, trip_id, body.seat_type,
+            body.min_sold, body.max_sold, body.price,
         )
+    except NotFoundError:
+        raise
+    except TripHasNoSeatLayoutError:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="trip_has_no_seat_layout")
+    except TrancheLimitExceededError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="tranche_limit_exceeded")
+    except TrancheExceedsSeatCapacityError:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="tranche_exceeds_seat_capacity")
+    except TrancheOverlapError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="tranche_overlap")
+    except TrancheMustStartAtZeroError:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="tranche_must_start_at_zero")
+    except TrancheGapError:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="tranche_gap")
 
-    await db.execute(
-        text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
-        {"key": f"price_tranche_{trip_id}"},
-    )
-
-    result = await db.execute(
-        select(PriceTranche)
-        .where(
-            PriceTranche.trip_id == trip_id,
-            PriceTranche.seat_type == body.seat_type,
-        )
-        .with_for_update()
-    )
-    existing = list(result.scalars().all())
-
-    if len(existing) >= 5:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="tranche_limit_exceeded",
-        )
-
-    seat_capacity = (
-        trip.seat_layout.total_cama
-        if body.seat_type == SeatTypeEnum.cama
-        else trip.seat_layout.total_semi_cama
-    )
-    if body.max_sold > seat_capacity:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="tranche_exceeds_seat_capacity",
-        )
-
-    for tranche in existing:
-        if body.min_sold < tranche.max_sold and body.max_sold > tranche.min_sold:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="tranche_overlap",
-            )
-
-    new_tranche = PriceTranche(
-        trip_id=trip_id,
-        seat_type=body.seat_type,
-        min_sold=body.min_sold,
-        max_sold=body.max_sold,
-        price=body.price,
-    )
-
-    all_tranches = existing + [new_tranche]
-    sorted_tranches = sorted(all_tranches, key=lambda t: t.min_sold)
-    if sorted_tranches[0].min_sold != 0:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="tranche_must_start_at_zero",
-        )
-    for i in range(1, len(sorted_tranches)):
-        if sorted_tranches[i].min_sold > sorted_tranches[i - 1].max_sold + 1:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="tranche_gap",
-            )
-
-    db.add(new_tranche)
     await db.commit()
     await db.refresh(new_tranche)
 
