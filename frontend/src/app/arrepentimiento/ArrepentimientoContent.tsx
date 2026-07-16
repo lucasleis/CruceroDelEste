@@ -181,7 +181,8 @@ export function ArrepentimientoContent() {
       }
 
       setResult({ kind: "error" });
-    } catch {
+    } catch (error) {
+      console.error("[ArrepentimientoContent] fetch error:", error);
       setResult({ kind: "error" });
     } finally {
       setLoading(false);
