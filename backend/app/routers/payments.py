@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -9,10 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.deps import get_db, trip_load_options
-from app.errors import InvalidWebhookSignature, PaymentProcessingError, SeatAlreadyReleasedError
-from app.models.booking import Booking, BookingStatusEnum, Chargeback, ChargebackStatusEnum, Passenger
+from app.errors import ChargebackAlreadyInStatusError, InvalidWebhookSignature, PaymentProcessingError, SeatAlreadyReleasedError
+from app.models.booking import Booking, BookingStatusEnum, Passenger
 
 from app.services.booking import confirm_booking
+from app.services.chargeback import upsert_chargeback
 from app.services.email import send_confirmation_email
 from app.services.payment import get_payment, verify_webhook_signature
 
@@ -259,35 +259,9 @@ async def chargebacks_webhook(
 
         # --- Step 8: upsert Chargeback — create or update. ---
         try:
-            new_status = ChargebackStatusEnum(payment.status_detail)
-        except ValueError:
-            logger.warning(
-                "chargeback_unknown_status_detail status_detail=%r mp_payment_id=%s",
-                payment.status_detail, data_id,
-            )
-            new_status = ChargebackStatusEnum.in_process
-
-        cb_result = await db.execute(
-            select(Chargeback)
-            .where(Chargeback.mp_payment_id == data_id)
-            .order_by(Chargeback.created_at.desc())
-            .limit(1)
-        )
-        existing = cb_result.scalar_one_or_none()
-
-        if existing is not None:
-            if existing.status == new_status:
-                return JSONResponse(_OK)  # idempotent — same status, nothing to do
-            existing.status = new_status
-            existing.status_detail = payment.status_detail or None
-            existing.updated_at = datetime.now(timezone.utc)
-        else:
-            db.add(Chargeback(
-                booking_id=booking.id,
-                mp_payment_id=data_id,
-                status=new_status,
-                status_detail=payment.status_detail or None,
-            ))
+            await upsert_chargeback(db, booking.id, data_id, payment.status_detail)
+        except ChargebackAlreadyInStatusError:
+            return JSONResponse(_OK)
 
         # --- Step 9: commit. The booking status is intentionally NOT changed. ---
         await db.commit()
