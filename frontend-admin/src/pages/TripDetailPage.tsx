@@ -36,7 +36,6 @@ import {
   updateTrip,
   getTripSeats,
   updateSeatStatus,
-  type AdminSeatRead,
 } from "@/api/trips";
 import {
   getPriceTranches,
@@ -44,6 +43,7 @@ import {
   deletePriceTranche,
 } from "@/api/priceTranches";
 import type {
+  AdminSeatRead,
   PriceTrancheRead,
   SeatTypeEnum,
   TripStatusEnum,

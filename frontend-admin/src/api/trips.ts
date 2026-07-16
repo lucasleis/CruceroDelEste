@@ -1,5 +1,6 @@
 import apiClient from "./client";
 import type {
+  AdminSeatRead,
   AdminTripRead,
   RouteStopRead,
   SeatLayoutRead,
@@ -53,13 +54,6 @@ export async function getSeatLayouts(): Promise<SeatLayoutRead[]> {
 export async function getRouteStops(routeId: string): Promise<RouteStopRead[]> {
   const response = await apiClient.get<RouteStopRead[]>(`/admin/routes/${routeId}/stops`);
   return response.data;
-}
-
-export interface AdminSeatRead {
-  id: string;
-  seat_number: string;
-  seat_type: "cama" | "semi_cama";
-  status: "available" | "reserved" | "sold" | "blocked";
 }
 
 export async function getTripSeats(tripId: string): Promise<AdminSeatRead[]> {
