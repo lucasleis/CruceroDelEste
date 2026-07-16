@@ -1,8 +1,9 @@
 import logging
+import hmac as hmac_lib
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -29,7 +30,12 @@ from app.services.booking import (
     mark_booking_refunded,
 )
 from app.services.inventory import SeatNotAvailable
-from app.services.payment import create_preference, create_refund
+from app.services.payment import (
+    create_preference,
+    create_refund,
+    generate_confirmation_token,
+    _CONFIRMATION_TOKEN_WINDOW_MINUTES,
+)
 from app.services.pricing import NoPriceTranche
 
 _REFUND_WINDOW_DAYS = 10
@@ -197,10 +203,19 @@ async def create_refund_request_endpoint(
 
 
 @router.get("/{booking_id}", response_model=BookingRead)
+@limiter.limit("10/minute")
 async def get_booking(
+    request: Request,
     booking_id: UUID,
+    token: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ) -> BookingRead:
+    _FORBIDDEN = HTTPException(status_code=403, detail="Forbidden")
+
+    expected = generate_confirmation_token(booking_id)
+    if not hmac_lib.compare_digest(expected, token):
+        raise _FORBIDDEN
+
     result = await db.execute(
         select(Booking)
         .options(
@@ -216,5 +231,12 @@ async def get_booking(
     )
     booking = result.scalar_one_or_none()
     if booking is None:
-        raise NotFoundError()
+        raise _FORBIDDEN
+
+    if booking.confirmed_at is None:
+        raise _FORBIDDEN
+    window = timedelta(minutes=_CONFIRMATION_TOKEN_WINDOW_MINUTES)
+    if datetime.now(timezone.utc) - booking.confirmed_at >= window:
+        raise _FORBIDDEN
+
     return BookingRead.model_validate(booking)
