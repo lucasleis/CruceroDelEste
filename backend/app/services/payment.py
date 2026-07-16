@@ -44,8 +44,19 @@ _REQUEST_OPTIONS = RequestOptions(connection_timeout=_REQUEST_TIMEOUT_S, max_ret
 # Replay protection: reject webhooks whose ts is outside this window.
 _REPLAY_PAST_S = 120
 _REPLAY_FUTURE_S = 600
+_CONFIRMATION_TOKEN_WINDOW_MINUTES = 60
 
 _sdk = mercadopago.SDK(settings.mercadopago_access_token)
+
+
+def generate_confirmation_token(booking_id: UUID) -> str:
+    import base64
+    digest = hmac.new(
+        settings.secret_key.encode(),
+        str(booking_id).encode(),
+        hashlib.sha256,
+    ).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +113,11 @@ async def create_preference(
         # MP will POST to this URL on every payment status change.
         "notification_url": f"{settings.backend_url}/webhooks/mercadopago",
         "back_urls": {
-            "success": f"{settings.frontend_url}/bookings/{booking_id}/success",
+            "success": (
+                f"{settings.frontend_url}/confirmacion"
+                f"?booking_id={booking_id}"
+                f"&token={generate_confirmation_token(booking_id)}"
+            ),
             "failure": f"{settings.frontend_url}/bookings/{booking_id}/failure",
             "pending": f"{settings.frontend_url}/bookings/{booking_id}/pending",
         },

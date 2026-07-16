@@ -102,8 +102,9 @@ export function ConfirmacionContent() {
   const searchParams = useSearchParams();
 
   const status = searchParams.get("status") ?? "";
-  const externalReference = searchParams.get("external_reference") ?? "";
+  const externalReference = searchParams.get("booking_id") ?? searchParams.get("external_reference") ?? "";
   const paymentId = searchParams.get("payment_id") ?? "";
+  const token = searchParams.get("token") ?? "";
 
   const [booking, setBooking] = useState<BookingRead | null>(null);
   const [loading, setLoading] = useState(status === "approved");
@@ -112,6 +113,8 @@ export function ConfirmacionContent() {
   useEffect(() => {
     if (status !== "approved") return;
 
+    window.history.replaceState({}, "", "/confirmacion");
+
     let cancelled = false;
 
     async function fetchBooking() {
@@ -119,7 +122,9 @@ export function ConfirmacionContent() {
       setFetchError(false);
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-        const response = await fetch(`${baseUrl}/bookings/${externalReference}`);
+        const response = await fetch(
+          `${baseUrl}/bookings/${externalReference}?token=${encodeURIComponent(token)}`
+        );
         if (!response.ok) {
           throw new Error(`Request failed with status ${response.status}`);
         }
@@ -143,7 +148,7 @@ export function ConfirmacionContent() {
     return () => {
       cancelled = true;
     };
-  }, [status, externalReference]);
+  }, [status, externalReference, token]);
 
   return (
     <div
