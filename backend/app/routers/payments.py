@@ -126,6 +126,23 @@ async def mercadopago_webhook(
         await confirm_booking(db, booking_id, payment.payment_id)
         await db.commit()
 
+        # --- Step 11b: verify the booking was actually confirmed. ---
+        # confirm_booking returns early (no-op) if the booking was already
+        # expired by expire_bookings_job before the webhook arrived.
+        # expire_on_commit invalidates all attributes, so a refresh is required
+        # before reading booking.status safely in async SQLAlchemy.
+        await db.refresh(booking)
+        if booking.status != BookingStatusEnum.confirmed:
+            logger.error(
+                "webhook_payment_approved_booking_not_confirmed "
+                "booking_id=%s payment_id=%s booking_total_amount=%s booking_status=%s",
+                booking_id,
+                payment.payment_id,
+                booking.total_amount,
+                booking.status.value,
+            )
+            return JSONResponse(_OK)
+
         # --- Step 12: send confirmation email to all passengers. ---
         result = await db.execute(
             select(Booking)

@@ -31,7 +31,7 @@ import resend
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
 from app.config import settings
-from app.models.booking import Booking, Passenger
+from app.models.booking import Booking, BookingStatusEnum, Passenger
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +106,14 @@ async def send_confirmation_email(booking: Booking) -> None:
     invoking this function. Async SQLAlchemy raises MissingGreenlet on lazy
     attribute access outside the original session context.
     """
+    if booking.status != BookingStatusEnum.confirmed:
+        logger.warning(
+            "send_confirmation_email_skipped_non_confirmed "
+            "booking_id=%s status=%s",
+            booking.id,
+            booking.status.value,
+        )
+        return
     failed: list[str] = []
     for passenger in booking.passengers:
         ctx = _context_for(booking, passenger)
