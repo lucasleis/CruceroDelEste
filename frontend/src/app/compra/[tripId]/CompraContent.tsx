@@ -31,7 +31,7 @@ const FIELD_LABELS: Record<keyof PassengerForm, string> = {
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const DNI_REGEX = /^\d{7,8}$/;
+const DNI_REGEX = /^\d{6,9}$/;
 const PHONE_REGEX = /^\+?\d{8,15}$/;
 
 function validatePassenger(
