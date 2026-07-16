@@ -19,6 +19,7 @@ Public API (unchanged from previous version):
 """
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import logging
@@ -50,7 +51,6 @@ _sdk = mercadopago.SDK(settings.mercadopago_access_token)
 
 
 def generate_confirmation_token(booking_id: UUID) -> str:
-    import base64
     digest = hmac.new(
         settings.secret_key.encode(),
         str(booking_id).encode(),
