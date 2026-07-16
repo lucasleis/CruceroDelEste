@@ -148,13 +148,13 @@ async def send_confirmation_email(booking: Booking) -> None:
         raise EmailDeliveryError(failed)
 
 
-async def send_reminder_email(booking: Booking) -> None:
+async def send_reminder_email(booking: Booking) -> bool:
     """Send the pre-trip reminder email to every passenger.
 
-    Per-passenger failures are logged at WARNING and swallowed. Caller must
-    treat any logged failure as grounds to leave booking.reminder_sent = False
-    so the next scheduler tick retries.
+    Per-passenger failures are logged at WARNING and swallowed.
+    Returns True if all passengers were notified successfully, False otherwise.
     """
+    had_failure = False
     for passenger in booking.passengers:
         ctx = _context_for(booking, passenger)
         subject = "Recordatorio de viaje — Expreso Río Paraná"
@@ -169,18 +169,22 @@ async def send_reminder_email(booking: Booking) -> None:
                 "reminder_email_failed booking_id=%s passenger_email=%s",
                 booking.id, passenger.email, exc_info=True,
             )
+            had_failure = True
             continue
         logger.info(
             "reminder_email_sent booking_id=%s passenger_email=%s resend_id=%s",
             booking.id, passenger.email, resend_id,
         )
+    return not had_failure
 
 
-async def send_feedback_email(booking: Booking) -> None:
+async def send_feedback_email(booking: Booking) -> bool:
     """Send the post-trip feedback email to every passenger.
 
     Same swallow-and-log semantics as send_reminder_email.
+    Returns True if all passengers were notified successfully, False otherwise.
     """
+    had_failure = False
     for passenger in booking.passengers:
         ctx = _context_for(booking, passenger)
         subject = "¿Cómo fue tu viaje? — Expreso Río Paraná"
@@ -195,8 +199,10 @@ async def send_feedback_email(booking: Booking) -> None:
                 "feedback_email_failed booking_id=%s passenger_email=%s",
                 booking.id, passenger.email, exc_info=True,
             )
+            had_failure = True
             continue
         logger.info(
             "feedback_email_sent booking_id=%s passenger_email=%s resend_id=%s",
             booking.id, passenger.email, resend_id,
         )
+    return not had_failure

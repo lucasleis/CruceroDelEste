@@ -102,9 +102,15 @@ async def send_reminders_job() -> None:
                     )
                 )
                 db_booking = result.scalar_one()
-                await send_reminder_email(db_booking)
-                db_booking.reminder_sent = True
-                await db.commit()
+                sent = await send_reminder_email(db_booking)
+                if sent:
+                    db_booking.reminder_sent = True
+                    await db.commit()
+                else:
+                    logger.warning(
+                        "send_reminders_job_partial_failure booking_id=%s, se reintentará en el próximo ciclo",
+                        booking_id,
+                    )
             except Exception:
                 logger.error(
                     "send_reminders_job failed booking_id=%s",
@@ -142,9 +148,15 @@ async def send_feedback_job() -> None:
                     )
                 )
                 db_booking = result.scalar_one()
-                await send_feedback_email(db_booking)
-                db_booking.feedback_sent = True
-                await db.commit()
+                sent = await send_feedback_email(db_booking)
+                if sent:
+                    db_booking.feedback_sent = True
+                    await db.commit()
+                else:
+                    logger.warning(
+                        "send_feedback_job_partial_failure booking_id=%s, se reintentará en el próximo ciclo",
+                        booking_id,
+                    )
             except Exception:
                 logger.error(
                     "send_feedback_job failed booking_id=%s",
