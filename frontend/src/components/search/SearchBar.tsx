@@ -56,6 +56,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
   const [errorStops, setErrorStops] = useState(false)
 
   const [allowedDestinationIds, setAllowedDestinationIds] = useState<Set<string> | undefined>(undefined)
+  const [destinationFetchError, setDestinationFetchError] = useState<string | null>(null)
 
   const [originError, setOriginError] = useState(false)
   const [destinationError, setDestinationError] = useState(false)
@@ -122,13 +123,17 @@ export function SearchBar({ onSearch }: SearchBarProps) {
   async function handleOriginStopSelected(stop: StopRead | null) {
     setDestination("")
     setAllowedDestinationIds(undefined)
+    setDestinationFetchError(null)
     if (stop === null) return
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/stops/${stop.id}/valid-destinations`)
+      if (!res.ok) throw new Error(`Request failed with status ${res.status}`)
       const destinations: StopRead[] = await res.json()
       setAllowedDestinationIds(new Set(destinations.map((d) => d.id)))
+      setDestinationFetchError(null)
     } catch {
-      setAllowedDestinationIds(undefined)
+      setAllowedDestinationIds(new Set())
+      setDestinationFetchError("No se pudieron cargar los destinos disponibles. Intentá de nuevo.")
     }
   }
 
@@ -239,6 +244,20 @@ export function SearchBar({ onSearch }: SearchBarProps) {
             whiteSpace: "nowrap",
           }}>
             Seleccioná un destino
+          </span>
+        )}
+        {destinationFetchError && (
+          <span style={{
+            position: "absolute",
+            top: "calc(100% + 20px)",
+            left: 0,
+            display: "block",
+            fontSize: "0.7rem",
+            color: "var(--color-accent)",
+            fontFamily: "var(--font-body)",
+            whiteSpace: "nowrap",
+          }}>
+            {destinationFetchError}
           </span>
         )}
       </div>
