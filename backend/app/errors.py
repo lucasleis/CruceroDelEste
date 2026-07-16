@@ -13,6 +13,12 @@ class SeatUnavailableError(Exception):
         super().__init__(f"Seat {seat_id} is not available")
 
 
+class SeatAlreadyReleasedError(Exception):
+    def __init__(self, seat_id: UUID) -> None:
+        self.seat_id = seat_id
+        super().__init__(f"Seat {seat_id} is no longer reserved")
+
+
 class NotFoundError(HTTPException):
     def __init__(
         self,
@@ -54,14 +60,6 @@ class RefundWindowExpiredError(Exception):
     def __init__(self, refund_request_id: UUID) -> None:
         self.refund_request_id = refund_request_id
         super().__init__(f"Refund window expired for request {refund_request_id}")
-
-
-class PaymentConfigError(Exception):
-    """Payment configuration is missing or invalid.
-
-    Raised at startup by pydantic validators when required payment settings
-    (e.g. mercadopago_access_token, backend_url) are absent or malformed.
-    """
 
 
 def register_exception_handlers(app: FastAPI) -> None:

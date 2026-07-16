@@ -162,9 +162,6 @@ async def get_payment(payment_id: str) -> PaymentDetails:
     data = result["response"]
     external_reference = data.get("external_reference") or ""
 
-    # MP returns transaction_amount as a float; the system stores amounts as
-    # whole ARS pesos (no cents), so round to the nearest integer rather than
-    # truncating to avoid off-by-one drift from float representation.
     return PaymentDetails(
         payment_id=str(data["id"]),
         status=data["status"],

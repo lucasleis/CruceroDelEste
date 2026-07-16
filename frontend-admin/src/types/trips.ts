@@ -52,6 +52,13 @@ export interface AdminTripRead {
   price_tranches_summary: PriceTrancheSummary;
 }
 
+export interface AdminSeatRead {
+  id: string;
+  seat_number: string;
+  seat_type: "cama" | "semi_cama";
+  status: "available" | "reserved" | "sold" | "blocked";
+}
+
 export interface PriceTrancheRead {
   id: string;
   trip_id: string;

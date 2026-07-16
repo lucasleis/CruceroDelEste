@@ -1,4 +1,4 @@
-import type { BookingStatusEnum, SeatTypeEnum, TripStatusEnum } from "@/types/trips";
+import type { BookingStatusEnum, ChargebackStatusEnum, SeatTypeEnum, TripStatusEnum } from "@/types/trips";
 
 export const STATUS_BADGE: Record<
   TripStatusEnum,
@@ -48,6 +48,24 @@ export const BOOKING_STATUS_BADGE: Record<
 export const SEAT_TYPE_LABEL: Record<SeatTypeEnum, string> = {
   cama: "Cama",
   semi_cama: "Semi Cama",
+};
+
+export const CHARGEBACK_STATUS_BADGE: Record<
+  ChargebackStatusEnum,
+  { label: string; className: string }
+> = {
+  in_process: {
+    label: "En proceso",
+    className: "bg-[#FEF9C3] text-[#854D0E]",
+  },
+  settled: {
+    label: "Resuelto en contra",
+    className: "bg-[#FDEAEA] text-[#E87B7B]",
+  },
+  reimbursed: {
+    label: "Resuelto a favor",
+    className: "bg-[#E8F5EE] text-[#6BBF8E]",
+  },
 };
 
 export const TRIP_STATUS_LABEL: Record<TripStatusEnum, string> = Object.fromEntries(
