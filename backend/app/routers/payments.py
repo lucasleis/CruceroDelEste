@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.deps import get_db, trip_load_options
-from app.errors import InvalidWebhookSignature, PaymentProcessingError
+from app.errors import InvalidWebhookSignature, PaymentProcessingError, SeatAlreadyReleasedError
 from app.models.booking import Booking, BookingStatusEnum, Chargeback, ChargebackStatusEnum, Passenger
 
 from app.services.booking import confirm_booking
@@ -121,14 +121,17 @@ async def mercadopago_webhook(
             return JSONResponse(_OK)
 
         # --- Step 11: persist the confirmation. ---
-        await confirm_booking(db, booking_id, payment.payment_id)
-        await db.commit()
+        try:
+            await confirm_booking(db, booking_id, payment.payment_id)
+            await db.commit()
+        except SeatAlreadyReleasedError as exc:
+            logger.error(
+                "webhook_seat_already_released booking_id=%s payment_id=%s seat_id=%s",
+                booking_id, payment.payment_id, exc.seat_id,
+            )
+            return JSONResponse(_OK)
 
         # --- Step 11b: verify the booking was actually confirmed. ---
-        # confirm_booking returns early (no-op) if the booking was already
-        # expired by expire_bookings_job before the webhook arrived.
-        # expire_on_commit invalidates all attributes, so a refresh is required
-        # before reading booking.status safely in async SQLAlchemy.
         await db.refresh(booking)
         if booking.status != BookingStatusEnum.confirmed:
             logger.error(

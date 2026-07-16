@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.errors import SeatAlreadyReleasedError
 from app.models.trip import Seat, SeatStatusEnum, SeatTypeEnum
 
 
@@ -80,5 +81,7 @@ async def mark_seats_sold(db: AsyncSession, seat_ids: list[UUID]) -> None:
     seats = list(result.scalars().all())
 
     for seat in seats:
+        if seat.status != SeatStatusEnum.reserved:
+            raise SeatAlreadyReleasedError(seat.id)
         seat.status = SeatStatusEnum.sold
         seat.reserved_at = None

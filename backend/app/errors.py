@@ -13,6 +13,12 @@ class SeatUnavailableError(Exception):
         super().__init__(f"Seat {seat_id} is not available")
 
 
+class SeatAlreadyReleasedError(Exception):
+    def __init__(self, seat_id: UUID) -> None:
+        self.seat_id = seat_id
+        super().__init__(f"Seat {seat_id} is no longer reserved")
+
+
 class NotFoundError(HTTPException):
     def __init__(
         self,
