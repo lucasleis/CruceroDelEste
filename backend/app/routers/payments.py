@@ -94,14 +94,12 @@ async def mercadopago_webhook(
 
         # --- Step 8: validate external_reference and lock the booking row. ---
         try:
-            booking_id = UUID(payment.external_reference)
-        except ValueError:
-            logger.warning(
-                "webhook_invalid_external_ref: value=%r request_id=%s",
-                payment.external_reference,
-                x_request_id,
+            booking_id = UUID(payment.external_reference or "")
+        except (ValueError, AttributeError, TypeError):
+            logger.error(
+                "webhook_invalid_external_reference payment_id=%s", payment_id,
             )
-            return JSONResponse(_IGN_NO_BOOKING)
+            return JSONResponse(_OK)
 
         result = await db.execute(
             # FOR UPDATE prevents two concurrent webhooks from double-confirming.
