@@ -62,6 +62,34 @@ class RefundWindowExpiredError(Exception):
         super().__init__(f"Refund window expired for request {refund_request_id}")
 
 
+class ChargebackAlreadyInStatusError(Exception):
+    """Raised by upsert_chargeback when the status hasn't changed."""
+
+
+class TripHasNoSeatLayoutError(Exception):
+    pass
+
+
+class TrancheLimitExceededError(Exception):
+    pass
+
+
+class TrancheExceedsSeatCapacityError(Exception):
+    pass
+
+
+class TrancheOverlapError(Exception):
+    pass
+
+
+class TrancheMustStartAtZeroError(Exception):
+    pass
+
+
+class TrancheGapError(Exception):
+    pass
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(SeatUnavailableError)
     async def seat_unavailable_handler(

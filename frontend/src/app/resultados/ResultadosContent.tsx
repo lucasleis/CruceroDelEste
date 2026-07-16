@@ -168,7 +168,8 @@ export function ResultadosContent() {
         if (!cancelled) {
           setTrips(data);
         }
-      } catch {
+      } catch (error) {
+        console.error("[ResultadosContent] fetch error:", error);
         if (!cancelled) {
           setError("error");
         }

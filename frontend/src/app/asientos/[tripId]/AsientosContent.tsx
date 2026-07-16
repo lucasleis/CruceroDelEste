@@ -94,7 +94,8 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
         if (!cancelled) {
           setTrip(data);
         }
-      } catch {
+      } catch (error) {
+        console.error("[AsientosContent] trip fetch error:", error);
         if (!cancelled) {
           setTripError("error");
         }
@@ -129,7 +130,8 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
         if (!cancelled) {
           setSeats(data);
         }
-      } catch {
+      } catch (error) {
+        console.error("[AsientosContent] seats fetch error:", error);
         if (!cancelled) {
           setError("error");
         }

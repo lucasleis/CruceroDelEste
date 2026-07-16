@@ -132,7 +132,8 @@ export function ConfirmacionContent() {
         if (!cancelled) {
           setBooking(data);
         }
-      } catch {
+      } catch (error) {
+        console.error("[ConfirmacionContent] fetch error:", error);
         if (!cancelled) {
           setFetchError(true);
         }
