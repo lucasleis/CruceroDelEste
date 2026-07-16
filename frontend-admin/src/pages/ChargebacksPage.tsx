@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { getChargebacks } from "@/api/chargebacks";
 import type { ChargebackStatusEnum } from "@/types/trips";
-import { formatDate } from "@/lib/tripUtils";
+import { formatDate, CHARGEBACK_STATUS_BADGE } from "@/lib/tripUtils";
 
 const FILTERS: { label: string; value: ChargebackStatusEnum | "all" }[] = [
   { label: "Todos", value: "all" },
@@ -21,24 +21,6 @@ const FILTERS: { label: string; value: ChargebackStatusEnum | "all" }[] = [
   { label: "Resuelto a favor", value: "reimbursed" },
   { label: "Resuelto en contra", value: "settled" },
 ];
-
-const STATUS_BADGE: Record<
-  ChargebackStatusEnum,
-  { label: string; className: string }
-> = {
-  in_process: {
-    label: "En proceso",
-    className: "bg-[#FEF9C3] text-[#854D0E]",
-  },
-  settled: {
-    label: "Resuelto en contra",
-    className: "bg-[#FDEAEA] text-[#E87B7B]",
-  },
-  reimbursed: {
-    label: "Resuelto a favor",
-    className: "bg-[#E8F5EE] text-[#6BBF8E]",
-  },
-};
 
 export default function ChargebacksPage() {
   const navigate = useNavigate();
@@ -123,7 +105,7 @@ export default function ChargebacksPage() {
 
             {!chargebacksQuery.isLoading &&
               chargebacks.map((chargeback) => {
-                const status = STATUS_BADGE[chargeback.status];
+                const status = CHARGEBACK_STATUS_BADGE[chargeback.status];
                 return (
                   <TableRow key={chargeback.id}>
                     <TableCell

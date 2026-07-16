@@ -399,7 +399,7 @@ export default function TripDetailPage() {
   const semiCamaTotal = layout?.total_semi_cama ?? 0;
   const camaGaps = computeAllGaps(tranches, "cama", camaTotal);
   const semiCamaGaps = computeAllGaps(tranches, "semi_cama", semiCamaTotal);
-  const camaTransches = tranches
+  const camaTranches = tranches
     .filter((t) => t.seat_type === "cama")
     .sort((a, b) => a.min_sold - b.min_sold);
   const semiCamaTranches = tranches
@@ -519,7 +519,7 @@ export default function TripDetailPage() {
                   colSpan={2}
                   className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]"
                 >
-                  Cama Ejecutivo ({camaTransches.length})
+                  Cama Ejecutivo ({camaTranches.length})
                 </TableHead>
                 <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A] text-right">
                   {camaOpen ? (
@@ -532,7 +532,7 @@ export default function TripDetailPage() {
             </TableHeader>
             {camaOpen && (
               <TableBody>
-                {camaTransches.length === 0 && (
+                {camaTranches.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={3}>
                       <p className="text-center text-sm text-neutral-600">
@@ -541,7 +541,7 @@ export default function TripDetailPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {camaTransches.map((tranche) => (
+                {camaTranches.map((tranche) => (
                   <TableRow key={tranche.id}>
                     <TableCell className="py-3 text-sm text-neutral-900">
                       {tranche.min_sold} – {tranche.max_sold}
