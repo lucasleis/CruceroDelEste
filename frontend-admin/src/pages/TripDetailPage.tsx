@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ChevronDown, ChevronLeft, ChevronUp, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -126,10 +126,6 @@ export default function TripDetailPage() {
   const [semiCamaOpen, setSemiCamaOpen] = useState(false);
 
   const [seatsOpen, setSeatsOpen] = useState(false);
-  const [seats, setSeats] = useState<AdminSeatRead[]>([]);
-  const [seatsLoading, setSeatsLoading] = useState(false);
-  const [seatsError, setSeatsError] = useState<string | null>(null);
-  const [updatingSeat, setUpdatingSeat] = useState<string | null>(null);
 
   const tripQuery = useQuery({
     queryKey: ["admin", "trips", tripId],
@@ -152,6 +148,28 @@ export default function TripDetailPage() {
     queryKey: ["admin", "routes", tripQuery.data?.route?.id, "stops"],
     queryFn: () => getRouteStops(tripQuery.data!.route.id),
     enabled: !!tripQuery.data?.route?.id,
+  });
+
+  const seatsQuery = useQuery({
+    queryKey: ["admin", "trips", tripId, "seats"],
+    queryFn: () => getTripSeats(tripId as string),
+    enabled: !!tripId && seatsOpen,
+  });
+
+  const toggleSeatMutation = useMutation({
+    mutationFn: ({
+      seatNumber,
+      status,
+    }: {
+      seatNumber: string;
+      status: "blocked" | "available";
+    }) => updateSeatStatus(tripId as string, seatNumber, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["admin", "trips", tripId, "seats"],
+      });
+    },
+    onError: () => toast.error("No se pudo actualizar el asiento."),
   });
 
   const isLoading =
@@ -337,34 +355,14 @@ export default function TripDetailPage() {
     }
   }
 
-  async function handleOpenSeats() {
+  function handleOpenSeats() {
     setSeatsOpen(true);
-    setSeatsLoading(true);
-    setSeatsError(null);
-    try {
-      const data = await getTripSeats(tripId as string);
-      setSeats(data);
-    } catch {
-      setSeatsError("No se pudieron cargar los asientos.");
-    } finally {
-      setSeatsLoading(false);
-    }
   }
 
-  async function handleToggleSeat(seat: AdminSeatRead) {
+  function handleToggleSeat(seat: AdminSeatRead) {
     if (seat.status === "reserved" || seat.status === "sold") return;
     const newStatus = seat.status === "blocked" ? "available" : "blocked";
-    setUpdatingSeat(seat.seat_number);
-    try {
-      const updated = await updateSeatStatus(tripId as string, seat.seat_number, newStatus);
-      setSeats((prev) =>
-        prev.map((s) => (s.seat_number === updated.seat_number ? updated : s))
-      );
-    } catch {
-      toast.error("No se pudo actualizar el asiento.");
-    } finally {
-      setUpdatingSeat(null);
-    }
+    toggleSeatMutation.mutate({ seatNumber: seat.seat_number, status: newStatus });
   }
 
   if (tripQuery.isError) {
@@ -399,6 +397,7 @@ export default function TripDetailPage() {
   const semiCamaTotal = layout?.total_semi_cama ?? 0;
   const camaGaps = computeAllGaps(tranches, "cama", camaTotal);
   const semiCamaGaps = computeAllGaps(tranches, "semi_cama", semiCamaTotal);
+  const seats = seatsQuery.data ?? [];
   const camaTranches = tranches
     .filter((t) => t.seat_type === "cama")
     .sort((a, b) => a.min_sold - b.min_sold);
@@ -888,18 +887,18 @@ export default function TripDetailPage() {
             </DialogTitle>
           </DialogHeader>
 
-          {seatsLoading && (
+          {seatsQuery.isLoading && (
             <div className="space-y-2">
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-full" />
             </div>
           )}
 
-          {seatsError && (
-            <p className="text-sm text-[#E87B7B]">{seatsError}</p>
+          {seatsQuery.isError && (
+            <p className="text-sm text-[#E87B7B]">No se pudieron cargar los asientos.</p>
           )}
 
-          {!seatsLoading && !seatsError && seats.length > 0 && (
+          {!seatsQuery.isLoading && !seatsQuery.isError && seats.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center gap-4 text-xs text-neutral-500">
                 <span className="flex items-center gap-1.5">
@@ -927,7 +926,9 @@ export default function TripDetailPage() {
                       .map((seat) => {
                         const isOccupied = seat.status === "reserved" || seat.status === "sold";
                         const isBlocked = seat.status === "blocked";
-                        const isUpdating = updatingSeat === seat.seat_number;
+                        const isUpdating =
+                          toggleSeatMutation.isPending &&
+                          toggleSeatMutation.variables?.seatNumber === seat.seat_number;
                         return (
                           <button
                             key={seat.seat_number}
@@ -969,7 +970,9 @@ export default function TripDetailPage() {
                       .map((seat) => {
                         const isOccupied = seat.status === "reserved" || seat.status === "sold";
                         const isBlocked = seat.status === "blocked";
-                        const isUpdating = updatingSeat === seat.seat_number;
+                        const isUpdating =
+                          toggleSeatMutation.isPending &&
+                          toggleSeatMutation.variables?.seatNumber === seat.seat_number;
                         return (
                           <button
                             key={seat.seat_number}
