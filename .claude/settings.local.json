@@ -89,7 +89,9 @@
       "Read(//etc/nginx/**)",
       "Read(//etc/**)",
       "Bash(docker start *)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(sed -n '1,199p' src/pages/TripDetailPage.tsx)",
+      "Bash(sed -n '468,$p' src/pages/TripDetailPage.tsx)"
     ]
   }
 }
