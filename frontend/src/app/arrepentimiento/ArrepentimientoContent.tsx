@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { Heading } from "@/components/core/Heading";
 import { BodyText } from "@/components/core/BodyText";
 import { BlueButton } from "@/components/core/BlueButton";
+import { refundRequest } from "@/api";
 
 type ResultState =
   | { kind: "idle" }
@@ -141,11 +142,7 @@ export function ArrepentimientoContent() {
     setResult({ kind: "idle" });
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings/${trimmedId}/refund-request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail }),
-      });
+      const res = await refundRequest(trimmedId, trimmedEmail);
 
       if (res.status === 201) {
         const data = await res.json();

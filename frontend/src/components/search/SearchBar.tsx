@@ -7,6 +7,7 @@ import { DateInput } from "@/components/search/DateInput"
 import { PassengerSelector } from "@/components/search/PassengerSelector"
 import { BlueButton } from "@/components/core/BlueButton"
 import { StopRead } from "@/types/trips"
+import { getStops, getValidDestinations } from "@/api"
 
 type TripType = "round-trip" | "one-way"
 type SeatClass = "cualquiera" | "semi-cama" | "cama"
@@ -70,12 +71,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
       setLoadingStops(true)
       setErrorStops(false)
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL
-        const response = await fetch(`${baseUrl}/stops`)
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`)
-        }
-        const data: StopRead[] = await response.json()
+        const data = await getStops()
         if (!cancelled) {
           setStops(data)
         }
@@ -126,9 +122,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
     setDestinationFetchError(null)
     if (stop === null) return
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/stops/${stop.id}/valid-destinations`)
-      if (!res.ok) throw new Error(`Request failed with status ${res.status}`)
-      const destinations: StopRead[] = await res.json()
+      const destinations = await getValidDestinations(stop.id)
       setAllowedDestinationIds(new Set(destinations.map((d) => d.id)))
       setDestinationFetchError(null)
     } catch {

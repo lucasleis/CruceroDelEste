@@ -15,45 +15,8 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-
-interface StopRead {
-  id: string;
-  name: string;
-  country: string;
-}
-
-interface RouteRead {
-  id: string;
-  origin_stop: StopRead;
-  destination_stop: StopRead;
-}
-
-interface TripSummary {
-  id: string;
-  route: RouteRead;
-  departure_at: string;
-  arrival_at: string;
-  status: string;
-}
-
-interface PassengerRead {
-  id: string;
-  seat_id: string;
-  first_name: string;
-  last_name: string;
-  dni: string;
-  email: string;
-  phone: string | null;
-}
-
-interface BookingRead {
-  id: string;
-  trip: TripSummary;
-  status: string;
-  contact_email: string;
-  total_amount: number;
-  passengers: PassengerRead[];
-}
+import { getBooking } from "@/api";
+import type { BookingRead } from "@/types/trips";
 
 function toArDateTime(iso: string): string {
   return new Date(iso).toLocaleString("es-AR", {
@@ -121,14 +84,7 @@ export function ConfirmacionContent() {
       setLoading(true);
       setFetchError(false);
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-        const response = await fetch(
-          `${baseUrl}/bookings/${externalReference}?token=${encodeURIComponent(token)}`
-        );
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-        const data: BookingRead = await response.json();
+        const data = await getBooking(externalReference, token);
         if (!cancelled) {
           setBooking(data);
         }

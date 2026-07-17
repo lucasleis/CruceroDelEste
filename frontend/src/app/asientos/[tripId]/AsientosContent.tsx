@@ -4,29 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { BlueButton } from "@/components/core/BlueButton";
-import type { StopRead } from "@/types/trips";
-
-type SeatApiStatus = "available" | "reserved" | "sold" | "blocked";
-
-interface SeatRead {
-  id: string;
-  seat_number: string;
-  seat_type: "cama" | "semi_cama";
-  status: SeatApiStatus;
-}
-
-interface RouteRead {
-  origin_stop: StopRead;
-  destination_stop: StopRead;
-}
-
-interface TripRead {
-  route: RouteRead;
-  departure_at: string;
-  arrival_at: string;
-  current_price_cama: number | null;
-  current_price_semi_cama: number | null;
-}
+import { getTrip, getTripSeats } from "@/api";
+import type { TripRead, SeatRead } from "@/types/trips";
 
 type Floor = "alta" | "baja";
 
@@ -84,13 +63,7 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
       setTripLoading(true);
       setTripError(null);
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-        const url = `${baseUrl}/trips/${tripId}`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-        const data: TripRead = await response.json();
+        const data = await getTrip(tripId);
         if (!cancelled) {
           setTrip(data);
         }
@@ -120,13 +93,7 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
       setLoading(true);
       setError(null);
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-        const url = `${baseUrl}/trips/${tripId}/seats`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-        const data: SeatRead[] = await response.json();
+        const data = await getTripSeats(tripId);
         if (!cancelled) {
           setSeats(data);
         }

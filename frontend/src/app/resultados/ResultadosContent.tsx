@@ -5,31 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { SearchSummaryBar } from "@/components/travel/SearchSummaryBar";
 import { FilterPanel } from "@/components/travel/FilterPanel";
 import { TripCard } from "@/components/travel/TripCard";
+import { searchTrips } from "@/api";
+import type { TripRead } from "@/types/trips";
 
 type SeatType = "cama" | "semi-cama" | "ejecutivo";
-
-interface StopRead {
-  id: string;
-  name: string;
-  country: string;
-}
-
-interface RouteRead {
-  id: string;
-  origin_stop: StopRead;
-  destination_stop: StopRead;
-}
-
-interface TripRead {
-  id: string;
-  route: RouteRead;
-  departure_at: string;
-  arrival_at: string;
-  status: string;
-  available_seats_count: number;
-  current_price_cama: number | null;
-  current_price_semi_cama: number | null;
-}
 
 const MONTH_LABELS = [
   "ENE",
@@ -152,19 +131,13 @@ export function ResultadosContent() {
       setLoading(true);
       setError(null);
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-        const params = new URLSearchParams();
-        if (originProvince) params.set("origin_province", originProvince);
-        else if (originStop) params.set("origin", originStop);
-        if (destinationProvince) params.set("destination_province", destinationProvince);
-        else if (destinationStop) params.set("destination", destinationStop);
-        if (date) params.set("departure_date", date);
-        const url = `${baseUrl}/trips?${params.toString()}`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-        const data: TripRead[] = await response.json();
+        const data = await searchTrips({
+          origin: originStop,
+          originProvince,
+          destination: destinationStop,
+          destinationProvince,
+          departureDate: date,
+        });
         if (!cancelled) {
           setTrips(data);
         }
