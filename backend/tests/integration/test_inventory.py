@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.errors import SeatAlreadyReleasedError
 from app.models.trip import (
     CountryEnum,
     Route,
@@ -207,29 +208,22 @@ async def test_mark_reserved_seat_transitions_to_sold(db: AsyncSession):
     assert seat_db.reserved_at is None
 
 
-async def test_mark_available_seat_silently_becomes_sold(db: AsyncSession):
-    # mark_seats_sold has no status check — it unconditionally sets sold.
+async def test_mark_available_seat_raises_already_released(db: AsyncSession):
     trip = await _make_trip(db)
     seat = await _make_seat(db, trip, "11A", status=SeatStatusEnum.available)
     await db.commit()
 
-    await mark_seats_sold(db, [seat.id])
-    await db.commit()
-
-    seat_db = await _fetch_seat(db, seat.id)
-    assert seat_db.status == SeatStatusEnum.sold
+    with pytest.raises(SeatAlreadyReleasedError):
+        await mark_seats_sold(db, [seat.id])
 
 
-async def test_mark_already_sold_seat_stays_sold(db: AsyncSession):
+async def test_mark_already_sold_seat_raises_already_released(db: AsyncSession):
     trip = await _make_trip(db)
     seat = await _make_seat(db, trip, "12A", status=SeatStatusEnum.sold)
     await db.commit()
 
-    await mark_seats_sold(db, [seat.id])
-    await db.commit()
-
-    seat_db = await _fetch_seat(db, seat.id)
-    assert seat_db.status == SeatStatusEnum.sold
+    with pytest.raises(SeatAlreadyReleasedError):
+        await mark_seats_sold(db, [seat.id])
 
 
 async def test_mark_sold_multiple_seats(db: AsyncSession):
