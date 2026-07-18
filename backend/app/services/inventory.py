@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import SeatAlreadyReleasedError
@@ -47,8 +47,8 @@ async def reserve_seats(
                 Seat.trip_id == trip_id,
             ).with_for_update(nowait=True)
         )
-    except OperationalError as exc:
-        if getattr(exc.orig, "pgcode", None) == "55P03":
+    except DBAPIError as exc:
+        if getattr(exc.orig, "sqlstate", None) == "55P03" or getattr(exc.orig, "pgcode", None) == "55P03":
             # Cannot determine which seat caused the lock contention (Postgres 55P03
             # does not expose the blocking row). Reporting seat_ids[0] as a placeholder.
             raise SeatNotAvailable(seat_ids[0])
