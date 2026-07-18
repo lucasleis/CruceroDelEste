@@ -4,9 +4,6 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.services.pricing import NoPriceTranche
-
-
 class SeatUnavailableError(Exception):
     def __init__(self, seat_id: str) -> None:
         self.seat_id = seat_id
@@ -88,6 +85,9 @@ class TrancheMustStartAtZeroError(Exception):
 
 class TrancheGapError(Exception):
     pass
+
+
+from app.services.pricing import NoPriceTranche
 
 
 def register_exception_handlers(app: FastAPI) -> None:

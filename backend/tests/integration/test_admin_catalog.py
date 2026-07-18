@@ -13,6 +13,7 @@ from app.models.trip import (
     Route,
     Seat,
     SeatLayout,
+    SeatLayoutSeat,
     SeatStatusEnum,
     SeatTypeEnum,
     Stop,
@@ -75,6 +76,25 @@ async def _make_layout(
 ) -> SeatLayout:
     layout = SeatLayout(name=name, total_cama=total_cama, total_semi_cama=total_semi_cama)
     db.add(layout)
+    await db.flush()
+
+    order = 0
+    for i in range(1, total_cama + 1):
+        db.add(SeatLayoutSeat(
+            seat_layout_id=layout.id,
+            seat_number=f"C{i:02d}",
+            seat_type=SeatTypeEnum.cama,
+            display_order=order,
+        ))
+        order += 1
+    for i in range(1, total_semi_cama + 1):
+        db.add(SeatLayoutSeat(
+            seat_layout_id=layout.id,
+            seat_number=f"S{i:02d}",
+            seat_type=SeatTypeEnum.semi_cama,
+            display_order=order,
+        ))
+        order += 1
     await db.flush()
     return layout
 

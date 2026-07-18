@@ -93,7 +93,8 @@
       "Bash(sed -n '1,199p' src/pages/TripDetailPage.tsx)",
       "Bash(sed -n '468,$p' src/pages/TripDetailPage.tsx)",
       "Bash(sed -n '1,209p' src/pages/TripDetailPage.tsx)",
-      "Bash(sed -n '343,$p' src/pages/TripDetailPage.tsx)"
+      "Bash(sed -n '343,$p' src/pages/TripDetailPage.tsx)",
+      "Bash(echo \"EXIT CODE: $?\")"
     ]
   }
 }
