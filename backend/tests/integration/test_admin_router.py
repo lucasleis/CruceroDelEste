@@ -205,7 +205,7 @@ async def test_protected_endpoint_no_auth_returns_401(client: AsyncClient):
     resp = await client.get("/admin/bookings")
 
     assert resp.status_code == 401
-    assert resp.json()["detail"] == "Not authenticated"
+    assert resp.json()["detail"] == "Invalid or expired token"
 
 
 async def test_protected_endpoint_invalid_token_returns_401(client: AsyncClient):
