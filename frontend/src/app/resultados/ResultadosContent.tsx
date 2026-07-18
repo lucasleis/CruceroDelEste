@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SearchSummaryBar } from "@/components/travel/SearchSummaryBar";
-import { FilterPanel } from "@/components/travel/FilterPanel";
+import { FilterPanel, type FilterState } from "@/components/travel/FilterPanel";
 import { TripCard } from "@/components/travel/TripCard";
 import { searchTrips } from "@/api";
 import type { TripRead } from "@/types/trips";
@@ -109,6 +109,39 @@ function mapTripToCardProps(trip: TripRead) {
   };
 }
 
+function getArHour(iso: string): number {
+  return Number(toArTime(iso).split(":")[0]);
+}
+
+function matchesPeriod(hour: number, period: FilterState["departurePeriods"][number]): boolean {
+  if (period === "morning") return hour >= 5 && hour < 12;
+  if (period === "afternoon") return hour >= 12 && hour < 18;
+  return hour >= 18 || hour < 5;
+}
+
+function applyFilters(trips: TripRead[], filters: FilterState): TripRead[] {
+  return trips.filter((trip) => {
+    if (filters.seatTypes.length > 0) {
+      const matchesSeatType = filters.seatTypes.some((seatType) => {
+        if (seatType === "cama") return trip.current_price_cama !== null;
+        if (seatType === "semi-cama") return trip.current_price_semi_cama !== null;
+        return false;
+      });
+      if (!matchesSeatType) return false;
+    }
+
+    if (filters.departurePeriods.length > 0) {
+      const hour = getArHour(trip.departure_at);
+      const matchesAnyPeriod = filters.departurePeriods.some((period) =>
+        matchesPeriod(hour, period)
+      );
+      if (!matchesAnyPeriod) return false;
+    }
+
+    return true;
+  });
+}
+
 export function ResultadosContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -123,6 +156,11 @@ export function ResultadosContent() {
   const [trips, setTrips] = useState<TripRead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterState>({
+    seatTypes: [],
+    departurePeriods: [],
+    amenities: [],
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -160,6 +198,8 @@ export function ResultadosContent() {
     };
   }, [originStop, originProvince, destinationStop, destinationProvince, date]);
 
+  const filteredTrips = applyFilters(trips, filters);
+
   return (
     <div style={{ background: "var(--color-surface)", minHeight: "100vh" }}>
       <SearchSummaryBar
@@ -178,7 +218,7 @@ export function ResultadosContent() {
           alignItems: "flex-start",
         }}
       >
-        <FilterPanel />
+        <FilterPanel filters={filters} onFilterChange={setFilters} />
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1 }}>
           {loading && (
@@ -220,9 +260,22 @@ export function ResultadosContent() {
             </p>
           )}
 
+          {!loading && !error && trips.length > 0 && filteredTrips.length === 0 && (
+            <p
+              style={{
+                textAlign: "center",
+                color: "var(--color-text-muted)",
+                fontFamily: "var(--font-body)",
+                padding: "48px 0",
+              }}
+            >
+              Ningún viaje coincide con los filtros aplicados.
+            </p>
+          )}
+
           {!loading &&
             !error &&
-            trips.map((trip) => (
+            filteredTrips.map((trip) => (
               <TripCard
                 key={trip.id}
                 {...mapTripToCardProps(trip)}

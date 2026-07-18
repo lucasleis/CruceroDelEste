@@ -1,20 +1,20 @@
 "use client";
 
-import { useState } from "react";
 import { AmenityBadge } from "@/components/travel/AmenityBadge";
 
 type SeatType = "cama" | "semi-cama" | "ejecutivo";
 type DeparturePeriod = "morning" | "afternoon" | "night";
 type AmenityType = "wifi" | "ac" | "usb" | "bathroom" | "entertainment";
 
-interface FilterState {
+export interface FilterState {
   seatTypes: SeatType[];
   departurePeriods: DeparturePeriod[];
   amenities: AmenityType[];
 }
 
 interface FilterPanelProps {
-  onFilterChange?: (filters: FilterState) => void;
+  filters: FilterState;
+  onFilterChange: (filters: FilterState) => void;
   className?: string;
 }
 
@@ -74,26 +74,18 @@ const checkboxStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-// TODO: connect to page-level state when results page is built.
-export function FilterPanel({ className }: FilterPanelProps) {
-  const [seatTypes, setSeatTypes] = useState<SeatType[]>([]);
-  const [departurePeriods, setDeparturePeriods] = useState<DeparturePeriod[]>(
-    []
-  );
-  const [amenities, setAmenities] = useState<AmenityType[]>([]);
+export function FilterPanel({ filters, onFilterChange, className }: FilterPanelProps) {
+  const { seatTypes, departurePeriods, amenities } = filters;
 
-  function toggle<T>(list: T[], value: T, setList: (next: T[]) => void) {
-    if (list.includes(value)) {
-      setList(list.filter((item) => item !== value));
-    } else {
-      setList([...list, value]);
-    }
+  function toggle<T>(list: T[], value: T, key: keyof FilterState) {
+    const next = list.includes(value)
+      ? list.filter((item) => item !== value)
+      : [...list, value];
+    onFilterChange({ ...filters, [key]: next });
   }
 
   function handleClear() {
-    setSeatTypes([]);
-    setDeparturePeriods([]);
-    setAmenities([]);
+    onFilterChange({ seatTypes: [], departurePeriods: [], amenities: [] });
   }
 
   return (
@@ -114,7 +106,7 @@ export function FilterPanel({ className }: FilterPanelProps) {
             type="checkbox"
             style={checkboxStyle}
             checked={seatTypes.includes(option.value)}
-            onChange={() => toggle(seatTypes, option.value, setSeatTypes)}
+            onChange={() => toggle(seatTypes, option.value, "seatTypes")}
           />
           <span style={labelStyle}>{option.label}</span>
         </label>
@@ -130,7 +122,7 @@ export function FilterPanel({ className }: FilterPanelProps) {
             style={checkboxStyle}
             checked={departurePeriods.includes(option.value)}
             onChange={() =>
-              toggle(departurePeriods, option.value, setDeparturePeriods)
+              toggle(departurePeriods, option.value, "departurePeriods")
             }
           />
           <span style={labelStyle}>{option.label}</span>
@@ -146,7 +138,7 @@ export function FilterPanel({ className }: FilterPanelProps) {
             type="checkbox"
             style={checkboxStyle}
             checked={amenities.includes(amenity)}
-            onChange={() => toggle(amenities, amenity, setAmenities)}
+            onChange={() => toggle(amenities, amenity, "amenities")}
           />
           <AmenityBadge type={amenity} mode="icon-label" />
         </label>
