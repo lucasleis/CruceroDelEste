@@ -193,17 +193,16 @@ async def test_refund_request_window_expired_24h_before_departure_422_persists_r
     assert refreshed.status == BookingStatusEnum.confirmed
 
 
-async def test_refund_request_booking_not_found_404(client: AsyncClient):
+async def test_refund_request_booking_not_found_returns_403(client: AsyncClient):
     resp = await client.post(
         f"/bookings/{uuid.uuid4()}/refund-request",
         json={"email": "ana@example.com"},
     )
 
-    assert resp.status_code == 404
-    assert resp.json()["detail"] == "not_found"
+    assert resp.status_code == 403
 
 
-async def test_refund_request_pending_booking_returns_409(
+async def test_refund_request_pending_booking_returns_403(
     client: AsyncClient, db: AsyncSession
 ):
     trip = await _make_trip(db)
@@ -242,11 +241,10 @@ async def test_refund_request_pending_booking_returns_409(
         json={"email": "ana@example.com"},
     )
 
-    assert resp.status_code == 409
-    assert resp.json()["detail"] == "booking_not_refundable"
+    assert resp.status_code == 403
 
 
-async def test_refund_request_expired_booking_returns_409(
+async def test_refund_request_expired_booking_returns_403(
     client: AsyncClient, db: AsyncSession
 ):
     booking, _ = await _make_confirmed_booking(db)
@@ -260,11 +258,10 @@ async def test_refund_request_expired_booking_returns_409(
         json={"email": "ana@example.com"},
     )
 
-    assert resp.status_code == 409
-    assert resp.json()["detail"] == "booking_not_refundable"
+    assert resp.status_code == 403
 
 
-async def test_refund_request_already_refunded_returns_409(
+async def test_refund_request_already_refunded_returns_403(
     client: AsyncClient, db: AsyncSession
 ):
     booking, _ = await _make_confirmed_booking(db)
@@ -276,8 +273,7 @@ async def test_refund_request_already_refunded_returns_409(
         json={"email": "ana@example.com"},
     )
 
-    assert resp.status_code == 409
-    assert resp.json()["detail"] == "booking_not_refundable"
+    assert resp.status_code == 403
 
 
 async def test_refund_request_wrong_email_returns_422(
