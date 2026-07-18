@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.deps import get_db, trip_load_options
 from app.limiter import limiter
-from app.errors import NotFoundError, PaymentProcessingError, RefundWindowExpiredError, SeatUnavailableError
+from app.errors import NotFoundError, PaymentProcessingError, RefundWindowExpiredError
 from app.models.booking import Booking, BookingStatusEnum
 from app.models.trip import Route, Trip, TripStatusEnum
 from app.schemas.bookings import (
@@ -29,7 +29,6 @@ from app.services.booking import (
     expire_booking,
     mark_booking_refunded,
 )
-from app.services.inventory import SeatNotAvailable
 from app.services.payment import (
     create_preference,
     create_refund,
@@ -92,8 +91,6 @@ async def create_booking_endpoint(
         )
     except InternationalRouteRequiredError:
         raise HTTPException(status_code=422, detail="international_route_required")
-    except SeatNotAvailable as exc:
-        raise SeatUnavailableError(str(exc.seat_id)) from exc
     except NoPriceTranche:
         logger.error(
             "no_price_tranche_on_booking trip_id=%s seat_ids=%s",

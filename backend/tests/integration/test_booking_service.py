@@ -13,6 +13,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.errors import SeatUnavailableError
 from app.models.booking import Booking, BookingStatusEnum, Passenger
 from app.models.trip import (
     CountryEnum,
@@ -33,7 +34,6 @@ from app.services.booking import (
     create_booking,
     expire_booking,
 )
-from app.services.inventory import SeatNotAvailable
 from app.services.pricing import NoPriceTranche
 
 _NOW = datetime.now(timezone.utc)
@@ -160,7 +160,7 @@ async def test_create_booking_already_reserved_seat_raises(db: AsyncSession):
     await _add_tranche(db, trip)
     await db.commit()
 
-    with pytest.raises(SeatNotAvailable):
+    with pytest.raises(SeatUnavailableError):
         await create_booking(
             db,
             trip_id=trip.id,
@@ -193,7 +193,7 @@ async def test_create_booking_no_price_tranche_raises(db: AsyncSession):
 async def test_create_booking_nonexistent_trip_raises(db: AsyncSession):
     # Seats exist in a real trip but we pass a random trip_id.
     # _fetch_seats_for_pricing returns empty → _calculate_total returns 0.
-    # reserve_seats finds no seats for the fake trip_id → SeatNotAvailable.
+    # reserve_seats finds no seats for the fake trip_id → SeatUnavailableError.
     fake_trip_id = uuid.uuid4()
     fake_seat_id = uuid.uuid4()
     fake_passenger = PassengerData(
@@ -204,7 +204,7 @@ async def test_create_booking_nonexistent_trip_raises(db: AsyncSession):
         email="x@example.com",
     )
 
-    with pytest.raises(SeatNotAvailable):
+    with pytest.raises(SeatUnavailableError):
         await create_booking(
             db,
             trip_id=fake_trip_id,

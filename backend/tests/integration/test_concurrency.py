@@ -19,6 +19,7 @@ import asyncio
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.errors import SeatUnavailableError
 from app.models.trip import (
     CountryEnum,
     Route,
@@ -29,7 +30,7 @@ from app.models.trip import (
     Trip,
     TripStatusEnum,
 )
-from app.services.inventory import SeatNotAvailable, reserve_seats
+from app.services.inventory import reserve_seats
 
 from datetime import datetime, timedelta, timezone
 
@@ -89,8 +90,8 @@ async def test_reserva_falla_si_asiento_esta_bloqueado_por_otra_transaccion(
         assert [s.id for s in reserved] == [seat_id]
 
         # act + assert: la sesión B intenta el mismo asiento → NOWAIT dispara
-        # 55P03, que reserve_seats traduce a SeatNotAvailable (no espera al lock)
-        with pytest.raises(SeatNotAvailable):
+        # 55P03, que reserve_seats traduce a SeatUnavailableError (no espera al lock)
+        with pytest.raises(SeatUnavailableError):
             await reserve_seats(session_b, [seat_id], trip_id)
 
         # la sesión A confirma su reserva
@@ -114,7 +115,7 @@ async def test_dos_reservas_simultaneas_del_mismo_asiento_solo_una_tiene_exito(
                 await reserve_seats(db, [seat_id], trip_id)
                 await db.commit()
                 return "ok"
-            except SeatNotAvailable:
+            except SeatUnavailableError:
                 await db.rollback()
                 return "blocked"
 

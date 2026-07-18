@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 class SeatUnavailableError(Exception):
-    def __init__(self, seat_id: str) -> None:
+    def __init__(self, seat_id: UUID) -> None:
         self.seat_id = seat_id
         super().__init__(f"Seat {seat_id} is not available")
 
@@ -97,7 +97,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
-            content={"detail": "seat_unavailable", "seat_id": exc.seat_id},
+            content={"detail": "seat_unavailable", "seat_id": str(exc.seat_id)},
         )
 
     @app.exception_handler(RequestValidationError)

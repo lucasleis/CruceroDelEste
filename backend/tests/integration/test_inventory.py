@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors import SeatAlreadyReleasedError
+from app.errors import SeatAlreadyReleasedError, SeatUnavailableError
 from app.models.trip import (
     CountryEnum,
     Route,
@@ -22,7 +22,6 @@ from app.models.trip import (
     TripStatusEnum,
 )
 from app.services.inventory import (
-    SeatNotAvailable,
     mark_seats_sold,
     reserve_seats,
 )
@@ -129,7 +128,7 @@ async def test_reserve_already_reserved_seat_raises(db: AsyncSession):
 
     s1_id, s2_id = s1.id, s2.id  # capture before rollback detaches objects
 
-    with pytest.raises(SeatNotAvailable) as exc_info:
+    with pytest.raises(SeatUnavailableError) as exc_info:
         await reserve_seats(db, [s1_id, s2_id], trip.id)
 
     assert exc_info.value.seat_id in (s1_id, s2_id)
@@ -145,7 +144,7 @@ async def test_reserve_sold_seat_raises(db: AsyncSession):
     seat = await _make_seat(db, trip, "4A", status=SeatStatusEnum.sold)
     await db.commit()
 
-    with pytest.raises(SeatNotAvailable):
+    with pytest.raises(SeatUnavailableError):
         await reserve_seats(db, [seat.id], trip.id)
 
 
@@ -172,8 +171,8 @@ async def test_reserve_seat_belonging_to_different_trip_raises(db: AsyncSession)
     await db.commit()
 
     # seat_in_b exists but belongs to trip_b — reserve_seats queries with trip_a.id
-    # so the seat is not found, triggering SeatNotAvailable.
-    with pytest.raises(SeatNotAvailable):
+    # so the seat is not found, triggering SeatUnavailableError.
+    with pytest.raises(SeatUnavailableError):
         await reserve_seats(db, [seat_in_b.id], trip_a.id)
 
 
