@@ -18,3 +18,11 @@ export async function createStop(data: {
 export async function deleteStop(id: string): Promise<void> {
   await apiClient.delete(`/admin/stops/${id}`);
 }
+
+export async function updateStop(
+  id: string,
+  data: { name?: string; country?: CountryEnum; province?: string }
+): Promise<StopRead> {
+  const response = await apiClient.patch<StopRead>(`/admin/stops/${id}`, data);
+  return response.data;
+}

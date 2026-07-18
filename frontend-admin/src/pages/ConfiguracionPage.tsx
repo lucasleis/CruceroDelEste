@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getStops, createStop, deleteStop } from "@/api/stops";
+import { getStops, createStop, deleteStop, updateStop } from "@/api/stops";
 import { getRoutes, createRoute, deleteRoute } from "@/api/routes";
 import type { CountryEnum, StopRead, RouteRead } from "@/types/trips";
 
@@ -44,6 +44,12 @@ export default function ConfiguracionPage() {
   const [country, setCountry] = useState<CountryEnum | "">("");
   const [province, setProvince] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [stopToEdit, setStopToEdit] = useState<StopRead | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCountry, setEditCountry] = useState<CountryEnum | "">("");
+  const [editProvince, setEditProvince] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   const [routeToDelete, setRouteToDelete] = useState<RouteRead | null>(null);
   const [createRouteOpen, setCreateRouteOpen] = useState(false);
@@ -112,6 +118,31 @@ export default function ConfiguracionPage() {
       }
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleConfirmEditStop() {
+    if (!stopToEdit) return;
+    setEditSaving(true);
+    try {
+      await updateStop(stopToEdit.id, {
+        name: editName.trim(),
+        country: editCountry || undefined,
+        province: editProvince.trim() || undefined,
+      });
+      toast.success("Parada actualizada");
+      queryClient.invalidateQueries({ queryKey: ["admin", "stops"] });
+      setStopToEdit(null);
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
+      if (status === 409) {
+        toast.error("Ya existe una parada con ese nombre.");
+      } else {
+        toast.error("Error al actualizar la parada.");
+      }
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -235,6 +266,19 @@ export default function ConfiguracionPage() {
                       {COUNTRY_LABEL[stop.country]}
                     </TableCell>
                     <TableCell className="py-3">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-neutral-600"
+                        onClick={() => {
+                          setStopToEdit(stop);
+                          setEditName(stop.name);
+                          setEditCountry(stop.country);
+                          setEditProvince(stop.province ?? "");
+                        }}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon-sm"
@@ -424,6 +468,84 @@ export default function ConfiguracionPage() {
               disabled={!name || !country || saving}
             >
               {saving ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={stopToEdit !== null}
+        onOpenChange={(open) => {
+          if (!open) setStopToEdit(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar parada</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="edit-stop-name"
+                className="text-sm font-medium text-neutral-600"
+              >
+                Nombre
+              </label>
+              <Input
+                id="edit-stop-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+                maxLength={100}
+                placeholder="Ej: Retiro"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-neutral-600">
+                País
+              </label>
+              <Select
+                value={editCountry}
+                onValueChange={(value) => setEditCountry(value as CountryEnum)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccionar país" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AR">Argentina</SelectItem>
+                  <SelectItem value="PY">Paraguay</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="edit-stop-province"
+                className="text-sm font-medium text-neutral-600"
+              >
+                Provincia
+              </label>
+              <Input
+                id="edit-stop-province"
+                value={editProvince}
+                onChange={(e) => setEditProvince(e.target.value)}
+                maxLength={100}
+                placeholder="Ej: Buenos Aires"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStopToEdit(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmEditStop}
+              disabled={!editName || !editCountry || editSaving}
+            >
+              {editSaving ? "Guardando..." : "Guardar"}
             </Button>
           </DialogFooter>
         </DialogContent>
