@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BlueButton } from "@/components/core/BlueButton";
 
@@ -102,6 +102,47 @@ export function CompraContent({ tripId }: CompraContentProps) {
   );
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
+  const [seatMap, setSeatMap] = useState<Record<string, string>>({});
+  const [seatsLoading, setSeatsLoading] = useState(true);
+  const [seatsError, setSeatsError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchSeats() {
+      setSeatsLoading(true);
+      setSeatsError(null);
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/trips/${tripId}/seats`);
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        const data: { id: string; seat_number: string }[] = await res.json();
+        if (!cancelled) {
+          const map: Record<string, string> = {};
+          data.forEach((s) => {
+            map[s.seat_number] = s.id;
+          });
+          setSeatMap(map);
+        }
+      } catch (err) {
+        console.error("[CompraContent] seats fetch error:", err);
+        if (!cancelled) {
+          setSeatsError("No pudimos cargar los asientos. Volvé a intentar más tarde.");
+        }
+      } finally {
+        if (!cancelled) {
+          setSeatsLoading(false);
+        }
+      }
+    }
+
+    fetchSeats();
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId]);
+
   function handleFieldChange(
     index: number,
     field: keyof PassengerForm,
@@ -121,7 +162,7 @@ export function CompraContent({ tripId }: CompraContentProps) {
     });
   }
 
-  function handleContinuar() {
+  async function handleContinuar() {
     const nextErrors = passengers.map((passenger, index) =>
       validatePassenger(passenger, index, passengers)
     );
@@ -132,8 +173,43 @@ export function CompraContent({ tripId }: CompraContentProps) {
       (passengerErrors) => Object.keys(passengerErrors).length > 0
     );
 
-    if (!hasErrors) {
-      console.log({ tripId, seats, passengers });
+    if (hasErrors) {
+      return;
+    }
+
+    const seatIds = seats.map((seatNumber) => seatMap[seatNumber]);
+    if (seatIds.some((id) => !id)) {
+      setSubmitError("No pudimos resolver alguno de los asientos seleccionados. Volvé a intentar.");
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trip_id: tripId,
+          contact_email: passengers[0].email,
+          seat_ids: seatIds,
+          passengers: passengers.map((p, index) => ({
+            seat_id: seatMap[seats[index]],
+            first_name: p.nombres,
+            last_name: p.apellidos,
+            dni: p.dni,
+            email: p.email,
+            phone: p.telefono || null,
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const data = await res.json();
+      window.location.href = data.init_point;
+    } catch (err) {
+      console.error("[CompraContent] booking POST error:", err);
+      setSubmitError("No pudimos confirmar la reserva. Intentá nuevamente.");
+      setSubmitting(false);
     }
   }
 
@@ -341,8 +417,26 @@ export function CompraContent({ tripId }: CompraContentProps) {
           );
         })}
 
-        <BlueButton variant="blue" onClick={handleContinuar} arrow>
-          Continuar al pago
+        {(seatsError || submitError) && (
+          <p
+            style={{
+              fontFamily: "var(--font-body)",
+              color: "var(--color-accent)",
+              fontSize: "14px",
+              margin: 0,
+            }}
+          >
+            {seatsError || submitError}
+          </p>
+        )}
+
+        <BlueButton
+          variant="blue"
+          onClick={handleContinuar}
+          arrow
+          disabled={seatsLoading || submitting || !!seatsError}
+        >
+          {seatsLoading ? "Cargando asientos…" : submitting ? "Procesando…" : "Continuar al pago"}
         </BlueButton>
       </div>
     </div>
