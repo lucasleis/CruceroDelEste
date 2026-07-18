@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.payment import generate_confirmation_token
 from app.models.booking import Booking, BookingStatusEnum, Passenger
 from app.models.trip import (
     CountryEnum,
@@ -356,8 +357,11 @@ async def test_get_booking_returns_200_with_correct_shape(
     client: AsyncClient, db: AsyncSession
 ):
     booking = await _make_booking_in_db(db)
+    booking.confirmed_at = datetime.now(timezone.utc)
+    await db.commit()
 
-    resp = await client.get(f"/bookings/{booking.id}")
+    token = generate_confirmation_token(booking.id)
+    resp = await client.get(f"/bookings/{booking.id}?token={token}")
 
     assert resp.status_code == 200
     data = resp.json()
@@ -368,7 +372,7 @@ async def test_get_booking_returns_200_with_correct_shape(
     assert data["contact_email"] == "buyer@example.com"
     assert data["total_amount"] == 24500
     assert "expires_at" in data
-    assert data["confirmed_at"] is None
+    assert data["confirmed_at"] is not None
 
     assert len(data["passengers"]) == 1
     pax = data["passengers"][0]
@@ -377,8 +381,10 @@ async def test_get_booking_returns_200_with_correct_shape(
     assert pax["email"] == "ana@example.com"
 
 
-async def test_get_booking_nonexistent_returns_404(client: AsyncClient):
-    resp = await client.get(f"/bookings/{uuid.uuid4()}")
+async def test_get_booking_nonexistent_returns_403(client: AsyncClient):
+    missing_id = uuid.uuid4()
+    token = generate_confirmation_token(missing_id)
 
-    assert resp.status_code == 404
-    assert resp.json()["detail"] == "not_found"
+    resp = await client.get(f"/bookings/{missing_id}?token={token}")
+
+    assert resp.status_code == 403
