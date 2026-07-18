@@ -210,13 +210,11 @@ export function PriceTrancheDialog({
             onClick={() => setCamaOpen((prev) => !prev)}
           >
             <TableRow>
-              <TableHead
-                colSpan={2}
-                className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]"
-              >
+              <TableHead className="w-1/3 bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">
                 Cama Ejecutivo ({camaTranches.length})
               </TableHead>
-              <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A] text-right">
+              <TableHead className="w-1/3 bg-[#E8EBFA]" />
+              <TableHead className="w-1/3 bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A] text-right">
                 {camaOpen ? (
                   <ChevronUp className="size-3.5 ml-auto" />
                 ) : (
@@ -238,13 +236,13 @@ export function PriceTrancheDialog({
               )}
               {camaTranches.map((tranche) => (
                 <TableRow key={tranche.id}>
-                  <TableCell className="py-3 text-sm text-neutral-900">
+                  <TableCell className="py-3 align-middle w-1/3 text-sm text-neutral-900">
                     {tranche.min_sold} – {tranche.max_sold}
                   </TableCell>
-                  <TableCell className="py-3 text-sm text-neutral-900">
+                  <TableCell className="py-3 align-middle w-1/3 text-sm text-neutral-900">
                     $ {tranche.price.toLocaleString("es-AR")}
                   </TableCell>
-                  <TableCell className="py-3">
+                  <TableCell className="py-3 align-middle w-1/3">
                     <Button
                       variant="ghost"
                       size="icon-sm"
@@ -268,13 +266,11 @@ export function PriceTrancheDialog({
             onClick={() => setSemiCamaOpen((prev) => !prev)}
           >
             <TableRow>
-              <TableHead
-                colSpan={2}
-                className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]"
-              >
+              <TableHead className="w-1/3 bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A]">
                 Semi Cama ({semiCamaTranches.length})
               </TableHead>
-              <TableHead className="bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A] text-right">
+              <TableHead className="w-1/3 bg-[#E8EBFA]" />
+              <TableHead className="w-1/3 bg-[#E8EBFA] text-xs font-medium uppercase tracking-wide text-[#4A4A6A] text-right">
                 {semiCamaOpen ? (
                   <ChevronUp className="size-3.5 ml-auto" />
                 ) : (
@@ -296,13 +292,13 @@ export function PriceTrancheDialog({
               )}
               {semiCamaTranches.map((tranche) => (
                 <TableRow key={tranche.id}>
-                  <TableCell className="py-3 text-sm text-neutral-900">
+                  <TableCell className="py-3 align-middle w-1/3 text-sm text-neutral-900">
                     {tranche.min_sold} – {tranche.max_sold}
                   </TableCell>
-                  <TableCell className="py-3 text-sm text-neutral-900">
+                  <TableCell className="py-3 align-middle w-1/3 text-sm text-neutral-900">
                     $ {tranche.price.toLocaleString("es-AR")}
                   </TableCell>
-                  <TableCell className="py-3">
+                  <TableCell className="py-3 align-middle w-1/3">
                     <Button
                       variant="ghost"
                       size="icon-sm"
