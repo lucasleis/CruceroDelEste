@@ -1,0 +1,56 @@
+:root {
+  --sn-color-surface: #121414;
+  --sn-color-surface-container-lowest: #0c0f0f;
+  --sn-color-surface-container-low: #1a1c1c;
+  --sn-color-surface-container: #1e2020;
+  --sn-color-surface-container-high: #282a2b;
+  --sn-color-surface-container-highest: #333535;
+  --sn-color-surface-bright: #37393a;
+  --sn-color-on-surface: #e2e2e2;
+  --sn-color-on-surface-variant: #c6c6cd;
+  --sn-color-outline: #8f9097;
+  --sn-color-outline-variant: #45464d;
+  --sn-color-primary: #bdc6e1;
+  --sn-color-on-primary: #273045;
+  --sn-color-primary-container: #0a1428;
+  --sn-color-secondary-container: #d7040f;
+  --sn-color-background: #121414;
+  --sn-color-on-background: #e2e2e2;
+
+  --sn-font-serif: 'Noto Serif', serif;
+  --sn-font-sans: 'Work Sans', sans-serif;
+
+  --sn-text-headline-xl-size: 64px;
+  --sn-text-headline-xl-weight: 700;
+  --sn-text-headline-xl-line-height: 1.1;
+  --sn-text-headline-xl-letter-spacing: -0.02em;
+  --sn-text-headline-lg-size: 48px;
+  --sn-text-headline-lg-weight: 700;
+  --sn-text-headline-lg-line-height: 1.2;
+  --sn-text-headline-lg-letter-spacing: -0.01em;
+  --sn-text-headline-lg-mobile-size: 36px;
+  --sn-text-headline-md-size: 32px;
+  --sn-text-headline-md-weight: 600;
+  --sn-text-headline-md-line-height: 1.3;
+  --sn-text-body-lg-size: 18px;
+  --sn-text-body-lg-weight: 400;
+  --sn-text-body-lg-line-height: 1.6;
+  --sn-text-body-md-size: 16px;
+  --sn-text-body-md-weight: 400;
+  --sn-text-body-md-line-height: 1.5;
+  --sn-text-label-caps-size: 12px;
+  --sn-text-label-caps-weight: 600;
+  --sn-text-label-caps-line-height: 1.5;
+  --sn-text-label-caps-letter-spacing: 0.15em;
+  --sn-text-stat-number-size: 56px;
+  --sn-text-stat-number-weight: 500;
+  --sn-text-stat-number-line-height: 1;
+
+  --sn-container-max: 1280px;
+  --sn-gutter: 32px;
+  --sn-margin-mobile: 20px;
+  --sn-section-gap: 120px;
+  --sn-stack-sm: 12px;
+  --sn-stack-md: 24px;
+  --sn-stack-lg: 48px;
+}
