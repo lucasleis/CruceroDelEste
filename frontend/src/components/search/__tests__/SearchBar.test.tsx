@@ -4,6 +4,27 @@ import userEvent from "@testing-library/user-event";
 import { SearchBar } from "@/components/search/SearchBar";
 import type { StopRead } from "@/types/trips";
 
+vi.mock("@/components/search/TripTypeSelector", () => ({
+  TripTypeSelector: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <button
+      data-testid="trip-type-toggle"
+      onClick={() => onChange(value === "round-trip" ? "one-way" : "round-trip")}
+    >
+      {value}
+    </button>
+  ),
+}))
+
+vi.mock("@/components/search/DateInput", () => ({
+  DateInput: ({ label, onChange }: { label: string; onChange: (d: Date | undefined) => void }) => (
+    <button
+      aria-label={label}
+      type="button"
+      onClick={() => onChange(new Date("2026-09-15T12:00:00"))}
+    />
+  ),
+}))
+
 // SearchBar fetches the stop catalogue on mount. We mock global.fetch (the only
 // external dependency) so the component logic — client-side validation and the
 // AR↔PY opposite-country destination filtering — runs for real.
@@ -138,5 +159,68 @@ describe("SearchBar — estados de carga/error de fetchStops", () => {
     expect(screen.queryByText("Paraguay")).not.toBeInTheDocument();
     expect(screen.queryByText(/Asunción/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Encarnación/)).not.toBeInTheDocument();
+  });
+});
+
+describe("SearchBar — validación one-way vs round-trip", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetchOk(STOPS));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("round-trip sin fecha de vuelta → onSearch no llamado", async () => {
+    // arrange: estado inicial es round-trip
+    const onSearch = vi.fn();
+    render(<SearchBar onSearch={onSearch} />);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const user = userEvent.setup();
+
+    // seleccionar origen: provincia "Buenos Aires" (AR)
+    await user.click(screen.getByText("Origen"));
+    await user.click(screen.getByText("Buenos Aires", { selector: "div" }));
+
+    // seleccionar destino: provincia "Central" (PY)
+    await user.click(screen.getByText("Destino"));
+    await user.click(screen.getByText("Central"));
+
+    // poner fecha de ida (mock llama onChange con una fecha fija)
+    await user.click(screen.getByRole("button", { name: "Fecha de ida" }));
+
+    // act: buscar sin fecha de vuelta
+    await user.click(screen.getByRole("button", { name: /buscar/i }));
+
+    // assert: la búsqueda se bloquea por falta de fecha de vuelta
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it("one-way sin fecha de vuelta → onSearch sí llamado", async () => {
+    // arrange
+    const onSearch = vi.fn();
+    render(<SearchBar onSearch={onSearch} />);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const user = userEvent.setup();
+
+    // cambiar a one-way
+    await user.click(screen.getByTestId("trip-type-toggle"));
+
+    // seleccionar origen: provincia "Buenos Aires" (AR)
+    await user.click(screen.getByText("Origen"));
+    await user.click(screen.getByText("Buenos Aires", { selector: "div" }));
+
+    // seleccionar destino: provincia "Central" (PY)
+    await user.click(screen.getByText("Destino"));
+    await user.click(screen.getByText("Central"));
+
+    // poner fecha de ida
+    await user.click(screen.getByRole("button", { name: "Fecha de ida" }));
+
+    // act: buscar sin fecha de vuelta
+    await user.click(screen.getByRole("button", { name: /buscar/i }));
+
+    // assert: en one-way la fecha de vuelta no es requerida → onSearch se dispara
+    expect(onSearch).toHaveBeenCalledTimes(1);
   });
 });
