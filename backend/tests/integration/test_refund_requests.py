@@ -361,3 +361,28 @@ async def test_refund_request_unrelated_email_returns_422(
 
     assert resp.status_code == 422
     assert resp.json()["detail"] == "email_not_found"
+
+
+async def test_refund_request_no_mp_payment_id_returns_500(
+    client: AsyncClient, db: AsyncSession
+):
+    """A confirmed booking without mp_payment_id returns 500; RefundRequest is persisted."""
+    booking, _ = await _make_confirmed_booking(db, mp_payment_id=None)
+
+    resp = await client.post(
+        f"/bookings/{booking.id}/refund-request",
+        json={"email": "ana@example.com"},
+    )
+
+    assert resp.status_code == 500
+    assert resp.json()["detail"] == "internal_server_error"
+
+    # RefundRequest IS persisted (committed before the mp_payment_id check).
+    booking_id = booking.id
+    db.expire_all()
+    result = await db.execute(
+        select(RefundRequest).where(RefundRequest.booking_id == booking_id)
+    )
+    refund_req = result.scalar_one_or_none()
+    assert refund_req is not None
+    assert refund_req.window_valid is True

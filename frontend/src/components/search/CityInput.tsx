@@ -17,7 +17,7 @@ const NO_PROVINCE_LABEL = "Otros"
 function groupStops(stops: StopRead[], allowedStopIds?: Set<string>): GroupedStops {
   const grouped: GroupedStops = {}
   const filtered =
-    allowedStopIds && allowedStopIds.size > 0
+    allowedStopIds !== undefined
       ? stops.filter((stop) => allowedStopIds.has(stop.id))
       : stops
   for (const stop of filtered) {

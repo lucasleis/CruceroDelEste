@@ -4,6 +4,27 @@ import userEvent from "@testing-library/user-event";
 import { SearchBar } from "@/components/search/SearchBar";
 import type { StopRead } from "@/types/trips";
 
+vi.mock("@/components/search/TripTypeSelector", () => ({
+  TripTypeSelector: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <button
+      data-testid="trip-type-toggle"
+      onClick={() => onChange(value === "round-trip" ? "one-way" : "round-trip")}
+    >
+      {value}
+    </button>
+  ),
+}))
+
+vi.mock("@/components/search/DateInput", () => ({
+  DateInput: ({ label, onChange }: { label: string; onChange: (d: Date | undefined) => void }) => (
+    <button
+      aria-label={label}
+      type="button"
+      onClick={() => onChange(new Date("2026-09-15T12:00:00"))}
+    />
+  ),
+}))
+
 // SearchBar fetches the stop catalogue on mount. We mock global.fetch (the only
 // external dependency) so the component logic — client-side validation and the
 // AR↔PY opposite-country destination filtering — runs for real.
@@ -65,5 +86,141 @@ describe("SearchBar — validación de búsqueda", () => {
     expect(screen.getByText("Paraguay")).toBeInTheDocument();
     expect(screen.getByText(/Asunción/)).toBeInTheDocument();
     expect(screen.queryByText("Argentina")).not.toBeInTheDocument();
+  });
+});
+
+describe("SearchBar — estados de carga/error de fetchStops", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("fetchStops pendiente → paradas no visibles en el dropdown de origen", async () => {
+    // fetch nunca resuelve — loadingStops permanece true
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise(() => {})));
+    const onSearch = vi.fn();
+    render(<SearchBar onSearch={onSearch} />);
+
+    // intentar abrir el dropdown de origen (disabled cuando loadingStops=true)
+    await userEvent.setup().click(screen.getByText("Origen"));
+
+    // no debe haber paradas ni encabezados de país en pantalla
+    expect(screen.queryByText("Argentina")).not.toBeInTheDocument();
+    expect(screen.queryByText("Paraguay")).not.toBeInTheDocument();
+  });
+
+  it("fetchStops falla → el componente renderiza sin lanzar excepción", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")));
+    const onSearch = vi.fn();
+
+    // no debe lanzar durante el render ni el efecto
+    render(<SearchBar onSearch={onSearch} />);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    // el componente sigue en pie — los labels están presentes
+    expect(screen.getByText("Origen")).toBeInTheDocument();
+    expect(screen.getByText("Destino")).toBeInTheDocument();
+  });
+
+  it("getValidDestinations falla → destino bloqueado, no se abre a todos", async () => {
+    // /stops → éxito; /stops/.../valid-destinations → falla
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes("valid-destinations")) {
+          return Promise.reject(new Error("gateway error"));
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => STOPS,
+        } as Response);
+      })
+    );
+
+    const onSearch = vi.fn();
+    render(<SearchBar onSearch={onSearch} />);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    const user = userEvent.setup();
+
+    // abrir origen y seleccionar la parada AR "Buenos Aires" (stop:, no provincia)
+    await user.click(screen.getByText("Origen"));
+    await user.click(screen.getByText("└ Buenos Aires"));
+
+    // esperar a que getValidDestinations falle y el estado se actualice
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining("valid-destinations"))
+    );
+
+    // abrir el dropdown de destino
+    await user.click(screen.getByText("Destino"));
+
+    // el Set vacío debe bloquear todos los destinos — ninguna parada visible
+    expect(screen.queryByText("Argentina")).not.toBeInTheDocument();
+    expect(screen.queryByText("Paraguay")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Asunción/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Encarnación/)).not.toBeInTheDocument();
+  });
+});
+
+describe("SearchBar — validación one-way vs round-trip", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetchOk(STOPS));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("round-trip sin fecha de vuelta → onSearch no llamado", async () => {
+    // arrange: estado inicial es round-trip
+    const onSearch = vi.fn();
+    render(<SearchBar onSearch={onSearch} />);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const user = userEvent.setup();
+
+    // seleccionar origen: provincia "Buenos Aires" (AR)
+    await user.click(screen.getByText("Origen"));
+    await user.click(screen.getByText("Buenos Aires", { selector: "div" }));
+
+    // seleccionar destino: provincia "Central" (PY)
+    await user.click(screen.getByText("Destino"));
+    await user.click(screen.getByText("Central"));
+
+    // poner fecha de ida (mock llama onChange con una fecha fija)
+    await user.click(screen.getByRole("button", { name: "Fecha de ida" }));
+
+    // act: buscar sin fecha de vuelta
+    await user.click(screen.getByRole("button", { name: /buscar/i }));
+
+    // assert: la búsqueda se bloquea por falta de fecha de vuelta
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it("one-way sin fecha de vuelta → onSearch sí llamado", async () => {
+    // arrange
+    const onSearch = vi.fn();
+    render(<SearchBar onSearch={onSearch} />);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const user = userEvent.setup();
+
+    // cambiar a one-way
+    await user.click(screen.getByTestId("trip-type-toggle"));
+
+    // seleccionar origen: provincia "Buenos Aires" (AR)
+    await user.click(screen.getByText("Origen"));
+    await user.click(screen.getByText("Buenos Aires", { selector: "div" }));
+
+    // seleccionar destino: provincia "Central" (PY)
+    await user.click(screen.getByText("Destino"));
+    await user.click(screen.getByText("Central"));
+
+    // poner fecha de ida
+    await user.click(screen.getByRole("button", { name: "Fecha de ida" }));
+
+    // act: buscar sin fecha de vuelta
+    await user.click(screen.getByRole("button", { name: /buscar/i }));
+
+    // assert: en one-way la fecha de vuelta no es requerida → onSearch se dispara
+    expect(onSearch).toHaveBeenCalledTimes(1);
   });
 });
