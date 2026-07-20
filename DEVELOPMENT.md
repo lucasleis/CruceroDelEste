@@ -100,6 +100,10 @@ UPDATE admin_users SET password_hash = '$2b$12$...' WHERE email = 'admin@example
 ### Levantar el servidor
 
 ```bash
+cd backend
+
+source .venv/bin/activate
+
 uvicorn app.main:app --reload
 # Disponible en http://localhost:8000
 # Swagger UI en http://localhost:8000/docs

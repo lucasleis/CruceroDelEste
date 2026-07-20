@@ -36,7 +36,7 @@ Ubicados en `frontend/src/components/travel/`.
 | AmenityBadge | AmenityBadge.tsx | Ícono de servicio a bordo. Modos: icon-only (Tooltip shadcn), icon-label. Variantes: wifi, ac, usb, bathroom, entertainment |
 | SeatTypeBadge | SeatTypeBadge.tsx | Pill badge de clase de asiento. Variantes: cama (azul sólido), semi-cama (aqua sólido), ejecutivo (outline) |
 | TripCard | TripCard.tsx | Card de resultado de búsqueda. Consume AmenityBadge y SeatTypeBadge. Borde izquierdo por disponibilidad: aqua >10, primary 5-10, accent 1-4 + badge urgencia. priceFrom acepta null |
-| FilterPanel | FilterPanel.tsx | Panel de filtros visual completo. onFilterChange preparada pero desconectada — ver LLE-126 |
+| FilterPanel | FilterPanel.tsx | Panel de filtros visual completo. onFilterChange preparada pero desconectada (LLE-126 cancelado — pendiente de conectar al implementar filtros en /resultados) |
 | SearchSummaryBar | SearchSummaryBar.tsx | Barra de resumen de búsqueda activa. onEditClick delegado a la página padre |
 | CityInput | CityInput.tsx | Selector de origen/destino. Recibe stops como prop (no fetchea). Valores prefijados: "stop:Nombre" o "province:Nombre". Props: allowedStopIds, onStopSelected, onProvinceSelected |
 
@@ -131,6 +131,16 @@ No arranques a implementar nada hasta que Lucas apruebe explícitamente el paso 
 
 ---
 
+## Estado de la suite de tests (backend)
+
+| Fecha | Resultado | Comando |
+|-------|-----------|---------|
+| 20/07/2026 | ✅ 223/223 passed | `cd backend && pytest` |
+
+6 warnings de Starlette (`HTTP_422_UNPROCESSABLE_ENTITY` deprecated) — no requieren acción.
+
+---
+
 ## Regla de negocio crítica — AR↔PY
 
 Los servicios son internacionales. **No se puede vender un tramo dentro del mismo país** (cabotaje extranjero prohibido). Cada parada está etiquetada con su país (`AR` o `PY`). Si el origen es Argentina, el destino solo puede ser Paraguay, y viceversa. Esta regla se valida tanto en frontend como en backend.
@@ -172,6 +182,23 @@ El dueño está en un conflicto societario interno. El interlocutor real del pro
 - **Lucas (user ID):** `3a547502-c723-4bbb-a05d-b4165f836768`
 - **Estados:** Done, Todo, Backlog, Canceled
 - **Prioridades:** 1=urgente, 2=alto, 3=medio, 4=bajo
+
+---
+
+## Documentación histórica (Linear Documents)
+
+Los siguientes Documents viven en el proyecto "Expresio Rio Parana" en Linear (sección Resources de la Overview del proyecto):
+
+| Document | Contenido |
+|----------|-----------|
+| 🛡️ Auditoría de Seguridad y Calidad | Hallazgos y decisiones de las rondas Audit-C1 a C4, SEC, Q, S (51 tickets) |
+| 🐛 Bugs — Histórico resueltos | Todos los bugs cerrados: reembolsos, asientos, MP, validaciones (16 tickets) |
+| 🧪 Tests — Histórico de fallas | Fallas de suite resueltas y patrón recurrente detectado (9 tickets) |
+| ⚙️ Admin Panel — Features | Features implementadas en frontend-admin (32 tickets) |
+| 🚀 Frontend Público — Features | Buscador, resultados, selector de asientos, flujo de compra (24 tickets) |
+| 🔖 Sprints, Arquitectura y Negocio | Decisiones de modelo de datos, cambio de entidad, sprints cerrados (10 tickets) |
+
+Consultar antes de preguntar "por qué se hizo X" — la mayoría de las decisiones técnicas y de negocio están documentadas ahí.
 
 ---
 
