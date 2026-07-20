@@ -246,3 +246,58 @@ async def test_send_reminders_job_no_reenvía_si_ya_sent(session_factory):
 
     # assert: send_reminder_email no fue llamada
     mock_send.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# send_feedback_job
+# ---------------------------------------------------------------------------
+
+async def test_send_feedback_job_envia_feedback_y_marca_sent(session_factory):
+    # arrange: confirmed, feedback_sent=False, departure hace 20h → arrival hace 3h (dentro de ventana)
+    booking_id = await _seed_confirmed_booking(
+        session_factory, departure_at=_NOW - timedelta(hours=20)
+    )
+
+    # act
+    with patch.object(reminders, "AsyncSessionLocal", session_factory):
+        await reminders.send_feedback_job()
+
+    # assert: feedback_sent pasó a True
+    async with session_factory() as db:
+        booking = await db.get(Booking, booking_id)
+        assert booking.feedback_sent is True
+
+
+async def test_send_feedback_job_no_toca_bookings_fuera_de_ventana(session_factory):
+    # arrange: confirmed, feedback_sent=False, departure hace 18h → arrival hace 1h (fuera de ventana)
+    booking_id = await _seed_confirmed_booking(
+        session_factory, departure_at=_NOW - timedelta(hours=18)
+    )
+
+    # act
+    with patch.object(reminders, "AsyncSessionLocal", session_factory):
+        await reminders.send_feedback_job()
+
+    # assert: feedback_sent sigue en False
+    async with session_factory() as db:
+        booking = await db.get(Booking, booking_id)
+        assert booking.feedback_sent is False
+
+
+async def test_send_feedback_job_no_reenvía_si_ya_sent(session_factory):
+    # arrange: confirmed, departure hace 20h → arrival hace 3h; marcar feedback_sent=True antes del job
+    booking_id = await _seed_confirmed_booking(
+        session_factory, departure_at=_NOW - timedelta(hours=20)
+    )
+    async with session_factory() as db:
+        booking = await db.get(Booking, booking_id)
+        booking.feedback_sent = True
+        await db.commit()
+
+    # act
+    with patch.object(reminders, "AsyncSessionLocal", session_factory):
+        with patch("tasks.reminders.send_feedback_email") as mock_send:
+            await reminders.send_feedback_job()
+
+    # assert: send_feedback_email no fue llamada
+    mock_send.assert_not_called()
