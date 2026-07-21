@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, ChevronUp, ChevronDown, ListOrdered } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,8 +28,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getStops, createStop, deleteStop, updateStop } from "@/api/stops";
-import { getRoutes, createRoute, deleteRoute } from "@/api/routes";
-import type { CountryEnum, StopRead, RouteRead } from "@/types/trips";
+import { getRoutes, createRoute, deleteRoute, getRouteStops, addRouteStop, removeRouteStop, reorderRouteStops } from "@/api/routes";
+import type { CountryEnum, StopRead, RouteRead, RouteStopRead } from "@/types/trips";
 
 const COUNTRY_LABEL: Record<CountryEnum, string> = {
   AR: "Argentina",
@@ -58,6 +58,12 @@ export default function ConfiguracionPage() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [savingRoute, setSavingRoute] = useState(false);
 
+  const [manageStopsRoute, setManageStopsRoute] = useState<RouteRead | null>(null);
+  const [addStopId, setAddStopId] = useState("");
+  const [addStopOrder, setAddStopOrder] = useState<number | "">("");
+  const [addingStop, setAddingStop] = useState(false);
+  const [addStopError, setAddStopError] = useState<string | null>(null);
+
   const stopsQuery = useQuery({
     queryKey: ["admin", "stops"],
     queryFn: getStops,
@@ -71,6 +77,13 @@ export default function ConfiguracionPage() {
   });
 
   const routes = routesQuery.data ?? [];
+
+  const routeStopsQuery = useQuery({
+    queryKey: ["admin", "routes", manageStopsRoute?.id, "stops"],
+    queryFn: () => getRouteStops(manageStopsRoute!.id),
+    enabled: !!manageStopsRoute,
+  });
+  const routeStops = routeStopsQuery.data ?? [];
 
   async function handleConfirmDelete() {
     if (!stopToDelete) return;
@@ -206,6 +219,56 @@ export default function ConfiguracionPage() {
       }
     } finally {
       setSavingRoute(false);
+    }
+  }
+
+  async function handleAddStop() {
+    if (!manageStopsRoute || !addStopId || addStopOrder === "") return;
+    setAddingStop(true);
+    setAddStopError(null);
+    try {
+      await addRouteStop(manageStopsRoute.id, { stop_id: addStopId, order: Number(addStopOrder) });
+      queryClient.invalidateQueries({ queryKey: ["admin", "routes", manageStopsRoute.id, "stops"] });
+      setAddStopId("");
+      setAddStopOrder("");
+    } catch (error) {
+      const status = (error as { response?: { status?: number; data?: { detail?: string } } })?.response;
+      if (status?.status === 409 && status?.data?.detail === "stop_already_in_route") {
+        setAddStopError("Esa parada ya está en la ruta.");
+      } else if (status?.status === 409 && status?.data?.detail === "order_already_taken") {
+        setAddStopError("Ese número de orden ya está usado.");
+      } else {
+        setAddStopError("Error al agregar la parada.");
+      }
+    } finally {
+      setAddingStop(false);
+    }
+  }
+
+  async function handleRemoveStop(stopId: string) {
+    if (!manageStopsRoute) return;
+    try {
+      await removeRouteStop(manageStopsRoute.id, stopId);
+      queryClient.invalidateQueries({ queryKey: ["admin", "routes", manageStopsRoute.id, "stops"] });
+    } catch {
+      toast.error("Error al eliminar la parada de la ruta.");
+    }
+  }
+
+  async function handleMoveStop(stopId: string, direction: "up" | "down") {
+    if (!manageStopsRoute) return;
+    const sorted = [...routeStops].sort((a, b) => a.order - b.order);
+    const idx = sorted.findIndex((s) => s.stop_id === stopId);
+    if (direction === "up" && idx === 0) return;
+    if (direction === "down" && idx === sorted.length - 1) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    const newOrder = [...sorted];
+    [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+    try {
+      await reorderRouteStops(manageStopsRoute.id, newOrder.map((s) => s.stop_id));
+      queryClient.invalidateQueries({ queryKey: ["admin", "routes", manageStopsRoute.id, "stops"] });
+    } catch {
+      toast.error("Error al reordenar las paradas.");
     }
   }
 
@@ -354,6 +417,14 @@ export default function ConfiguracionPage() {
                       </div>
                     </TableCell>
                     <TableCell className="py-3">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-neutral-600"
+                        onClick={() => setManageStopsRoute(route)}
+                      >
+                        <ListOrdered className="size-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon-sm"
@@ -655,6 +726,115 @@ export default function ConfiguracionPage() {
               disabled={!originStopId || !destinationStopId || savingRoute}
             >
               {savingRoute ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={manageStopsRoute !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setManageStopsRoute(null);
+            setAddStopId("");
+            setAddStopOrder("");
+            setAddStopError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Paradas — {manageStopsRoute?.origin_stop.name} → {manageStopsRoute?.destination_stop.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {routeStopsQuery.isLoading && (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            )}
+
+            {!routeStopsQuery.isLoading && routeStops.length === 0 && (
+              <p className="text-sm text-neutral-600">Sin paradas intermedias.</p>
+            )}
+
+            {!routeStopsQuery.isLoading && routeStops.length > 0 && (
+              <ol className="space-y-1">
+                {[...routeStops].sort((a, b) => a.order - b.order).map((stop, idx, arr) => (
+                  <li key={stop.stop_id} className="flex items-center gap-2 text-sm text-neutral-900">
+                    <span className="w-6 text-right text-neutral-400 shrink-0">{stop.order + 1}.</span>
+                    <span className="flex-1">{stop.name}</span>
+                    <span className="text-xs text-neutral-500">{stop.country}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={idx === 0}
+                      onClick={() => handleMoveStop(stop.stop_id, "up")}
+                    >
+                      <ChevronUp className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={idx === arr.length - 1}
+                      onClick={() => handleMoveStop(stop.stop_id, "down")}
+                    >
+                      <ChevronDown className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-[#E87B7B]"
+                      onClick={() => handleRemoveStop(stop.stop_id)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            <div className="border-t pt-4 space-y-3">
+              <p className="text-sm font-medium text-neutral-600">Agregar parada</p>
+              <Select value={addStopId} onValueChange={(value) => setAddStopId(value ?? "")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccionar parada" />
+                </SelectTrigger>
+                <SelectContent>
+                  {stops.map((stop) => (
+                    <SelectItem key={stop.id} value={stop.id}>
+                      {stop.name} ({stop.country})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Orden (0 = primero)"
+                  value={addStopOrder}
+                  onChange={(e) => setAddStopOrder(e.target.value === "" ? "" : Number(e.target.value))}
+                  className="w-40"
+                />
+                <Button
+                  onClick={handleAddStop}
+                  disabled={!addStopId || addStopOrder === "" || addingStop}
+                  size="sm"
+                >
+                  {addingStop ? "Agregando..." : "Agregar"}
+                </Button>
+              </div>
+              {addStopError && <p className="text-sm text-[#E87B7B]">{addStopError}</p>}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManageStopsRoute(null)}>
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>
