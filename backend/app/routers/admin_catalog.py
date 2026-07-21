@@ -21,6 +21,7 @@ from app.models.trip import (
     Stop,
     Trip,
     TripStatusEnum,
+    TripStopOverride,
 )
 from app.schemas.admin import (
     AdminSeatRead,
@@ -36,6 +37,8 @@ from app.schemas.admin import (
     StopUpdate,
     TrancheCoverage,
     TripCreate,
+    TripStopOverrideRead,
+    TripStopOverrideReorder,
     TripUpdate,
 )
 from app.schemas.trips import RouteRead, StopRead
@@ -723,3 +726,171 @@ async def update_seat_status(
     await db.commit()
     await db.refresh(seat)
     return seat
+
+
+# ---------------------------------------------------------------------------
+# Trip stop overrides
+# ---------------------------------------------------------------------------
+
+
+@router.get("/trips/{trip_id}/stops", response_model=list[TripStopOverrideRead])
+async def get_trip_stop_overrides(
+    trip_id: UUID,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[TripStopOverrideRead]:
+    trip = await db.get(Trip, trip_id)
+    if trip is None:
+        raise NotFoundError()
+
+    overrides_result = await db.execute(
+        select(TripStopOverride.order, Stop.id, Stop.name, Stop.country)
+        .join(Stop, TripStopOverride.stop_id == Stop.id)
+        .where(TripStopOverride.trip_id == trip_id)
+        .order_by(TripStopOverride.order.asc())
+    )
+    overrides = overrides_result.all()
+
+    if overrides:
+        return [
+            TripStopOverrideRead(order=order, stop_id=stop_id, name=name, country=country)
+            for order, stop_id, name, country in overrides
+        ]
+
+    route_stops_result = await db.execute(
+        select(RouteStop.order, Stop.id, Stop.name, Stop.country)
+        .join(Stop, RouteStop.stop_id == Stop.id)
+        .where(RouteStop.route_id == trip.route_id)
+        .order_by(RouteStop.order.asc())
+    )
+    return [
+        TripStopOverrideRead(order=order, stop_id=stop_id, name=name, country=country)
+        for order, stop_id, name, country in route_stops_result.all()
+    ]
+
+
+@router.post(
+    "/trips/{trip_id}/stops/initialize",
+    response_model=list[TripStopOverrideRead],
+    status_code=status.HTTP_201_CREATED,
+)
+async def initialize_trip_stop_overrides(
+    trip_id: UUID,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[TripStopOverrideRead]:
+    trip = await db.get(Trip, trip_id)
+    if trip is None:
+        raise NotFoundError()
+
+    existing = await db.execute(
+        select(TripStopOverride.id).where(TripStopOverride.trip_id == trip_id).limit(1)
+    )
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="overrides_already_initialized",
+        )
+
+    route_stops_result = await db.execute(
+        select(RouteStop)
+        .where(RouteStop.route_id == trip.route_id)
+        .order_by(RouteStop.order.asc())
+    )
+    route_stops = route_stops_result.scalars().all()
+
+    for rs in route_stops:
+        db.add(TripStopOverride(trip_id=trip_id, stop_id=rs.stop_id, order=rs.order))
+
+    await db.commit()
+
+    result = await db.execute(
+        select(TripStopOverride.order, Stop.id, Stop.name, Stop.country)
+        .join(Stop, TripStopOverride.stop_id == Stop.id)
+        .where(TripStopOverride.trip_id == trip_id)
+        .order_by(TripStopOverride.order.asc())
+    )
+    return [
+        TripStopOverrideRead(order=order, stop_id=stop_id, name=name, country=country)
+        for order, stop_id, name, country in result.all()
+    ]
+
+
+@router.delete(
+    "/trips/{trip_id}/stops/{stop_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_trip_stop_override(
+    trip_id: UUID,
+    stop_id: UUID,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    trip = await db.get(Trip, trip_id)
+    if trip is None:
+        raise NotFoundError()
+
+    result = await db.execute(
+        select(TripStopOverride).where(
+            TripStopOverride.trip_id == trip_id,
+            TripStopOverride.stop_id == stop_id,
+        )
+    )
+    override = result.scalar_one_or_none()
+    if override is None:
+        raise NotFoundError()
+
+    await db.delete(override)
+    await db.commit()
+
+
+@router.put(
+    "/trips/{trip_id}/stops/reorder",
+    response_model=list[TripStopOverrideRead],
+)
+async def reorder_trip_stop_overrides(
+    trip_id: UUID,
+    body: TripStopOverrideReorder,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[TripStopOverrideRead]:
+    trip = await db.get(Trip, trip_id)
+    if trip is None:
+        raise NotFoundError()
+
+    result = await db.execute(
+        select(TripStopOverride).where(TripStopOverride.trip_id == trip_id)
+    )
+    overrides = list(result.scalars().all())
+
+    current_ids = {o.stop_id for o in overrides}
+    new_ids = set(body.stop_ids)
+    if current_ids != new_ids or len(body.stop_ids) != len(overrides):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="stop_ids_mismatch",
+        )
+
+    by_stop_id = {o.stop_id: o for o in overrides}
+    for position, stop_id in enumerate(body.stop_ids):
+        by_stop_id[stop_id].order = position
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="reorder_conflict",
+        )
+
+    result = await db.execute(
+        select(TripStopOverride.order, Stop.id, Stop.name, Stop.country)
+        .join(Stop, TripStopOverride.stop_id == Stop.id)
+        .where(TripStopOverride.trip_id == trip_id)
+        .order_by(TripStopOverride.order.asc())
+    )
+    return [
+        TripStopOverrideRead(order=order, stop_id=stop_id, name=name, country=country)
+        for order, stop_id, name, country in result.all()
+    ]
