@@ -22,6 +22,13 @@ export interface RouteStopRead {
   country: "AR" | "PY";
 }
 
+export interface TripStopOverrideRead {
+  order: number;
+  stop_id: string;
+  name: string;
+  country: "AR" | "PY";
+}
+
 export interface SeatLayoutRead {
   id: string;
   name: string;

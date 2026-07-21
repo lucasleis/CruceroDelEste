@@ -5,6 +5,7 @@ import type {
   RouteStopRead,
   SeatLayoutRead,
   TripStatusEnum,
+  TripStopOverrideRead,
 } from "@/types/trips";
 
 export async function getAdminTrips(): Promise<AdminTripRead[]> {
@@ -70,5 +71,24 @@ export async function updateSeatStatus(
     `/admin/trips/${tripId}/seats/${seatNumber}`,
     { status }
   );
+  return response.data;
+}
+
+export async function getTripStopOverrides(tripId: string): Promise<TripStopOverrideRead[]> {
+  const response = await apiClient.get<TripStopOverrideRead[]>(`/admin/trips/${tripId}/stops`);
+  return response.data;
+}
+
+export async function initializeTripStopOverrides(tripId: string): Promise<TripStopOverrideRead[]> {
+  const response = await apiClient.post<TripStopOverrideRead[]>(`/admin/trips/${tripId}/stops/initialize`);
+  return response.data;
+}
+
+export async function deleteTripStopOverride(tripId: string, stopId: string): Promise<void> {
+  await apiClient.delete(`/admin/trips/${tripId}/stops/${stopId}`);
+}
+
+export async function reorderTripStopOverrides(tripId: string, stopIds: string[]): Promise<TripStopOverrideRead[]> {
+  const response = await apiClient.put<TripStopOverrideRead[]>(`/admin/trips/${tripId}/stops/reorder`, { stop_ids: stopIds });
   return response.data;
 }

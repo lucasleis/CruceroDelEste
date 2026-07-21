@@ -93,6 +93,17 @@ class RouteStopReorder(BaseModel):
     stop_ids: list[UUID]
 
 
+class TripStopOverrideRead(BaseModel):
+    order: int
+    stop_id: UUID
+    name: str
+    country: str
+
+
+class TripStopOverrideReorder(BaseModel):
+    stop_ids: list[UUID]
+
+
 class TripCreate(BaseModel):
     route_id: UUID
     departure_at: datetime

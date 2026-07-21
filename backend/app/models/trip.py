@@ -99,6 +99,25 @@ class RouteStop(Base):
     stop = relationship("Stop")
 
 
+class TripStopOverride(Base):
+    __tablename__ = "trip_stop_overrides"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id", ondelete="CASCADE"), nullable=False)
+    stop_id = Column(UUID(as_uuid=True), ForeignKey("stops.id"), nullable=False)
+    order = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("trip_id", "order", name="uq_trip_stop_overrides_trip_order"),
+        UniqueConstraint("trip_id", "stop_id", name="uq_trip_stop_overrides_trip_stop"),
+        Index("idx_trip_stop_overrides_trip_id", "trip_id", "order"),
+    )
+
+    trip = relationship("Trip", back_populates="stop_overrides")
+    stop = relationship("Stop")
+
+
 class SeatLayout(Base):
     __tablename__ = "seat_layouts"
 
@@ -161,6 +180,7 @@ class Trip(Base):
     seats = relationship("Seat", back_populates="trip", cascade="all, delete-orphan")
     price_tranches = relationship("PriceTranche", back_populates="trip", cascade="all, delete-orphan")
     bookings = relationship("Booking", back_populates="trip")
+    stop_overrides = relationship("TripStopOverride", back_populates="trip", order_by="TripStopOverride.order", cascade="all, delete-orphan")
 
 
 class Seat(Base):
