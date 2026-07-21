@@ -96,7 +96,10 @@
       "Bash(sed -n '343,$p' src/pages/TripDetailPage.tsx)",
       "Bash(echo \"EXIT CODE: $?\")",
       "Bash(pkill -f \"next dev\")",
-      "Bash(disown)"
+      "Bash(disown)",
+      "Bash(pytest)",
+      "Bash(python3 -m pytest --version)",
+      "Bash(xxd)"
     ]
   }
 }

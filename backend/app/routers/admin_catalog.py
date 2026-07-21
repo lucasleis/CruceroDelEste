@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,7 +28,9 @@ from app.schemas.admin import (
     AdminTripRead,
     PriceTrancheSummary,
     RouteCreate,
+    RouteStopAdd,
     RouteStopRead,
+    RouteStopReorder,
     SeatLayoutRead,
     StopCreate,
     StopUpdate,
@@ -262,6 +265,144 @@ async def get_route_stops(
     route = await db.get(Route, route_id)
     if route is None:
         raise NotFoundError()
+
+    result = await db.execute(
+        select(RouteStop.order, Stop.id, Stop.name, Stop.country)
+        .join(Stop, RouteStop.stop_id == Stop.id)
+        .where(RouteStop.route_id == route_id)
+        .order_by(RouteStop.order.asc())
+    )
+    return [
+        RouteStopRead(order=order, stop_id=stop_id, name=name, country=country)
+        for order, stop_id, name, country in result.all()
+    ]
+
+
+@router.post(
+    "/routes/{route_id}/stops",
+    response_model=list[RouteStopRead],
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_route_stop(
+    route_id: UUID,
+    body: RouteStopAdd,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[RouteStopRead]:
+    route = await db.get(Route, route_id)
+    if route is None:
+        raise NotFoundError()
+
+    stop = await db.get(Stop, body.stop_id)
+    if stop is None:
+        raise NotFoundError()
+
+    existing_stop = await db.execute(
+        select(RouteStop).where(
+            RouteStop.route_id == route_id,
+            RouteStop.stop_id == body.stop_id,
+        )
+    )
+    if existing_stop.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="stop_already_in_route",
+        )
+
+    existing_order = await db.execute(
+        select(RouteStop).where(
+            RouteStop.route_id == route_id,
+            RouteStop.order == body.order,
+        )
+    )
+    if existing_order.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="order_already_taken",
+        )
+
+    db.add(RouteStop(route_id=route_id, stop_id=body.stop_id, order=body.order))
+    await db.commit()
+
+    result = await db.execute(
+        select(RouteStop.order, Stop.id, Stop.name, Stop.country)
+        .join(Stop, RouteStop.stop_id == Stop.id)
+        .where(RouteStop.route_id == route_id)
+        .order_by(RouteStop.order.asc())
+    )
+    return [
+        RouteStopRead(order=order, stop_id=stop_id, name=name, country=country)
+        for order, stop_id, name, country in result.all()
+    ]
+
+
+@router.delete(
+    "/routes/{route_id}/stops/{stop_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def remove_route_stop(
+    route_id: UUID,
+    stop_id: UUID,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    route = await db.get(Route, route_id)
+    if route is None:
+        raise NotFoundError()
+
+    result = await db.execute(
+        select(RouteStop).where(
+            RouteStop.route_id == route_id,
+            RouteStop.stop_id == stop_id,
+        )
+    )
+    route_stop = result.scalar_one_or_none()
+    if route_stop is None:
+        raise NotFoundError()
+
+    await db.delete(route_stop)
+    await db.commit()
+
+
+@router.put(
+    "/routes/{route_id}/stops/reorder",
+    response_model=list[RouteStopRead],
+)
+async def reorder_route_stops(
+    route_id: UUID,
+    body: RouteStopReorder,
+    _admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[RouteStopRead]:
+    route = await db.get(Route, route_id)
+    if route is None:
+        raise NotFoundError()
+
+    result = await db.execute(
+        select(RouteStop).where(RouteStop.route_id == route_id)
+    )
+    route_stops = list(result.scalars().all())
+
+    current_ids = {rs.stop_id for rs in route_stops}
+    new_ids = set(body.stop_ids)
+    if current_ids != new_ids or len(body.stop_ids) != len(route_stops):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="stop_ids_mismatch",
+        )
+
+    by_stop_id = {rs.stop_id: rs for rs in route_stops}
+    for position, stop_id in enumerate(body.stop_ids):
+        by_stop_id[stop_id].order = position
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="reorder_conflict",
+        )
 
     result = await db.execute(
         select(RouteStop.order, Stop.id, Stop.name, Stop.country)

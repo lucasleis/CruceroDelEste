@@ -84,6 +84,15 @@ class RouteStopRead(BaseModel):
     country: str
 
 
+class RouteStopAdd(BaseModel):
+    stop_id: UUID
+    order: int = Field(ge=0)
+
+
+class RouteStopReorder(BaseModel):
+    stop_ids: list[UUID]
+
+
 class TripCreate(BaseModel):
     route_id: UUID
     departure_at: datetime
