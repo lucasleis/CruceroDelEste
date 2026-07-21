@@ -96,11 +96,12 @@ Claude va a leer el archivo, entender el estado del proyecto, y retomar desde do
 Copiar y pegar al inicio de cada conversación nueva:
 
 ---
-Leé CLAUDE.md del proyecto (raíz del monorepo). Ese archivo tiene todo el contexto: stack, reglas de negocio, componentes construidos y proceso de trabajo.
+Leé el documento "CLAUDE.md" del proyecto "Expresio Rio Parana" en Linear. Ese documento tiene todo el contexto: stack, reglas de negocio, componentes construidos y proceso de trabajo.
 
 Una vez leído:
-1. Si tenés acceso a Linear (MCP conectado): buscá los tickets del proyecto "Expresio Rio Parana" en estado Todo o In Progress, analizá dependencias y bloqueantes, y proponé el próximo paso con justificación.
-2. Si no tenés acceso a Linear: indicalo y pedile a Lucas que describa qué sigue.
+
+Buscá los tickets del proyecto "Expresio Rio Parana" en estado Todo o In Progress, analizá dependencias y bloqueantes, y proponé el próximo paso con justificación.
+Si no podés acceder a Linear, indicalo y pedile a Lucas que pegue el contenido de CLAUDE.md manualmente.
 
 No arranques a implementar nada hasta que Lucas apruebe explícitamente el paso propuesto.
 ---
