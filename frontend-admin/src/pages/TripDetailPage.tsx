@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getAdminTrip, getRouteStops, getSeatLayouts } from "@/api/trips";
+import { getAdminTrip, getSeatLayouts, getTripStopOverrides, initializeTripStopOverrides, deleteTripStopOverride, reorderTripStopOverrides } from "@/api/trips";
+import { toast } from "sonner";
 import { getPriceTranches } from "@/api/priceTranches";
 import { EditTripDialog } from "@/components/trips/EditTripDialog";
 import { PriceTrancheDialog } from "@/components/trips/PriceTrancheDialog";
@@ -26,6 +27,7 @@ export default function TripDetailPage() {
   const queryClient = useQueryClient();
 
   const [stopsOpen, setStopsOpen] = useState(false);
+  const [initializingStops, setInitializingStops] = useState(false);
 
   const tripQuery = useQuery({
     queryKey: ["admin", "trips", tripId],
@@ -44,11 +46,13 @@ export default function TripDetailPage() {
     queryFn: getSeatLayouts,
   });
 
-  const routeStopsQuery = useQuery({
-    queryKey: ["admin", "routes", tripQuery.data?.route?.id, "stops"],
-    queryFn: () => getRouteStops(tripQuery.data!.route.id),
-    enabled: !!tripQuery.data?.route?.id,
+  const tripStopsQuery = useQuery({
+    queryKey: ["admin", "trips", tripId, "stops"],
+    queryFn: () => getTripStopOverrides(tripId as string),
+    enabled: !!tripId && stopsOpen,
   });
+  const tripStops = tripStopsQuery.data ?? [];
+  const hasOverrides = tripStops.length > 0;
 
   const isLoading =
     tripQuery.isLoading || tranchesQuery.isLoading || seatLayoutsQuery.isLoading;
@@ -83,6 +87,46 @@ export default function TripDetailPage() {
   const layout = seatLayouts.find((l) => l.id === trip.seat_layout_id);
   const camaTotal = layout?.total_cama ?? 0;
   const semiCamaTotal = layout?.total_semi_cama ?? 0;
+
+  async function handleInitializeStops() {
+    if (!tripId) return;
+    setInitializingStops(true);
+    try {
+      await initializeTripStopOverrides(tripId);
+      queryClient.invalidateQueries({ queryKey: ["admin", "trips", tripId, "stops"] });
+    } catch {
+      toast.error("Error al inicializar las paradas.");
+    } finally {
+      setInitializingStops(false);
+    }
+  }
+
+  async function handleDeleteStop(stopId: string) {
+    if (!tripId) return;
+    try {
+      await deleteTripStopOverride(tripId, stopId);
+      queryClient.invalidateQueries({ queryKey: ["admin", "trips", tripId, "stops"] });
+    } catch {
+      toast.error("Error al eliminar la parada.");
+    }
+  }
+
+  async function handleMoveStop(stopId: string, direction: "up" | "down") {
+    if (!tripId) return;
+    const sorted = [...tripStops].sort((a, b) => a.order - b.order);
+    const idx = sorted.findIndex((s) => s.stop_id === stopId);
+    if (direction === "up" && idx === 0) return;
+    if (direction === "down" && idx === sorted.length - 1) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    const newOrder = [...sorted];
+    [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+    try {
+      await reorderTripStopOverrides(tripId, newOrder.map((s) => s.stop_id));
+      queryClient.invalidateQueries({ queryKey: ["admin", "trips", tripId, "stops"] });
+    } catch {
+      toast.error("Error al reordenar las paradas.");
+    }
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
@@ -173,7 +217,7 @@ export default function TripDetailPage() {
             </DialogTitle>
           </DialogHeader>
 
-          {routeStopsQuery.isLoading && (
+          {tripStopsQuery.isLoading && (
             <div className="space-y-2">
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-full" />
@@ -181,22 +225,62 @@ export default function TripDetailPage() {
             </div>
           )}
 
-          {!routeStopsQuery.isLoading && routeStopsQuery.data?.length === 0 && (
+          {!tripStopsQuery.isLoading && tripStops.length === 0 && (
             <p className="text-sm text-neutral-600">Sin paradas registradas.</p>
           )}
 
-          {!routeStopsQuery.isLoading && routeStopsQuery.data && routeStopsQuery.data.length > 0 && (
-            <ol className="space-y-1 max-h-96 overflow-y-auto">
-              {routeStopsQuery.data.map((stop) => (
+          {!tripStopsQuery.isLoading && tripStops.length > 0 && (
+            <ol className="space-y-1 max-h-80 overflow-y-auto">
+              {[...tripStops].sort((a, b) => a.order - b.order).map((stop, idx, arr) => (
                 <li key={stop.stop_id} className="flex items-center gap-2 text-sm text-neutral-900">
                   <span className="text-neutral-400 w-6 text-right shrink-0">{stop.order + 1}.</span>
                   <span className="flex-1">{stop.name}</span>
                   <Badge className={stop.country === "AR" ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"}>
                     {stop.country}
                   </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={idx === 0}
+                    onClick={() => handleMoveStop(stop.stop_id, "up")}
+                  >
+                    <ChevronUp className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={idx === arr.length - 1}
+                    onClick={() => handleMoveStop(stop.stop_id, "down")}
+                  >
+                    <ChevronDown className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-[#E87B7B]"
+                    onClick={() => handleDeleteStop(stop.stop_id)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
                 </li>
               ))}
             </ol>
+          )}
+
+          {!tripStopsQuery.isLoading && !hasOverrides && (
+            <div className="border-t pt-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleInitializeStops}
+                disabled={initializingStops}
+              >
+                {initializingStops ? "Inicializando..." : "Inicializar desde la ruta"}
+              </Button>
+              <p className="mt-1 text-xs text-neutral-500">
+                Copia las paradas de la ruta para este viaje y permite editarlas de forma independiente.
+              </p>
+            </div>
           )}
 
           <DialogFooter>
