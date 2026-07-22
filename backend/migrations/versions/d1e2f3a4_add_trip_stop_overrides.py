@@ -28,7 +28,35 @@ def upgrade() -> None:
     )
     op.create_index("idx_trip_stop_overrides_trip_id", "trip_stop_overrides", ["trip_id", "order"])
 
+    op.create_index(
+        "idx_bookings_mp_payment_id",
+        "bookings",
+        ["mp_payment_id"],
+        postgresql_where=sa.text("mp_payment_id IS NOT NULL"),
+    )
+    op.create_index(
+        "idx_bookings_pending_reminder",
+        "bookings",
+        ["trip_id"],
+        postgresql_where=sa.text("status = 'confirmed' AND reminder_sent = false"),
+    )
+    op.create_index(
+        "idx_bookings_pending_feedback",
+        "bookings",
+        ["trip_id"],
+        postgresql_where=sa.text("status = 'confirmed' AND feedback_sent = false"),
+    )
+    op.create_index(
+        "idx_routes_destination_stop",
+        "routes",
+        ["destination_stop_id"],
+    )
+
 
 def downgrade() -> None:
-    op.drop_index("idx_trip_stop_overrides_trip_id")
+    op.drop_index("idx_routes_destination_stop", table_name="routes")
+    op.drop_index("idx_bookings_pending_feedback", table_name="bookings")
+    op.drop_index("idx_bookings_pending_reminder", table_name="bookings")
+    op.drop_index("idx_bookings_mp_payment_id", table_name="bookings")
+    op.drop_index("idx_trip_stop_overrides_trip_id", table_name="trip_stop_overrides")
     op.drop_table("trip_stop_overrides")
