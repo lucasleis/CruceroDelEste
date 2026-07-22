@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BlueButton } from "@/components/core/BlueButton";
 
@@ -88,6 +88,11 @@ export function CompraContent({ tripId }: CompraContentProps) {
     .map((s) => s.trim())
     .filter(Boolean);
 
+  const seatIds = (searchParams.get("seat_ids") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   const passengerCountParam = Number(searchParams.get("passengers"));
   const passengerCount =
     Number.isFinite(passengerCountParam) && passengerCountParam > 0
@@ -102,46 +107,8 @@ export function CompraContent({ tripId }: CompraContentProps) {
   );
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  const [seatMap, setSeatMap] = useState<Record<string, string>>({});
-  const [seatsLoading, setSeatsLoading] = useState(true);
-  const [seatsError, setSeatsError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchSeats() {
-      setSeatsLoading(true);
-      setSeatsError(null);
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/trips/${tripId}/seats`);
-        if (!res.ok) throw new Error(`status ${res.status}`);
-        const data: { id: string; seat_number: string }[] = await res.json();
-        if (!cancelled) {
-          const map: Record<string, string> = {};
-          data.forEach((s) => {
-            map[s.seat_number] = s.id;
-          });
-          setSeatMap(map);
-        }
-      } catch (err) {
-        console.error("[CompraContent] seats fetch error:", err);
-        if (!cancelled) {
-          setSeatsError("No pudimos cargar los asientos. Volvé a intentar más tarde.");
-        }
-      } finally {
-        if (!cancelled) {
-          setSeatsLoading(false);
-        }
-      }
-    }
-
-    fetchSeats();
-    return () => {
-      cancelled = true;
-    };
-  }, [tripId]);
 
   function handleFieldChange(
     index: number,
@@ -177,7 +144,6 @@ export function CompraContent({ tripId }: CompraContentProps) {
       return;
     }
 
-    const seatIds = seats.map((seatNumber) => seatMap[seatNumber]);
     if (seatIds.some((id) => !id)) {
       setSubmitError("No pudimos resolver alguno de los asientos seleccionados. Volvé a intentar.");
       return;
@@ -194,7 +160,7 @@ export function CompraContent({ tripId }: CompraContentProps) {
           contact_email: passengers[0].email,
           seat_ids: seatIds,
           passengers: passengers.map((p, index) => ({
-            seat_id: seatMap[seats[index]],
+            seat_id: seatIds[index],
             first_name: p.nombres,
             last_name: p.apellidos,
             dni: p.dni,
@@ -417,7 +383,7 @@ export function CompraContent({ tripId }: CompraContentProps) {
           );
         })}
 
-        {(seatsError || submitError) && (
+        {submitError && (
           <p
             style={{
               fontFamily: "var(--font-body)",
@@ -426,7 +392,7 @@ export function CompraContent({ tripId }: CompraContentProps) {
               margin: 0,
             }}
           >
-            {seatsError || submitError}
+            {submitError}
           </p>
         )}
 
@@ -434,9 +400,9 @@ export function CompraContent({ tripId }: CompraContentProps) {
           variant="blue"
           onClick={handleContinuar}
           arrow
-          disabled={seatsLoading || submitting || !!seatsError}
+          disabled={submitting}
         >
-          {seatsLoading ? "Cargando asientos…" : submitting ? "Procesando…" : "Continuar al pago"}
+          {submitting ? "Procesando…" : "Continuar al pago"}
         </BlueButton>
       </div>
     </div>

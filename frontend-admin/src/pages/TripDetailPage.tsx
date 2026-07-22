@@ -33,6 +33,9 @@ export default function TripDetailPage() {
     queryKey: ["admin", "trips", tripId],
     queryFn: () => getAdminTrip(tripId as string),
     enabled: !!tripId,
+    initialData: () =>
+      queryClient.getQueryData<import("@/types/trips").AdminTripRead[]>(["admin", "trips"])
+        ?.find((t) => t.id === tripId),
   });
 
   const tranchesQuery = useQuery({
@@ -44,6 +47,7 @@ export default function TripDetailPage() {
   const seatLayoutsQuery = useQuery({
     queryKey: ["admin", "seat-layouts"],
     queryFn: getSeatLayouts,
+    staleTime: 5 * 60 * 1000,
   });
 
   const tripStopsQuery = useQuery({

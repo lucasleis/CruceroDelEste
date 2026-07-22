@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { ArrowRight, Clock } from "lucide-react";
 import { SeatTypeBadge } from "@/components/travel/SeatTypeBadge";
 import { AmenityBadge } from "@/components/travel/AmenityBadge";
@@ -38,7 +39,7 @@ function getBorderColor(availableSeats: number): string {
   return "var(--color-accent)";
 }
 
-export function TripCard({
+export const TripCard = memo(function TripCard({
   departureTime,
   departureDate,
   arrivalTime,
@@ -311,4 +312,4 @@ export function TripCard({
       </div>
     </div>
   );
-}
+});
