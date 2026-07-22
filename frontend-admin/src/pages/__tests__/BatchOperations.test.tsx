@@ -282,11 +282,9 @@ describe("TripsPage — eliminación por lote (batch delete)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Eliminar futuros/ }));
     await act(async () => {});
 
-    fireEvent.click(screen.getByRole("button", { name: /^Eliminar$/ }));
-
-    // handleBatchDelete usa Promise.all (microtasks), drenar sin setTimeout
     await act(async () => {
-      for (let i = 0; i < 10; i++) await Promise.resolve();
+      fireEvent.click(screen.getByRole("button", { name: /^Eliminar$/ }));
+      for (let i = 0; i < 20; i++) await Promise.resolve();
     });
 
     expect(deleteTripMock).toHaveBeenCalledTimes(3);
@@ -312,16 +310,21 @@ describe("TripsPage — eliminación por lote (batch delete)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Eliminar futuros/ }));
     await act(async () => {});
 
-    fireEvent.click(screen.getByRole("button", { name: /^Eliminar$/ }));
-
     await act(async () => {
-      for (let i = 0; i < 10; i++) await Promise.resolve();
+      fireEvent.click(screen.getByRole("button", { name: /^Eliminar$/ }));
+      for (let i = 0; i < 20; i++) await Promise.resolve();
     });
 
     expect(deleteTripMock).toHaveBeenCalledTimes(2);
-    // Dialog: 1 eliminado + mensaje de salteados
-    expect(screen.getByText(/Se eliminaron/)).toBeInTheDocument();
-    expect(screen.getByText(/No se pudieron eliminar/)).toBeInTheDocument();
+
+    // Ambas <p> tienen <span> interno → getByText con string/regex falla porque
+    // el texto queda partido entre nodos. Usar matcher de función sobre textContent.
+    expect(
+      screen.getByText((_, el) => el?.tagName === "P" && el.textContent === "Se eliminaron 1 viaje.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText((_, el) => el?.tagName === "P" && (el.textContent ?? "").includes("No se pudieron eliminar 1 viaje por tener reservas confirmadas"))
+    ).toBeInTheDocument();
   });
 
   it("batch_delete_ignora_trips_pasados_y_cancelados", async () => {
@@ -338,10 +341,9 @@ describe("TripsPage — eliminación por lote (batch delete)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Eliminar futuros/ }));
     await act(async () => {});
 
-    fireEvent.click(screen.getByRole("button", { name: /^Eliminar$/ }));
-
     await act(async () => {
-      for (let i = 0; i < 10; i++) await Promise.resolve();
+      fireEvent.click(screen.getByRole("button", { name: /^Eliminar$/ }));
+      for (let i = 0; i < 20; i++) await Promise.resolve();
     });
 
     // Solo el viaje futuro y no cancelado fue procesado
