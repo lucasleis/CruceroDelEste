@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SearchSummaryBar } from "@/components/travel/SearchSummaryBar";
 import { FilterPanel, type FilterState } from "@/components/travel/FilterPanel";
@@ -9,6 +9,14 @@ import { searchTrips } from "@/api";
 import type { TripRead } from "@/types/trips";
 
 type SeatType = "cama" | "semi-cama" | "ejecutivo";
+
+const HARDCODED_AMENITIES: ("wifi" | "ac" | "usb" | "bathroom" | "entertainment")[] = [
+  "wifi",
+  "ac",
+  "usb",
+  "bathroom",
+  "entertainment",
+];
 
 const MONTH_LABELS = [
   "ENE",
@@ -97,13 +105,7 @@ function mapTripToCardProps(trip: TripRead) {
     durationMinutes,
     isDirect: true,
     seatTypes,
-    amenities: ["wifi", "ac", "usb", "bathroom", "entertainment"] as (
-      | "wifi"
-      | "ac"
-      | "usb"
-      | "bathroom"
-      | "entertainment"
-    )[],
+    amenities: HARDCODED_AMENITIES,
     priceFrom: prices.length > 0 ? Math.min(...prices) : null,
     availableSeats: trip.available_seats_count,
   };
@@ -198,7 +200,9 @@ export function ResultadosContent() {
     };
   }, [originStop, originProvince, destinationStop, destinationProvince, date]);
 
-  const filteredTrips = applyFilters(trips, filters);
+  const filteredTrips = useMemo(() => applyFilters(trips, filters), [trips, filters]);
+
+  const cardProps = useMemo(() => filteredTrips.map(mapTripToCardProps), [filteredTrips]);
 
   return (
     <div style={{ background: "var(--color-surface)", minHeight: "100vh" }}>
@@ -275,10 +279,10 @@ export function ResultadosContent() {
 
           {!loading &&
             !error &&
-            filteredTrips.map((trip) => (
+            filteredTrips.map((trip, index) => (
               <TripCard
                 key={trip.id}
-                {...mapTripToCardProps(trip)}
+                {...cardProps[index]}
                 onSelect={() => router.push(`/asientos/${trip.id}?passengers=${passengers}`)}
               />
             ))}
