@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -34,6 +34,12 @@ import { getRoutes } from "@/api/routes";
 import type { AdminTripRead } from "@/types/trips";
 import { STATUS_BADGE, formatDate } from "@/lib/tripUtils";
 import CreateBatchTripsDialog from "./CreateBatchTripsDialog";
+
+type RouteGroup = {
+  routeId: string;
+  routeName: string;
+  trips: AdminTripRead[];
+};
 
 export default function TripsPage() {
   const navigate = useNavigate();
@@ -122,22 +128,34 @@ export default function TripsPage() {
     let deleted = 0;
     const skipped: { tripId: string; departure_at: string }[] = [];
 
-    for (const trip of futureTrips) {
-      try {
-        await deleteTrip(trip.id);
-        deleted++;
-      } catch (error) {
-        const status = (
-          error as { response?: { status?: number; data?: { detail?: string } } }
-        )?.response;
-        if (
-          status?.status === 409 &&
-          (status.data?.detail === "trip_has_confirmed_bookings" ||
-            status.data?.detail === "trip_has_bookings")
-        ) {
-          skipped.push({ tripId: trip.id, departure_at: trip.departure_at });
+    // deleteTrip returns Promise<void> (Axios-based). With .catch(e => e), resolved
+    // value is undefined on success or the AxiosError object on failure — same shape
+    // as the existing { response?: { status?, data? } } cast used elsewhere in this file.
+    const CHUNK_SIZE = 5;
+    for (let i = 0; i < futureTrips.length; i += CHUNK_SIZE) {
+      const chunk = futureTrips.slice(i, i + CHUNK_SIZE);
+      const results = await Promise.all(
+        chunk.map((t) => deleteTrip(t.id).catch((e) => e as unknown))
+      );
+      results.forEach((result, idx) => {
+        if (result === undefined) {
+          deleted++;
+        } else {
+          const errResponse = (
+            result as { response?: { status?: number; data?: { detail?: string } } }
+          )?.response;
+          if (
+            errResponse?.status === 409 &&
+            (errResponse.data?.detail === "trip_has_confirmed_bookings" ||
+              errResponse.data?.detail === "trip_has_bookings")
+          ) {
+            skipped.push({
+              tripId: chunk[idx].id,
+              departure_at: chunk[idx].departure_at,
+            });
+          }
         }
-      }
+      });
     }
 
     queryClient.invalidateQueries({ queryKey: ["admin", "trips"] });
@@ -216,32 +234,28 @@ export default function TripsPage() {
   const routes = routesQuery.data ?? [];
   const isLoading = tripsQuery.isLoading || seatLayoutsQuery.isLoading;
 
-  type RouteGroup = {
-    routeId: string;
-    routeName: string;
-    trips: AdminTripRead[];
-  };
-
-  const routeGroups: RouteGroup[] = Object.values(
-    trips.reduce<Record<string, RouteGroup>>((acc, trip) => {
-      const routeId = trip.route.id;
-      if (!acc[routeId]) {
-        acc[routeId] = {
-          routeId,
-          routeName: `${trip.route.origin_stop.name} → ${trip.route.destination_stop.name}`,
-          trips: [],
-        };
-      }
-      acc[routeId].trips.push(trip);
-      return acc;
-    }, {})
-  );
-
-  routeGroups.forEach((group) => {
-    group.trips.sort(
-      (a, b) => new Date(a.departure_at).getTime() - new Date(b.departure_at).getTime()
+  const routeGroups = useMemo<RouteGroup[]>(() => {
+    const groups = Object.values(
+      trips.reduce<Record<string, RouteGroup>>((acc, trip) => {
+        const routeId = trip.route.id;
+        if (!acc[routeId]) {
+          acc[routeId] = {
+            routeId,
+            routeName: `${trip.route.origin_stop.name} → ${trip.route.destination_stop.name}`,
+            trips: [],
+          };
+        }
+        acc[routeId].trips.push(trip);
+        return acc;
+      }, {})
     );
-  });
+    groups.forEach((group) => {
+      group.trips.sort(
+        (a, b) => new Date(a.departure_at).getTime() - new Date(b.departure_at).getTime()
+      );
+    });
+    return groups;
+  }, [trips]);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
