@@ -79,11 +79,13 @@ export default function TripsPage() {
   const seatLayoutsQuery = useQuery({
     queryKey: ["admin", "seat-layouts"],
     queryFn: getSeatLayouts,
+    staleTime: 5 * 60 * 1000,
   });
 
   const routesQuery = useQuery({
     queryKey: ["admin", "routes"],
     queryFn: getRoutes,
+    staleTime: 5 * 60 * 1000,
   });
 
   async function handleConfirmDelete() {

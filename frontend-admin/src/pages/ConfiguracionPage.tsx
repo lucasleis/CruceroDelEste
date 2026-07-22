@@ -74,6 +74,7 @@ export default function ConfiguracionPage() {
   const routesQuery = useQuery({
     queryKey: ["admin", "routes"],
     queryFn: getRoutes,
+    staleTime: 5 * 60 * 1000,
   });
 
   const routes = routesQuery.data ?? [];
