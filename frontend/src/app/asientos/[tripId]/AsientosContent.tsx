@@ -177,6 +177,7 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
 
     const params = new URLSearchParams();
     params.set("seats", selected.join(","));
+    params.set("seat_ids", selected.map((n) => seatsByNumber.get(n)?.id ?? "").join(","));
     if (passengerCount !== null) {
       params.set("passengers", String(passengerCount));
     }
