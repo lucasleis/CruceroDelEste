@@ -2,7 +2,7 @@ import logging
 from datetime import date, datetime, time, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -162,7 +162,8 @@ async def list_trip_seats(
 
 
 @stops_router.get("", response_model=list[StopRead])
-async def list_stops(db: AsyncSession = Depends(get_db)) -> list[StopRead]:
+async def list_stops(response: Response, db: AsyncSession = Depends(get_db)) -> list[StopRead]:
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
     result = await db.execute(select(Stop).order_by(Stop.name.asc()))
     return [StopRead.model_validate(s) for s in result.scalars().all()]
 
