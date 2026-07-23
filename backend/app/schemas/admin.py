@@ -184,3 +184,26 @@ class AdminBookingRead(BaseModel):
     feedback_sent: bool
     created_at: datetime
     passengers: list[PassengerRead]
+
+
+class AdminBookingListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    trip_id: UUID
+    status: BookingStatusEnum
+    contact_email: str
+    total_amount: int
+    mp_preference_id: str | None
+    mp_payment_id: str | None
+    expires_at: datetime
+    confirmed_at: datetime | None
+    reminder_sent: bool
+    feedback_sent: bool
+    created_at: datetime
+    passenger_count: int
+
+
+class PaginatedBookingsResponse(BaseModel):
+    items: list[AdminBookingListItem]
+    total: int

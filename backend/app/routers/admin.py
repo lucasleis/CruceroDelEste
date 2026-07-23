@@ -3,9 +3,9 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from passlib.context import CryptContext
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,6 +27,7 @@ from app.models.booking import (
     BookingStatusEnum,
     Chargeback,
     ChargebackStatusEnum,
+    Passenger,
     RefundRequest,
 )
 from app.models.trip import PriceTranche, SeatTypeEnum, Trip
@@ -38,6 +39,8 @@ from app.schemas.admin import (
     PriceTrancheCreate,
     PriceTrancheRead,
     AdminBookingRead,
+    AdminBookingListItem,
+    PaginatedBookingsResponse,
     ChargebackRead,
 )
 from app.schemas.bookings import RefundRequestRead
@@ -110,27 +113,47 @@ async def me(_admin: AdminUser = Depends(get_current_admin)) -> AdminMeResponse:
     return AdminMeResponse(id=_admin.id, email=_admin.email)
 
 
-@router.get("/bookings", response_model=list[AdminBookingRead])
+@router.get("/bookings", response_model=PaginatedBookingsResponse)
 async def list_bookings(
     booking_status: BookingStatusEnum | None = None,
     trip_id: UUID | None = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     _admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
-) -> list[AdminBookingRead]:
-    query = (
-        select(Booking)
-        .options(selectinload(Booking.passengers))
-        # MVP: sin paginación, límite defensivo de 500
-        .limit(500)
-        .order_by(Booking.created_at.desc())
-    )
+) -> PaginatedBookingsResponse:
+    filters = []
     if booking_status is not None:
-        query = query.where(Booking.status == booking_status)
+        filters.append(Booking.status == booking_status)
     if trip_id is not None:
-        query = query.where(Booking.trip_id == trip_id)
+        filters.append(Booking.trip_id == trip_id)
 
+    passenger_count_subquery = (
+        select(func.count(Passenger.id))
+        .where(Passenger.booking_id == Booking.id)
+        .correlate(Booking)
+        .scalar_subquery()
+    )
+
+    query = (
+        select(Booking, passenger_count_subquery.label("passenger_count"))
+        .where(*filters)
+        .order_by(Booking.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
     result = await db.execute(query)
-    return list(result.scalars().all())
+    items = [
+        AdminBookingListItem.model_validate(
+            {**booking.__dict__, "passenger_count": passenger_count}
+        )
+        for booking, passenger_count in result.all()
+    ]
+
+    count_query = select(func.count()).select_from(Booking).where(*filters)
+    total = (await db.execute(count_query)).scalar_one()
+
+    return PaginatedBookingsResponse(items=items, total=total)
 
 
 @router.get("/bookings/{booking_id}", response_model=AdminBookingRead)

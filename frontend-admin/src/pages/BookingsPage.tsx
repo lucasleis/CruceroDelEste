@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -14,6 +15,8 @@ import {
 import { getBookings } from "@/api/bookings";
 import type { BookingStatusEnum } from "@/types/trips";
 import { formatDate, BOOKING_STATUS_BADGE } from "@/lib/tripUtils";
+
+const PAGE_SIZE = 50;
 
 const FILTERS: { label: string; value: BookingStatusEnum | "all" }[] = [
   { label: "Todas", value: "all" },
@@ -28,16 +31,21 @@ export default function BookingsPage() {
   const [activeFilter, setActiveFilter] = useState<BookingStatusEnum | "all">(
     "all"
   );
+  const [page, setPage] = useState(0);
 
   const bookingsQuery = useQuery({
-    queryKey: ["admin", "bookings", { status: activeFilter }],
+    queryKey: ["admin", "bookings", { status: activeFilter, page }],
     queryFn: () =>
-      activeFilter === "all"
-        ? getBookings()
-        : getBookings({ booking_status: activeFilter }),
+      getBookings({
+        ...(activeFilter === "all" ? {} : { booking_status: activeFilter }),
+        skip: page * PAGE_SIZE,
+        limit: PAGE_SIZE,
+      }),
   });
 
-  const bookings = bookingsQuery.data ?? [];
+  const bookings = bookingsQuery.data?.items ?? [];
+  const total = bookingsQuery.data?.total ?? 0;
+  const hasNextPage = (page + 1) * PAGE_SIZE < total;
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
@@ -48,7 +56,10 @@ export default function BookingsPage() {
           <button
             key={filter.value}
             type="button"
-            onClick={() => setActiveFilter(filter.value)}
+            onClick={() => {
+              setActiveFilter(filter.value);
+              setPage(0);
+            }}
             className={`rounded-lg px-3 py-1.5 text-sm ${
               activeFilter === filter.value
                 ? "bg-primary-light font-medium text-primary"
@@ -120,7 +131,7 @@ export default function BookingsPage() {
                       {booking.id.slice(0, 8)}
                     </TableCell>
                     <TableCell className="py-3 text-sm text-neutral-900">
-                      {booking.passengers.length} pasajero(s)
+                      {booking.passenger_count} pasajero(s)
                     </TableCell>
                     <TableCell className="py-3 text-sm text-neutral-900">
                       {booking.contact_email}
@@ -139,6 +150,28 @@ export default function BookingsPage() {
               })}
           </TableBody>
         </Table>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between">
+        <p className="text-sm text-neutral-600">{total} reserva(s) en total</p>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 0}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Anterior
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!hasNextPage}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Siguiente
+          </Button>
+        </div>
       </div>
     </div>
   );

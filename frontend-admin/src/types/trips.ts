@@ -116,6 +116,27 @@ export interface AdminBookingRead {
   passengers: PassengerRead[];
 }
 
+export interface AdminBookingListItem {
+  id: string;
+  trip_id: string;
+  status: BookingStatusEnum;
+  contact_email: string;
+  total_amount: number;
+  mp_preference_id: string | null;
+  mp_payment_id: string | null;
+  expires_at: string;
+  confirmed_at: string | null;
+  reminder_sent: boolean;
+  feedback_sent: boolean;
+  created_at: string;
+  passenger_count: number;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+}
+
 export interface RefundRequestRead {
   id: string;
   booking_id: string;

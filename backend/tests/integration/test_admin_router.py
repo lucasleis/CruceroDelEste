@@ -231,7 +231,7 @@ async def test_list_bookings_empty_returns_200(
     resp = await client.get("/admin/bookings", headers=_auth(token))
 
     assert resp.status_code == 200
-    assert resp.json() == []
+    assert resp.json() == {"items": [], "total": 0}
 
 
 async def test_list_bookings_returns_correct_shape(
@@ -246,9 +246,10 @@ async def test_list_bookings_returns_correct_shape(
 
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 1
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
 
-    b = data[0]
+    b = data["items"][0]
     assert b["id"] == str(booking.id)
     assert b["trip_id"] == str(trip.id)
     assert b["status"] == "pending_payment"
@@ -261,11 +262,8 @@ async def test_list_bookings_returns_correct_shape(
     assert b["feedback_sent"] is False
     assert "expires_at" in b
     assert "created_at" in b
-
-    assert len(b["passengers"]) == 1
-    pax = b["passengers"][0]
-    assert pax["first_name"] == "Ana"
-    assert pax["email"] == "ana@example.com"
+    assert b["passenger_count"] == 1
+    assert "passengers" not in b
 
 
 async def test_list_bookings_no_auth_returns_401(client: AsyncClient):
@@ -322,8 +320,9 @@ async def test_list_bookings_filter_by_status(
 
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 1
-    assert data[0]["status"] == "confirmed"
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
+    assert data["items"][0]["status"] == "confirmed"
 
 
 async def test_list_bookings_filter_by_trip_id(
@@ -363,8 +362,107 @@ async def test_list_bookings_filter_by_trip_id(
 
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 1
-    assert data[0]["trip_id"] == str(trip_a.id)
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
+    assert data["items"][0]["trip_id"] == str(trip_a.id)
+
+
+async def test_list_bookings_pagination_limits_results(
+    client: AsyncClient, db: AsyncSession
+):
+    await _make_admin(db)
+    trip = await _make_trip(db)
+    now = datetime.now(timezone.utc)
+    for i in range(3):
+        seat = Seat(
+            trip_id=trip.id,
+            seat_number=f"{i}A",
+            seat_type=SeatTypeEnum.cama,
+            status=SeatStatusEnum.reserved,
+        )
+        db.add(seat)
+        await db.flush()
+        booking = Booking(
+            trip_id=trip.id,
+            status=BookingStatusEnum.pending_payment,
+            contact_email="buyer@example.com",
+            total_amount=24500,
+            expires_at=now + timedelta(minutes=15),
+        )
+        db.add(booking)
+        await db.flush()
+        db.add(Passenger(
+            booking_id=booking.id,
+            seat_id=seat.id,
+            first_name="Ana",
+            last_name="García",
+            dni="12345678",
+            email="ana@example.com",
+        ))
+        await db.flush()
+    token = await _login(client, "admin@test.com", "secret")
+
+    resp = await client.get(
+        "/admin/bookings",
+        headers=_auth(token),
+        params={"limit": 2},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 3
+    assert len(data["items"]) == 2
+
+
+async def test_list_bookings_pagination_skip_offsets_results(
+    client: AsyncClient, db: AsyncSession
+):
+    await _make_admin(db)
+    trip = await _make_trip(db)
+    now = datetime.now(timezone.utc)
+    bookings = []
+    for i in range(3):
+        seat = Seat(
+            trip_id=trip.id,
+            seat_number=f"{i}A",
+            seat_type=SeatTypeEnum.cama,
+            status=SeatStatusEnum.reserved,
+        )
+        db.add(seat)
+        await db.flush()
+        booking = Booking(
+            trip_id=trip.id,
+            status=BookingStatusEnum.pending_payment,
+            contact_email="buyer@example.com",
+            total_amount=24500,
+            expires_at=now + timedelta(minutes=15),
+        )
+        db.add(booking)
+        await db.flush()
+        db.add(Passenger(
+            booking_id=booking.id,
+            seat_id=seat.id,
+            first_name="Ana",
+            last_name="García",
+            dni="12345678",
+            email="ana@example.com",
+        ))
+        await db.flush()
+        bookings.append(booking)
+    token = await _login(client, "admin@test.com", "secret")
+
+    resp = await client.get(
+        "/admin/bookings",
+        headers=_auth(token),
+        params={"skip": 2, "limit": 2},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 3
+    assert len(data["items"]) == 1
+    returned_ids = {item["id"] for item in data["items"]}
+    assert returned_ids == {str(bookings[0].id)}
 
 
 # ---------------------------------------------------------------------------
