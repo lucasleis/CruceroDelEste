@@ -1,19 +1,27 @@
-import { HeroNosotros } from "@/components/sections/nosotros/HeroNosotros"
-import { PionerosSection } from "@/components/sections/nosotros/PionerosSection"
-import { ValoresSection } from "@/components/sections/nosotros/ValoresSection"
-import { FlotaSection } from "@/components/sections/nosotros/FlotaSection"
-import { RutasSection } from "@/components/sections/nosotros/RutasSection"
-import { EstadisticasSection } from "@/components/sections/nosotros/EstadisticasSection"
+import { Navbar } from "@/components/navigation/Navbar"
+import { Footer } from "@/components/sections/Footer"
+import HeroSection from "@/components/sections/nosotros/HeroSection"
+import LegadoSection from "@/components/sections/nosotros/LegadoSection"
+import ConfortSection from "@/components/sections/nosotros/ConfortSection"
+import HistoriaSection from "@/components/sections/nosotros/HistoriaSection"
+import ValoresSection from "@/components/sections/nosotros/ValoresSection"
+import RedDestinosSection from "@/components/sections/nosotros/RedDestinosSection"
+import ServiciosSection from "@/components/sections/nosotros/ServiciosSection"
+import CtaFinalSection from "@/components/sections/nosotros/CtaFinalSection"
 
 export default function NosotrosPage() {
   return (
     <>
-      <HeroNosotros />
-      <PionerosSection />
+      <Navbar />
+      <HeroSection />
+      <LegadoSection />
+      <ConfortSection />
+      <HistoriaSection />
       <ValoresSection />
-      <FlotaSection />
-      <RutasSection />
-      <EstadisticasSection />
+      <RedDestinosSection />
+      <ServiciosSection />
+      <CtaFinalSection />
+      <Footer />
     </>
   )
 }
