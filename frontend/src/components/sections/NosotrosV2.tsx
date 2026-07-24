@@ -47,23 +47,27 @@ export function NosotrosV2() {
             imageAlt="Nuestra empresa"
             title="Nuestra empresa"
             description="Más de 60 años conectando Argentina y Paraguay con seguridad, experiencia y servicio de calidad."
+            href="/nosotros"
           />
           <NosotrosCardV2
             imageSrc="/assets/nosotros/destinos.jpg"
             imageAlt="Nuestros destinos"
             title="Nuestros destinos"
             description="Una extensa red de rutas que une ciudades y personas en Argentina y Paraguay con frecuencias diarias."
+            href="/destinos"
           />
           <NosotrosCardV2
             imageSrc="/assets/nosotros/equipo.jpg"
             imageAlt="Nuestro equipo"
             title="Nuestro equipo"
             description="Profesionales comprometidos que trabajan cada día para brindar un viaje seguro, cómodo y puntual."
+            href="/nosotros#contacto"
           />
           <NosotrosCardV2
             imageSrc="/assets/nosotros/compromiso.jpg"
             imageAlt="Nuestro compromiso"
             title="Nuestro compromiso"
+            href="/nosotros"
             description={
               <>
                 Ponemos a las personas en el centro de todo lo que hacemos, cuidando <strong>cada detalle</strong> para
