@@ -39,6 +39,7 @@ const LINK_HREFS: Record<string, string> = {
   "Preguntas frecuentes": "/preguntas-frecuentes",
   "Botón de arrepentimiento": "/arrepentimiento",
   "Servicios": "/nosotros#servicios",
+  "Contacto": "/nosotros#contacto",
 }
 
 const WhatsAppIcon = () => (

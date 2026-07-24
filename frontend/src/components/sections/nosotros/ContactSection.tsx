@@ -24,7 +24,7 @@ const channels = [
 
 export default function ContactSection() {
   return (
-    <section className="py-20">
+    <section id="contacto" className="py-20">
       <div className="max-w-[1280px] mx-auto px-10">
         <h2 className="font-serif text-2xl font-semibold text-black border-l-4 border-[#e3000f] pl-4 mb-12">
           Contactanos

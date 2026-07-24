@@ -1,6 +1,6 @@
 export default function HeroSection() {
   return (
-    <section className="relative flex items-center justify-center py-20 px-6 min-h-[600px] overflow-hidden">
+    <section className="relative flex items-center justify-center py-20 px-6 min-h-[700px] overflow-hidden">
       <div className="absolute inset-0 z-0">
         <img
           alt="Background bus"
