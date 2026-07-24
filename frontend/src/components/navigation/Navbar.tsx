@@ -11,7 +11,7 @@ interface NavbarProps {
 }
 
 const NAV_LINKS = [
-  { label: "Destinos", href: "/#destinos" },
+  { label: "Destinos", href: "/destinos" },
   { label: "Estado del viaje", href: "/estado-viaje" },
   { label: "Mis reservas", href: "/mis-reservas" },
   { label: "Preguntas frecuentes", href: "/preguntas-frecuentes" },

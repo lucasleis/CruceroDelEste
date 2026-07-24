@@ -1,3 +1,6 @@
+"use client"
+
+import { useRouter } from "next/navigation"
 import { Heading } from "@/components/core/Heading"
 import { Subheading } from "@/components/core/Subheading"
 import { BodyText } from "@/components/core/BodyText"
@@ -16,6 +19,8 @@ const CARDS = [
 ]
 
 export function Destinos() {
+  const router = useRouter()
+
   return (
     <section style={{ width: "100%", background: "white", paddingTop: "64px", paddingBottom: "64px", paddingLeft: "32px", paddingRight: "32px" }}>
       <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
@@ -63,7 +68,7 @@ export function Destinos() {
             <BodyText color="body" size="sm">Explorá más destinos y encontrá tu próximo viaje.</BodyText>
           </div>
 
-          <BlueButton variant="navy" arrow={true}>Ver todos los destinos</BlueButton>
+          <BlueButton variant="navy" arrow={true} onClick={() => router.push("/destinos")}>Ver todos los destinos</BlueButton>
         </div>
 
       </div>
