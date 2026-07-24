@@ -20,20 +20,25 @@ const InstagramIcon = () => (
 const COLUMNS = [
   {
     label: "PÁGINAS",
-    links: ["Inicio", "Destinos", "Horarios", "Novedades", "Contacto"],
+    links: ["Inicio", "Destinos", "Contacto"],
   },
   {
     label: "EMPRESA",
-    links: ["Nosotros", "Flota", "Servicios", "Trabajá con nosotros"],
+    links: ["Nosotros", "Servicios"],
   },
   {
     label: "INFORMACIÓN",
-    links: ["Tarifas", "Preguntas frecuentes", "Términos y condiciones", "Política de privacidad", "Botón de arrepentimiento"],
+    links: ["Preguntas frecuentes", "Términos y condiciones", "Política de privacidad", "Botón de arrepentimiento"],
   },
 ]
 
 const LINK_HREFS: Record<string, string> = {
+  "Inicio": "/",
+  "Destinos": "/destinos",
+  "Nosotros": "/nosotros",
+  "Preguntas frecuentes": "/preguntas-frecuentes",
   "Botón de arrepentimiento": "/arrepentimiento",
+  "Servicios": "/nosotros#servicios",
 }
 
 const WhatsAppIcon = () => (

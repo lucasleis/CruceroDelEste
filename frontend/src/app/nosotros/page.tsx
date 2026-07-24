@@ -7,6 +7,7 @@ import HistoriaSection from "@/components/sections/nosotros/HistoriaSection"
 import ValoresSection from "@/components/sections/nosotros/ValoresSection"
 import RedDestinosSection from "@/components/sections/nosotros/RedDestinosSection"
 import ServiciosSection from "@/components/sections/nosotros/ServiciosSection"
+import ContactSection from "@/components/sections/nosotros/ContactSection"
 import CtaFinalSection from "@/components/sections/nosotros/CtaFinalSection"
 
 export default function NosotrosPage() {
@@ -20,6 +21,7 @@ export default function NosotrosPage() {
       <ValoresSection />
       <RedDestinosSection />
       <ServiciosSection />
+      <ContactSection />
       <CtaFinalSection />
       <Footer />
     </>

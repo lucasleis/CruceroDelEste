@@ -7,9 +7,8 @@
 ## Stack
 
 - Next.js App Router, TypeScript
-- Sin Tailwind. Sin módulos CSS. Sin clases externas.
-- Estilos: inline styles únicamente + CSS custom properties de src/styles/tokens.css
-- Cero hex hardcodeados — solo var(--color-*), var(--font-*), var(--shadow-*), var(--radius-*), var(--duration-*)
+- Tailwind v4 instalado y en uso en todo el proyecto — usar clases de utilidad de Tailwind
+- Estilos: Tailwind + CSS custom properties de src/styles/tokens.css donde aplique
 - Cero npm packages nuevos sin aprobación explícita de Lucas
 - shadcn/ui está instalado pero se reserva para frontend-admin. NUNCA usarlo en el frontend público.
 

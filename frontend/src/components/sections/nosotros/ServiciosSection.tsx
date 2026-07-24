@@ -1,6 +1,6 @@
 export default function ServiciosSection() {
   return (
-    <section className="py-20 bg-[#f9f9f9]">
+    <section id="servicios" className="py-20 bg-[#f9f9f9]">
       <div className="max-w-[1280px] mx-auto px-10">
         <h2 className="font-serif text-2xl leading-8 font-semibold text-[#1a1c1c] mb-12 border-l-4 border-[#e3000f] pl-4">
           Nuestros servicios, tu comodidad
