@@ -17,6 +17,14 @@ const NAV_LINKS = [
   { label: "Preguntas frecuentes", href: "/preguntas-frecuentes" },
 ];
 
+const HamburgerIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+  </svg>
+)
+
 export function Navbar({ transparent = true, static: isStatic = false }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -37,46 +45,31 @@ export function Navbar({ transparent = true, static: isStatic = false }: NavbarP
 
   return (
     <nav
-      style={{
-        position: isStatic ? "relative" : "fixed",
-        top: isStatic ? undefined : "16px",
-        left: isStatic ? undefined : "50%",
-        transform: isStatic ? undefined : "translateX(-50%)",
-        width: "90%",
-        maxWidth: "1280px",
-        zIndex: 50,
-        height: "clamp(52px, 6vw, 72px)",
-        padding: "0 clamp(16px, 3vw, 40px)",
-        borderRadius: "var(--radius-md)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        background,
-        backdropFilter,
-        WebkitBackdropFilter: backdropFilter,
-      }}
+      className={`site-navbar${isStatic ? " site-navbar-static" : ""}`}
+      style={{ background, backdropFilter, WebkitBackdropFilter: backdropFilter }}
     >
+      {/* Logo — siempre visible */}
       <Link href="/" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
         <Image
           src="/assets/logo-rioparana.png"
           alt="Expreso Río Paraná"
           height={40}
           width={160}
-          style={{ width: "auto", height: "clamp(28px, 3vw, 40px)" }}
+          className="navbar-logo"
           priority
         />
       </Link>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "clamp(16px, 2.5vw, 40px)" }}>
+      {/* Nav links — solo desktop */}
+      <div className="navbar-links">
         {NAV_LINKS.map((link) => (
           <Link
             key={link.label}
             href={link.href}
             style={{
               fontFamily: "var(--font-body)",
-              fontSize: "clamp(12px, 1.2vw, 15px)",
               fontWeight: 500,
-              color: "#000000",
+              color: "var(--color-white)",
               textDecoration: "none",
             }}
             className="navbar-link"
@@ -86,16 +79,17 @@ export function Navbar({ transparent = true, static: isStatic = false }: NavbarP
         ))}
       </div>
 
-      <BlueButton variant="blue" onClick={handleCTAClick}>
-        Comprar pasajes
-      </BlueButton>
+      {/* Right side — CTA + hamburger */}
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <BlueButton variant="blue" onClick={handleCTAClick} className="navbar-cta">
+          Comprar pasajes
+        </BlueButton>
 
-      <style>{`
-        .navbar-link:hover {
-          text-decoration: underline;
-          text-underline-offset: 4px;
-        }
-      `}</style>
+        <button className="navbar-hamburger">
+          <HamburgerIcon />
+        </button>
+      </div>
+
     </nav>
   );
 }

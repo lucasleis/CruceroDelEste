@@ -36,11 +36,7 @@ export function NosotrosV2() {
         </div>
 
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: "32px",
-          }}
+          className="nosotros-grid"
         >
           <NosotrosCardV2
             imageSrc="/assets/nosotros/empresa.jpg"

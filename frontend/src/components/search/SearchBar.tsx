@@ -64,6 +64,19 @@ export function SearchBar({ onSearch }: SearchBarProps) {
   const [departureDateError, setDepartureDateError] = useState(false)
   const [returnDateError, setReturnDateError] = useState(false)
 
+  const [isMobile, setIsMobile] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    function handleResize() {
+      setIsMobile(window.innerWidth <= 960)
+    }
+    handleResize()
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
+
   useEffect(() => {
     let cancelled = false
 
@@ -164,6 +177,126 @@ export function SearchBar({ onSearch }: SearchBarProps) {
       returnDate,
       passengers,
     })
+  }
+
+  if (mounted && isMobile) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", width: "100%", padding: "0 16px", boxSizing: "border-box" }}>
+        <div style={{
+          width: "100%",
+          maxWidth: "480px",
+          background: "white",
+          borderRadius: "var(--radius-lg)",
+          boxShadow: "var(--shadow-md)",
+          padding: "8px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0px",
+        }}>
+          {/* TripTypeSelector — ancho completo */}
+          <div style={{ padding: "4px" }}>
+            <div style={{ width: "100%" }}>
+              <TripTypeSelector value={tripType} onChange={handleTripTypeChange} />
+            </div>
+          </div>
+
+          {/* Origen */}
+          <div style={{ borderTop: "1px solid var(--color-border)", padding: "12px 16px", position: "relative" }}>
+            <CityInput
+              label="Origen"
+              value={origin}
+              onChange={handleOriginChange}
+              icon="pin"
+              stops={stops}
+              loadingStops={loadingStops}
+              errorStops={errorStops}
+              onStopSelected={handleOriginStopSelected}
+              onProvinceSelected={handleOriginProvinceSelected}
+            />
+            {originError && (
+              <span style={{ display: "block", fontSize: "0.7rem", color: "#e53e3e", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+                Seleccioná un origen
+              </span>
+            )}
+          </div>
+
+          {/* Destino */}
+          <div style={{ borderTop: "1px solid var(--color-border)", padding: "12px 16px", position: "relative" }}>
+            <CityInput
+              label="Destino"
+              value={destination}
+              onChange={(value) => { setDestination(value); if (value !== "") setDestinationError(false) }}
+              icon="pin-filled"
+              stops={stops}
+              loadingStops={loadingStops}
+              errorStops={errorStops}
+              allowedStopIds={allowedDestinationIds}
+            />
+            {destinationError && (
+              <span style={{ display: "block", fontSize: "0.7rem", color: "#e53e3e", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+                Seleccioná un destino
+              </span>
+            )}
+            {destinationFetchError && (
+              <span style={{ display: "block", fontSize: "0.7rem", color: "var(--color-accent)", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+                {destinationFetchError}
+              </span>
+            )}
+          </div>
+
+          {/* Fechas — dos columnas */}
+          <div style={{ borderTop: "1px solid var(--color-border)", padding: "12px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <div style={{ position: "relative" }}>
+              <DateInput
+                label="Fecha de ida"
+                value={departureDate}
+                onChange={(date) => { setDepartureDate(date); if (date) setDepartureDateError(false) }}
+                mode={tripType}
+              />
+              {departureDateError && (
+                <span style={{ display: "block", fontSize: "0.7rem", color: "#e53e3e", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+                  Seleccioná una fecha
+                </span>
+              )}
+            </div>
+            {tripType === "round-trip" && (
+              <div style={{ position: "relative" }}>
+                <DateInput
+                  label="Fecha de vuelta"
+                  value={returnDate}
+                  onChange={(date) => { setReturnDate(date); if (date) setReturnDateError(false) }}
+                  mode={tripType}
+                  minDate={departureDate}
+                  defaultMonth={departureDate}
+                />
+                {returnDateError && (
+                  <span style={{ display: "block", fontSize: "0.7rem", color: "#e53e3e", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+                    Seleccioná una fecha
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Pasajeros */}
+          <div style={{ borderTop: "1px solid var(--color-border)", padding: "12px 16px" }}>
+            <PassengerSelector value={passengers} onChange={setPassengers} />
+          </div>
+
+          {/* Botón Buscar — ancho completo */}
+          <div style={{ borderTop: "1px solid var(--color-border)", padding: "8px 4px 4px 4px" }}>
+            <BlueButton
+              variant="navy"
+              leftIcon={<SearchIcon />}
+              style={{ width: "100%", fontSize: "15px", padding: "14px 20px", borderRadius: "var(--radius-md)" }}
+              onClick={handleSearchClick}
+            >
+              Buscar
+            </BlueButton>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -26,8 +26,8 @@ export function NosotrosCardV2({ imageSrc, imageAlt, title, description, href }:
       style={{
         overflow: "hidden",
         borderRadius: "50%",
-        width: "200px",
-        height: "200px",
+        width: "min(200px, 60vw)",
+        height: "min(200px, 60vw)",
         margin: "0 auto",
       }}
     >
@@ -42,7 +42,6 @@ export function NosotrosCardV2({ imageSrc, imageAlt, title, description, href }:
           transition: "transform 0.3s ease",
           transform: href && isHovered ? "scale(1.08)" : undefined,
         }}
-        {...hoverHandlers}
       />
     </div>
   )
@@ -53,12 +52,11 @@ export function NosotrosCardV2({ imageSrc, imageAlt, title, description, href }:
         fontFamily: "var(--font-display)",
         fontWeight: 700,
         fontSize: "1.15rem",
-        color: href && isHovered ? "#e3000f" : "var(--color-primary)",
+        color: href && isHovered ? "var(--color-accent)" : "var(--color-primary)",
         borderBottom: "2px solid var(--color-primary)",
         paddingBottom: "4px",
         display: "inline-block",
       }}
-      {...hoverHandlers}
     >
       {title}
     </span>
@@ -73,6 +71,7 @@ export function NosotrosCardV2({ imageSrc, imageAlt, title, description, href }:
         textAlign: "center",
         gap: "20px",
       }}
+      {...hoverHandlers}
     >
       {href ? (
         <Link href={href} style={{ textDecoration: "none" }}>

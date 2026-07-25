@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Heading } from "@/components/core/Heading"
@@ -23,6 +24,19 @@ const ClockIcon = () => (
 
 export function Hero() {
   const router = useRouter()
+
+  const [isMobile, setIsMobile] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    function handleResize() {
+      setIsMobile(window.innerWidth <= 960)
+    }
+    handleResize()
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
 
   function handleSearch(value: {
     originStop?: string
@@ -52,7 +66,7 @@ export function Hero() {
 
   return (
     <section style={{ width: "100%", minHeight: "80vh", position: "relative" }}>
-      {/* Background image */}
+      {/* Background image — siempre */}
       <Image
         src="/secciones/Hero.png"
         alt=""
@@ -61,7 +75,7 @@ export function Hero() {
         style={{ objectFit: "cover", objectPosition: "center", zIndex: 0 }}
       />
 
-      {/* Overlay */}
+      {/* Overlay — siempre */}
       <div
         style={{
           position: "absolute",
@@ -71,72 +85,129 @@ export function Hero() {
         }}
       />
 
-      {/* Navbar */}
+      {/* Navbar — siempre */}
       <div style={{ position: "relative", zIndex: 20 }}>
         <Navbar />
       </div>
 
-      {/* Content */}
-      <div
-        style={{
-          position: "absolute",
+      {mounted && isMobile ? (
+        /* Layout mobile — stack vertical */
+        <div style={{
+          position: "relative",
           zIndex: 10,
-          left: "8%",
-          top: "50%",
-          transform: "translateY(-50%)",
           display: "flex",
           flexDirection: "column",
-          gap: "16px",
-          maxWidth: "520px",
-        }}
-      >
-        <p style={{
-          fontFamily: "var(--font-body)",
-          fontSize: "0.85rem",
-          fontWeight: 600,
-          color: "white",
-          margin: 0,
-          letterSpacing: "0.03em",
-          display: "flex",
-          alignItems: "center",
-          gap: "6px",
+          gap: "24px",
+          padding: "24px 0 40px 0",
         }}>
-          Conectamos Argentina
-          <img src="/assets/flags/ar.svg" alt="Argentina" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
-          y Paraguay
-          <img src="/assets/flags/py.svg" alt="Paraguay" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
-        </p>
+          {/* Texto */}
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            padding: "0 24px",
+          }}>
+            <p style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              color: "white",
+              margin: 0,
+              letterSpacing: "0.03em",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}>
+              Conectamos Argentina
+              <img src="/assets/flags/ar.svg" alt="Argentina" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
+              y Paraguay
+              <img src="/assets/flags/py.svg" alt="Paraguay" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
+            </p>
 
-        <Heading as="h1" size="xl" color="white">
-          Pasajes baratos, comprá y viajá más.
-        </Heading>
+            <Heading as="h1" size="xl" color="white">
+              Pasajes baratos, comprá y viajá más.
+            </Heading>
 
-        <Subheading color="white" size="md">
-          Cada día, miles de personas viajan con nosotros.
-        </Subheading>
+            <Subheading color="white" size="md">
+              Cada día, miles de personas viajan con nosotros.
+            </Subheading>
 
-        <FeatureItem color="white" icon={<ShieldIcon />}>
-          Compra 100% segura
-        </FeatureItem>
+            <FeatureItem color="white" icon={<ShieldIcon />}>
+              Compra 100% segura
+            </FeatureItem>
 
-        <FeatureItem color="white" icon={<ClockIcon />}>
-          Más de 60 años conectando destinos
-        </FeatureItem>
-      </div>
+            <FeatureItem color="white" icon={<ClockIcon />}>
+              Más de 60 años conectando destinos
+            </FeatureItem>
+          </div>
 
-      {/* SearchBar */}
-      <div
-        id="buscar"
-        style={{
-          position: "absolute",
-          bottom: "32px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 20,
-        }}
-      >
-        <SearchBar onSearch={handleSearch} />
-      </div>
+          {/* SearchBar */}
+          <SearchBar onSearch={handleSearch} />
+        </div>
+      ) : (
+        /* Layout desktop — sin cambios */
+        <>
+          <div
+            style={{
+              position: "absolute",
+              zIndex: 10,
+              left: "8%",
+              top: "50%",
+              transform: "translateY(-50%)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+              maxWidth: "520px",
+            }}
+          >
+            <p style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              color: "white",
+              margin: 0,
+              letterSpacing: "0.03em",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}>
+              Conectamos Argentina
+              <img src="/assets/flags/ar.svg" alt="Argentina" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
+              y Paraguay
+              <img src="/assets/flags/py.svg" alt="Paraguay" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
+            </p>
+
+            <Heading as="h1" size="xl" color="white">
+              Pasajes baratos, comprá y viajá más.
+            </Heading>
+
+            <Subheading color="white" size="md">
+              Cada día, miles de personas viajan con nosotros.
+            </Subheading>
+
+            <FeatureItem color="white" icon={<ShieldIcon />}>
+              Compra 100% segura
+            </FeatureItem>
+
+            <FeatureItem color="white" icon={<ClockIcon />}>
+              Más de 60 años conectando destinos
+            </FeatureItem>
+          </div>
+
+          <div
+            id="buscar"
+            style={{
+              position: "absolute",
+              bottom: "32px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 20,
+            }}
+          >
+            <SearchBar onSearch={handleSearch} />
+          </div>
+        </>
+      )}
     </section>
   )
 }
