@@ -65,14 +65,14 @@ export function Hero() {
   }
 
   return (
-    <section style={{ width: "100%", minHeight: "80vh", position: "relative" }}>
+    <section style={{ width: "100%", minHeight: mounted && isMobile ? "100svh" : "80vh", position: "relative" }}>
       {/* Background image — siempre */}
       <Image
-        src="/secciones/Hero.png"
+        src={mounted && isMobile ? "/secciones/Hero-mobile.png" : "/secciones/Hero.png"}
         alt=""
         fill
         priority
-        style={{ objectFit: "cover", objectPosition: "center", zIndex: 0 }}
+        style={{ objectFit: "cover", objectPosition: mounted && isMobile ? "center 60%" : "center", zIndex: 0 }}
       />
 
       {/* Overlay — siempre */}
@@ -97,52 +97,43 @@ export function Hero() {
           zIndex: 10,
           display: "flex",
           flexDirection: "column",
-          gap: "24px",
-          padding: "24px 0 40px 0",
+          padding: "80px 24px 48px 24px",
+          gap: "12px",
+          minHeight: "75vh",
+          justifyContent: "flex-start",
         }}>
-          {/* Texto */}
-          <div style={{
+          <p style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            color: "white",
+            margin: 0,
+            letterSpacing: "0.03em",
             display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-            padding: "0 24px",
+            alignItems: "center",
+            gap: "6px",
           }}>
-            <p style={{
-              fontFamily: "var(--font-body)",
-              fontSize: "0.85rem",
-              fontWeight: 600,
-              color: "white",
-              margin: 0,
-              letterSpacing: "0.03em",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}>
-              Conectamos Argentina
-              <img src="/assets/flags/ar.svg" alt="Argentina" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
-              y Paraguay
-              <img src="/assets/flags/py.svg" alt="Paraguay" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
-            </p>
+            Conectamos Argentina
+            <img src="/assets/flags/ar.svg" alt="Argentina" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
+            y Paraguay
+            <img src="/assets/flags/py.svg" alt="Paraguay" style={{ width: "20px", height: "14px", borderRadius: "2px", objectFit: "cover" }} />
+          </p>
 
-            <Heading as="h1" size="xl" color="white">
-              Pasajes baratos, comprá y viajá más.
-            </Heading>
+          <Heading as="h1" size="xl" color="white">
+            Pasajes baratos, comprá y viajá más.
+          </Heading>
 
-            <Subheading color="white" size="md">
-              Cada día, miles de personas viajan con nosotros.
-            </Subheading>
+          <Subheading color="white" size="md">
+            Cada día, miles de personas viajan con nosotros.
+          </Subheading>
 
-            <FeatureItem color="white" icon={<ShieldIcon />}>
-              Compra 100% segura
-            </FeatureItem>
+          <FeatureItem color="white" icon={<ShieldIcon />}>
+            Compra 100% segura
+          </FeatureItem>
 
-            <FeatureItem color="white" icon={<ClockIcon />}>
-              Más de 60 años conectando destinos
-            </FeatureItem>
-          </div>
-
-          {/* SearchBar */}
-          <SearchBar onSearch={handleSearch} />
+          <FeatureItem color="white" icon={<ClockIcon />}>
+            Más de 60 años conectando destinos
+          </FeatureItem>
         </div>
       ) : (
         /* Layout desktop — sin cambios */

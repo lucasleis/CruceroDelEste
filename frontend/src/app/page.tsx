@@ -1,4 +1,5 @@
 import { Hero } from "@/components/sections/Hero"
+import { SearchBarMobileWrapper } from "@/components/search/SearchBarMobileWrapper"
 import { Destinos } from "@/components/sections/Destinos"
 import { Beneficios } from "@/components/sections/Beneficios"
 import { NosotrosV2 } from "@/components/sections/NosotrosV2"
@@ -10,6 +11,7 @@ export default function Home() {
   return (
     <main>
       <Hero />
+      <SearchBarMobileWrapper />
       <Destinos />
       <Beneficios />
       <NosotrosV2 />

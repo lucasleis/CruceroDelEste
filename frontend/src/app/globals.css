@@ -308,3 +308,9 @@ button.flex.h-10.items-center.justify-between {
     padding: 8px 12px !important;
   }
 }
+
+@media (max-width: 960px) {
+  .hero-section {
+    min-height: 100svh;
+  }
+}
