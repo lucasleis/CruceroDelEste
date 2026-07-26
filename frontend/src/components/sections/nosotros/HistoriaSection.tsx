@@ -53,25 +53,25 @@ export default function HistoriaSection() {
   }, []);
 
   return (
-    <section className="py-32 bg-white">
-      <div className="max-w-[1280px] mx-auto px-10">
-        <div className="grid grid-cols-12 gap-16 items-start">
-          <div className="col-span-5 space-y-12 sticky top-32">
-            <h2 className="font-serif text-5xl text-[#132691]">
+    <section className="py-16 md:py-32 bg-white">
+      <div className="max-w-[1280px] mx-auto px-6 md:px-10">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-16 items-start">
+          <div className="md:col-span-5 space-y-6 md:space-y-12 md:sticky md:top-32">
+            <h2 className="font-serif text-3xl md:text-5xl text-[#132691]">
               Cuatro Décadas de Trayectoria
             </h2>
-            <p className="text-[#454653] text-xl leading-relaxed">
+            <p className="text-[#454653] text-base md:text-xl leading-relaxed">
               Lo que comenzó como una visión familiar en las orillas del Paraná, se ha transformado en el estándar de oro del transporte terrestre argentino.
             </p>
             <div className="grid grid-cols-2 gap-8 pt-8 border-t border-[#132691]/10">
               <div>
-                <div className="text-6xl font-bold text-[#132691] mb-2">50+</div>
+                <div className="text-4xl md:text-6xl font-bold text-[#132691] mb-2">50+</div>
                 <div className="text-[13px] tracking-[0.2em] font-semibold uppercase text-[#e3000f]">
                   Años de Servicio
                 </div>
               </div>
               <div>
-                <div className="text-6xl font-bold text-[#132691] mb-2">1M+</div>
+                <div className="text-4xl md:text-6xl font-bold text-[#132691] mb-2">1M+</div>
                 <div className="text-[13px] tracking-[0.2em] font-semibold uppercase text-[#e3000f]">
                   Pasajeros/Año
                 </div>
@@ -79,7 +79,7 @@ export default function HistoriaSection() {
             </div>
           </div>
 
-          <div className="col-span-7 space-y-24 pl-16 border-l border-[#132691]/20">
+          <div className="md:col-span-7 space-y-12 md:space-y-24 pl-8 md:pl-16 border-l border-[#132691]/20">
             {TIMELINE.map((item, index) => (
               <div className="relative" key={item.year}>
                 <div
@@ -91,8 +91,8 @@ export default function HistoriaSection() {
                 <span className="text-[13px] tracking-[0.2em] font-semibold text-[#e3000f] mb-2 block">
                   {item.year}
                 </span>
-                <h3 className="font-serif text-3xl mb-4 text-[#1a1c1c]">{item.title}</h3>
-                <p className="text-[#454653] text-lg">{item.text}</p>
+                <h3 className="font-serif text-xl md:text-3xl mb-3 md:mb-4 text-[#1a1c1c]">{item.title}</h3>
+                <p className="text-[#454653] text-sm md:text-lg">{item.text}</p>
               </div>
             ))}
           </div>

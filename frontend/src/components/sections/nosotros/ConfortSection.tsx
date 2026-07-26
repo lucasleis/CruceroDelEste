@@ -1,7 +1,7 @@
 export default function ConfortSection() {
   return (
-    <section className="py-20 bg-white">
-      <div className="max-w-[1280px] mx-auto px-10 grid grid-cols-2 gap-16 items-center">
+    <section className="py-10 md:py-20 bg-white">
+      <div className="max-w-[1280px] mx-auto px-6 md:px-10 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
         <div className="relative group">
           <div className="absolute -inset-4 bg-[#b5ecf1] rounded-xl -rotate-2 z-0 group-hover:rotate-0 transition-transform" />
           <div className="relative h-96 w-full z-10 overflow-hidden">
@@ -10,10 +10,10 @@ export default function ConfortSection() {
         </div>
 
         <div>
-          <h2 className="font-serif text-2xl leading-8 font-semibold text-[#1a1c1c] mb-6">
+          <h2 className="font-serif text-xl md:text-2xl leading-8 font-semibold text-[#1a1c1c] mb-4 md:mb-6">
             Confort de Vanguardia
           </h2>
-          <p className="font-['Manrope'] text-lg font-light leading-relaxed mb-8 text-[#454653]">
+          <p className="font-['Manrope'] text-sm md:text-lg font-light leading-relaxed mb-6 md:mb-8 text-[#454653]">
             Viajar no es solo llegar; es disfrutar del trayecto. Nuestras unidades están equipadas con
             tecnología de confort de última generación, diseñadas para que cada minuto a bordo sea una
             experiencia de descanso.
