@@ -36,6 +36,7 @@ export function BeneficioCard({ imageSrc, imageAlt, icon, title, description }: 
 
       {/* Content area */}
       <div
+        className="beneficio-content"
         style={{
           display: "flex",
           flexDirection: "row",

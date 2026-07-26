@@ -349,3 +349,33 @@ button.flex.h-10.items-center.justify-between {
     width: 100%;
   }
 }
+
+.beneficios-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 960px) {
+  .beneficios-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .beneficios-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .beneficios-grid img {
+    height: 80px !important;
+  }
+
+  .beneficios-grid .beneficio-content {
+    padding: 12px !important;
+  }
+  .beneficios-section {
+    padding-top: 32px !important;
+    padding-bottom: 32px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}

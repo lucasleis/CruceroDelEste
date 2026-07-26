@@ -65,6 +65,7 @@ const BENEFICIOS = [
 export function Beneficios() {
   return (
     <section
+      className="beneficios-section"
       style={{
         width: "100%",
         background: "var(--color-surface)",
@@ -95,13 +96,7 @@ export function Beneficios() {
         </div>
 
         {/* Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "20px",
-          }}
-        >
+        <div className="beneficios-grid">
           {BENEFICIOS.map((beneficio) => (
             <BeneficioCard key={beneficio.title} {...beneficio} />
           ))}
