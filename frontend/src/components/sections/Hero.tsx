@@ -97,7 +97,7 @@ export function Hero() {
           zIndex: 10,
           display: "flex",
           flexDirection: "column",
-          padding: "80px 24px 48px 24px",
+          padding: "100px 24px 48px 24px",
           gap: "12px",
           minHeight: "75vh",
           justifyContent: "flex-start",
