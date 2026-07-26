@@ -97,6 +97,7 @@ export function Footer() {
 
         {/* Middle — Link grid */}
         <div
+          className="footer-links-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(3, 200px)",
@@ -131,6 +132,7 @@ export function Footer() {
 
         {/* Bottom — Copyright + Social + Legal */}
         <div
+          className="footer-bottom"
           style={{
             borderTop: "1px solid rgba(255,255,255,0.15)",
             paddingTop: "20px",
@@ -143,6 +145,7 @@ export function Footer() {
         >
           {/* Left */}
           <span
+            className="footer-bottom-copyright"
             style={{
               fontFamily: "var(--font-body)",
               fontSize: "var(--text-sm)",
@@ -154,7 +157,7 @@ export function Footer() {
           </span>
 
           {/* Center — Socials */}
-          <div style={{ display: "flex", flexDirection: "row", gap: "16px" }}>
+          <div className="footer-bottom-socials" style={{ display: "flex", flexDirection: "row", gap: "16px" }}>
             {SOCIALS.map(({ name, icon }) => (
               <a key={name} href="#" className="footer-social">
                 {icon}
@@ -165,7 +168,7 @@ export function Footer() {
           </div>
 
           {/* Right — Legal */}
-          <div style={{ display: "flex", flexDirection: "row", gap: "16px", alignItems: "center" }}>
+          <div className="footer-bottom-legal" style={{ display: "flex", flexDirection: "row", gap: "16px", alignItems: "center" }}>
             <a href="#" className="footer-legal">Política de privacidad</a>
             <span style={{ color: "white", opacity: 0.4 }}>|</span>
             <a href="#" className="footer-legal">Términos y condiciones</a>

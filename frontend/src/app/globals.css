@@ -389,4 +389,24 @@ button.flex.h-10.items-center.justify-between {
   .arrepentimiento-inner button {
     width: 100% !important;
   }
+
+  .footer-links-grid {
+    display: none !important;
+  }
+
+  .footer-bottom {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+  .footer-bottom-legal {
+    order: 1;
+  }
+  .footer-bottom-socials {
+    order: 2;
+  }
+  .footer-bottom-copyright {
+    order: 3;
+  }
 }
