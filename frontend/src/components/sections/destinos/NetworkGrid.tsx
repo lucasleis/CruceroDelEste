@@ -12,8 +12,11 @@ const destinations = [
 export default function NetworkGrid() {
   const [query, setQuery] = useState("");
 
+  const normalize = (str: string) =>
+    str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+
   const filteredDestinations = destinations.filter((city) =>
-    city.toLowerCase().includes(query.toLowerCase())
+    normalize(city).includes(normalize(query))
   );
 
   return (

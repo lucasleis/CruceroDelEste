@@ -101,7 +101,8 @@
       "Bash(python3 -m pytest --version)",
       "Bash(xxd)",
       "Bash(pytest tests/ -x -q)",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "Bash(python3 -)"
     ]
   }
 }
