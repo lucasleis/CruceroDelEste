@@ -135,7 +135,21 @@ export function Hero() {
             Más de 60 años conectando destinos
           </FeatureItem>
         </div>
-      ) : (
+      ) : null}
+
+      {mounted && isMobile && (
+        <div style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: "160px",
+          background: "linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 100%)",
+          zIndex: 5,
+        }} />
+      )}
+
+      {!(mounted && isMobile) && (
         /* Layout desktop — sin cambios */
         <>
           <div

@@ -49,9 +49,10 @@ export function SearchBarMobileWrapper() {
 
   return (
     <div style={{
-      background: "white",
+      marginTop: "-180px",
+      position: "relative",
+      zIndex: 20,
       padding: "0 16px 32px 16px",
-      marginTop: "-24px",
     }}>
       <SearchBar onSearch={handleSearch} />
     </div>
