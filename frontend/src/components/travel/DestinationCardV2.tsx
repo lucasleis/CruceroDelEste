@@ -22,6 +22,7 @@ export function DestinationCardV2({
 
   return (
     <div
+      className="destino-card"
       style={{
         display: "inline-flex",
         flexDirection: "column",
@@ -36,6 +37,7 @@ export function DestinationCardV2({
     >
       {/* Image */}
       <div
+        className="destino-card-image"
         style={{
           height: "280px",
           position: "relative",

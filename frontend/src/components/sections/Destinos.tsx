@@ -41,7 +41,7 @@ export function Destinos() {
         </div>
 
         {/* Cards row */}
-        <div style={{ display: "flex", gap: "24px", justifyContent: "center", marginBottom: "32px" }}>
+        <div className="destinos-grid" style={{ marginBottom: "32px" }}>
           {CARDS.map((card) => (
             <DestinationCardV2 key={card.city} {...card} />
           ))}
@@ -51,6 +51,7 @@ export function Destinos() {
 
         {/* Bottom bar */}
         <div
+          className="destinos-bottombar"
           style={{
             display: "flex",
             alignItems: "center",

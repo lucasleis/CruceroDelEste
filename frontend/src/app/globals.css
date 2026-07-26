@@ -318,3 +318,34 @@ button.flex.h-10.items-center.justify-between {
     background: white;
   }
 }
+
+.destinos-grid {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+}
+
+@media (max-width: 960px) {
+  .destinos-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    justify-content: unset;
+  }
+  .destino-card {
+    width: 100% !important;
+    display: flex;
+    flex-direction: column;
+  }
+  .destino-card-image {
+    height: 180px !important;
+  }
+  .destinos-bottombar {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  .destinos-bottombar button {
+    width: 100%;
+  }
+}
