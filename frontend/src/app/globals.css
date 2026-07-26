@@ -378,4 +378,15 @@ button.flex.h-10.items-center.justify-between {
     padding-left: 16px !important;
     padding-right: 16px !important;
   }
+
+  .arrepentimiento-inner {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    width: 100% !important;
+    min-width: unset !important;
+  }
+  .arrepentimiento-inner button {
+    width: 100% !important;
+  }
 }

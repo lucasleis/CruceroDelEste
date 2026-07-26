@@ -19,6 +19,7 @@ export function Arrepentimiento() {
       }}
     >
       <div
+        className="arrepentimiento-inner"
         style={{
           display: "flex",
           alignItems: "center",
