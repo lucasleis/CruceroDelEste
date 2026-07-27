@@ -134,7 +134,7 @@ export function PassengerSelector({ value, onChange }: PassengerSelectorProps) {
   const [open, setOpen] = useState(false)
 
   return (
-    <div style={{ position: "relative", zIndex: 50 }}>
+    <div style={{ position: "relative", zIndex: 10 }}>
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
@@ -167,7 +167,7 @@ export function PassengerSelector({ value, onChange }: PassengerSelectorProps) {
           padding: "16px",
           background: "white",
           position: "relative",
-          zIndex: 50,
+          zIndex: 10,
           boxShadow: "var(--shadow-md)",
           border: "1px solid var(--color-border)",
           borderRadius: "var(--radius-md)",
@@ -213,7 +213,7 @@ export function PassengerSelector({ value, onChange }: PassengerSelectorProps) {
               >
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent style={{ zIndex: 200, background: "white" }} className="z-[200] bg-white">
+              <SelectContent style={{ zIndex: 150, background: "white" }} className="z-[200] bg-white">
                 <SelectItem value="cualquiera">Cualquiera</SelectItem>
                 <SelectItem value="semi-cama">Semi Cama</SelectItem>
                 <SelectItem value="cama">Cama</SelectItem>

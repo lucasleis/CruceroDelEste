@@ -164,7 +164,7 @@ export function CityInput({
             position: "absolute",
             top: "calc(100% + 8px)",
             left: 0,
-            zIndex: 1000,
+            zIndex: 100,
             background: "white",
             border: "1px solid var(--color-border)",
             borderRadius: "var(--radius-md)",

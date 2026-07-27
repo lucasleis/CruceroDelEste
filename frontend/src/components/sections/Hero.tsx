@@ -86,7 +86,7 @@ export function Hero() {
       />
 
       {/* Navbar — siempre */}
-      <div style={{ position: "relative", zIndex: 20 }}>
+      <div style={{ position: "relative", zIndex: 60 }}>
         <Navbar />
       </div>
 

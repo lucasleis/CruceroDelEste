@@ -50,7 +50,7 @@ export function Navbar({ transparent = true, static: isStatic = false }: NavbarP
     <>
     <nav
       className={`site-navbar${isStatic ? " site-navbar-static" : ""}`}
-      style={{ background, backdropFilter, WebkitBackdropFilter: backdropFilter }}
+      style={{ background, backdropFilter, WebkitBackdropFilter: backdropFilter, zIndex: 50 }}
     >
       {/* Logo — siempre visible */}
       <Link href="/" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>

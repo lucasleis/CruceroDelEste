@@ -95,7 +95,7 @@ export function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
             position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,0.5)",
-            zIndex: 40,
+            zIndex: 199,
           }}
           onClick={onClose}
         />
@@ -110,7 +110,7 @@ export function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
           width: "80vw",
           maxWidth: "360px",
           background: "var(--color-surface)",
-          zIndex: 50,
+          zIndex: 200,
           display: "flex",
           flexDirection: "column",
           transform: isOpen ? "translateX(0%)" : "translateX(100%)",

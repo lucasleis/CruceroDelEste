@@ -230,12 +230,12 @@ button.flex.h-10.items-center.justify-between {
 
 .site-navbar {
   position: fixed;
+  z-index: 50;
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
   width: 90%;
   max-width: 1280px;
-  z-index: 50;
   height: clamp(52px, 6vw, 72px);
   padding: 0 clamp(16px, 3vw, 40px);
   border-radius: var(--radius-md);
