@@ -60,13 +60,12 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            render={(props, ref) => (
+            render={(props) => (
               <Button
                 variant="ghost"
                 className="absolute top-2 right-2"
                 size="icon-sm"
                 {...props}
-                ref={ref}
               />
             )}
           >
@@ -110,7 +109,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close
-          render={(props, ref) => <Button variant="outline" {...props} ref={ref} />}
+          render={(props) => <Button variant="outline" {...props} />}
         >
           Close
         </DialogPrimitive.Close>
