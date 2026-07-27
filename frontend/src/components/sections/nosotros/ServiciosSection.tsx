@@ -5,8 +5,8 @@ export default function ServiciosSection() {
         <h2 className="font-serif text-2xl leading-8 font-semibold text-[#1a1c1c] mb-12 border-l-4 border-[#e3000f] pl-4">
           Nuestros servicios, tu comodidad
         </h2>
-        <div className="grid grid-cols-4 gap-6">
-          <div className="col-span-2 bg-[#f3f3f3] p-8 border border-[#b5ecf1] flex flex-col justify-between">
+        <div className="flex flex-col gap-6 md:grid md:grid-cols-4 md:gap-6">
+          <div className="md:col-span-2 bg-[#f3f3f3] p-8 border border-[#b5ecf1] flex flex-col justify-between">
             <div className="material-symbols-outlined text-[#132691] text-4xl mb-4">history</div>
             <div>
               <h3 className="font-serif text-2xl leading-8 font-semibold mb-2 text-black">Décadas de Trayectoria</h3>
@@ -16,8 +16,8 @@ export default function ServiciosSection() {
             </div>
           </div>
 
-          <div className="col-span-2 flex gap-6">
-            <div className="group relative bg-[#132691] text-white p-8 flex flex-col justify-center items-center text-center overflow-hidden cursor-default flex-1 min-w-0 [transition:flex-grow_400ms_ease] hover:[flex-grow:3]">
+          <div className="flex flex-col gap-6 md:col-span-2 md:flex-row">
+            <div className="group relative bg-[#132691] text-white p-8 flex flex-col justify-center items-center text-center overflow-hidden cursor-default flex-1 min-w-0 min-h-[180px] md:min-h-0 [transition:flex-grow_400ms_ease] hover:[flex-grow:3]">
               <div className="material-symbols-outlined text-4xl mb-2 transition-opacity duration-300 group-hover:opacity-0">
                 airline_seat_flat
               </div>
@@ -31,7 +31,7 @@ export default function ServiciosSection() {
               </div>
             </div>
 
-            <div className="group relative bg-[#e3000f] text-white p-8 flex flex-col justify-center items-center text-center overflow-hidden cursor-default flex-1 min-w-0 [transition:flex-grow_400ms_ease] hover:[flex-grow:3]">
+            <div className="group relative bg-[#e3000f] text-white p-8 flex flex-col justify-center items-center text-center overflow-hidden cursor-default flex-1 min-w-0 min-h-[180px] md:min-h-0 [transition:flex-grow_400ms_ease] hover:[flex-grow:3]">
               <div className="material-symbols-outlined text-4xl mb-2 transition-opacity duration-300 group-hover:opacity-0">
                 airline_seat_recline_normal
               </div>
