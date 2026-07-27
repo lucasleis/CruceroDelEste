@@ -23,7 +23,7 @@ export default function NetworkGrid() {
     <section className="py-12 md:py-20 max-w-[1280px] mx-auto px-4 md:px-16 bg-[#f9f9f9]">
       <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-8 md:mb-12 gap-4 md:gap-6">
         <div className="max-w-2xl">
-          <h2 className="text-[32px] leading-10 tracking-tight font-semibold text-[#132691] mb-2">
+          <h2 className="text-[26px] md:text-[32px] leading-10 tracking-tight font-semibold text-[#132691] mb-2">
             Nuestra Red Completa
           </h2>
           <p className="text-base leading-6 text-gray-600">
@@ -69,7 +69,7 @@ export default function NetworkGrid() {
             Nuestra red de rutas se expande cada temporada. Contactá a nuestro servicio de atención al cliente para chárteres especiales o viajes grupales.
           </p>
         </div>
-        <button className="w-full md:w-auto border-2 border-[#132691] text-[#132691] px-8 py-3 rounded-lg text-sm font-semibold tracking-wide hover:bg-[#132691] hover:text-white transition-all text-center">
+        <button className="w-full md:w-auto border-2 border-[#132691] text-[#132691] px-8 py-3 rounded-lg text-[16px] font-semibold tracking-wide hover:bg-[#132691] hover:text-white transition-all text-center">
           Contactar Ventas
         </button>
       </div>

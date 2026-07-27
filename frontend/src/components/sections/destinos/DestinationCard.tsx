@@ -89,16 +89,16 @@ export default function DestinationCard({
               <h2 className={`text-2xl md:text-5xl leading-tight md:leading-[56px] tracking-tight font-bold mb-2 md:mb-4 ${isDark ? "text-white" : "text-[#132691]"}`}>
                 {title}
               </h2>
-              <p className={`text-sm md:text-lg leading-relaxed mb-4 md:mb-12 ${isDark ? "text-white/80" : "text-gray-600"}`}>
+              <p className={`text-[16px] md:text-lg leading-relaxed mb-4 md:mb-12 ${isDark ? "text-white/80" : "text-gray-600"}`}>
                 {description}
               </p>
               {ctaType === "link" ? (
-                <a className="inline-flex items-center gap-2 w-fit text-[#132691] text-sm font-semibold tracking-wide group" href="#">
+                <a className="inline-flex items-center gap-2 w-fit text-[#132691] text-[16px] font-semibold tracking-wide group" href="#">
                   {ctaText}
                   <span className="group-hover:translate-x-1 transition-transform">→</span>
                 </a>
               ) : (
-                <button className="w-fit bg-[#e3000f] text-white px-6 py-2 md:px-8 md:py-3 rounded-lg text-sm font-semibold tracking-wide hover:opacity-90 transition-all">
+                <button className="w-fit bg-[#e3000f] text-white px-6 py-2 md:px-8 md:py-3 rounded-lg text-[16px] font-semibold tracking-wide hover:opacity-90 transition-all">
                   {ctaText}
                 </button>
               )}
@@ -120,16 +120,16 @@ export default function DestinationCard({
               <h2 className={`text-2xl md:text-5xl leading-tight md:leading-[56px] tracking-tight font-bold mb-2 md:mb-4 ${isDark ? "text-white" : "text-[#132691]"}`}>
                 {title}
               </h2>
-              <p className={`text-sm md:text-lg leading-relaxed mb-4 md:mb-12 ${isDark ? "text-white/80" : "text-gray-600"}`}>
+              <p className={`text-[16px] md:text-lg leading-relaxed mb-4 md:mb-12 ${isDark ? "text-white/80" : "text-gray-600"}`}>
                 {description}
               </p>
               {ctaType === "link" ? (
-                <a className="inline-flex items-center gap-2 w-fit text-[#132691] text-sm font-semibold tracking-wide group" href="#">
+                <a className="inline-flex items-center gap-2 w-fit text-[#132691] text-[16px] font-semibold tracking-wide group" href="#">
                   {ctaText}
                   <span className="group-hover:translate-x-1 transition-transform">→</span>
                 </a>
               ) : (
-                <button className="w-fit bg-[#e3000f] text-white px-6 py-2 md:px-8 md:py-3 rounded-lg text-sm font-semibold tracking-wide hover:opacity-90 transition-all">
+                <button className="w-fit bg-[#e3000f] text-white px-6 py-2 md:px-8 md:py-3 rounded-lg text-[16px] font-semibold tracking-wide hover:opacity-90 transition-all">
                   {ctaText}
                 </button>
               )}
