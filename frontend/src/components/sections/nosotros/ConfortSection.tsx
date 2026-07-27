@@ -13,7 +13,7 @@ export default function ConfortSection() {
           <h2 className="font-serif text-xl md:text-2xl leading-8 font-semibold text-[#1a1c1c] mb-4 md:mb-6">
             Confort de Vanguardia
           </h2>
-          <p className="font-['Manrope'] text-sm md:text-lg font-light leading-relaxed mb-6 md:mb-8 text-[#454653]">
+          <p className="font-['Manrope'] text-[16px] md:text-lg font-light leading-relaxed mb-6 md:mb-8 text-[#454653]">
             Viajar no es solo llegar; es disfrutar del trayecto. Nuestras unidades están equipadas con
             tecnología de confort de última generación, diseñadas para que cada minuto a bordo sea una
             experiencia de descanso.

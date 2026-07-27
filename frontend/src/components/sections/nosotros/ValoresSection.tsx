@@ -44,7 +44,7 @@ export default function ValoresSection() {
             >
               <div className="material-symbols-outlined mb-4 text-3xl text-black group-hover:text-white">{valor.icon}</div>
               <h4 className="font-bold mb-2 text-black group-hover:text-white">{valor.title}</h4>
-              <p className="text-sm opacity-80 text-black group-hover:text-white">{valor.text}</p>
+              <p className="text-[15px] opacity-80 text-black group-hover:text-white">{valor.text}</p>
             </div>
           ))}
         </div>

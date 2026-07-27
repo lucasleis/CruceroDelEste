@@ -92,7 +92,7 @@ export default function HistoriaSection() {
                   {item.year}
                 </span>
                 <h3 className="font-serif text-xl md:text-3xl mb-3 md:mb-4 text-[#1a1c1c]">{item.title}</h3>
-                <p className="text-[#454653] text-sm md:text-lg">{item.text}</p>
+                <p className="text-[#454653] text-[15px] md:text-lg">{item.text}</p>
               </div>
             ))}
           </div>
