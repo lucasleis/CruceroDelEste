@@ -21,10 +21,10 @@ const accentColorMap: Record<AccentColor, string> = {
 };
 
 const sizeStyles: Record<Size, React.CSSProperties> = {
-  xl: { fontSize: "clamp(2.5rem, 5vw, 3.75rem)", lineHeight: 1.1 },
-  lg: { fontSize: "clamp(2rem, 4vw, 3rem)", lineHeight: 1.1 },
-  md: { fontSize: "clamp(1.75rem, 3vw, 2.25rem)", lineHeight: 1.15 },
-  sm: { fontSize: "clamp(1.5rem, 2.5vw, 1.875rem)", lineHeight: 1.2 },
+  xl: { fontSize: "clamp(2rem, 5vw, 3.75rem)", lineHeight: 1.1 },
+  lg: { fontSize: "clamp(1.625rem, 4vw, 3rem)", lineHeight: 1.1 },
+  md: { fontSize: "clamp(1.375rem, 3vw, 2.25rem)", lineHeight: 1.15 },
+  sm: { fontSize: "clamp(1.25rem, 2.5vw, 1.875rem)", lineHeight: 1.2 },
 };
 
 const colorMap: Record<Color, string> = {
