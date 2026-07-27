@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { BlueButton } from "@/components/core/BlueButton";
+import { MobileDrawer } from "./MobileDrawer";
 
 interface NavbarProps {
   transparent?: boolean;
@@ -28,6 +30,7 @@ const HamburgerIcon = () => (
 export function Navbar({ transparent = true, static: isStatic = false }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleCTAClick = () => {
     if (pathname === "/") {
@@ -44,6 +47,7 @@ export function Navbar({ transparent = true, static: isStatic = false }: NavbarP
   const backdropFilter = transparent ? "blur(16px)" : undefined;
 
   return (
+    <>
     <nav
       className={`site-navbar${isStatic ? " site-navbar-static" : ""}`}
       style={{ background, backdropFilter, WebkitBackdropFilter: backdropFilter }}
@@ -85,11 +89,13 @@ export function Navbar({ transparent = true, static: isStatic = false }: NavbarP
           Comprar pasajes
         </BlueButton>
 
-        <button className="navbar-hamburger">
+        <button className="navbar-hamburger" onClick={() => setDrawerOpen(true)}>
           <HamburgerIcon />
         </button>
       </div>
 
     </nav>
+    <MobileDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
+    </>
   );
 }
