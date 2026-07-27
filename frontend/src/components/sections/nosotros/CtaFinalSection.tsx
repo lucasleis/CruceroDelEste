@@ -18,8 +18,8 @@ export default function CtaFinalSection() {
             Asegurá tu lugar en nuestra flota de vanguardia. Experiencia, seguridad y confort en cada kilómetro que recorremos juntos.
           </p>
 
-          <div className="flex gap-6 items-center">
-            <button className="bg-[#e3000f] text-white px-10 py-5 font-serif text-2xl font-semibold hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center gap-3">
+          <div className="flex flex-col gap-4 items-start md:flex-row md:gap-6 md:items-center">
+            <button className="bg-[#e3000f] text-white px-10 py-5 font-serif text-2xl font-semibold hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center gap-3 w-full md:w-auto justify-center">
               RESERVAR AHORA
               <span className="material-symbols-outlined">confirmation_number</span>
             </button>
