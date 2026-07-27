@@ -8,7 +8,7 @@ const channels = [
   },
   {
     icon: "mail",
-    label: "Correspondencia Electrónica",
+    label: "Email",
     value: "info@rioparana.com",
     href: "mailto:info@rioparana.com",
     description: "Consultas institucionales y generales.",
@@ -29,7 +29,7 @@ export default function ContactSection() {
         <h2 className="font-serif text-2xl font-semibold text-black border-l-4 border-[#e3000f] pl-4 mb-12">
           Contactanos
         </h2>
-        <div className="grid grid-cols-3 gap-8">
+        <div className="flex flex-col gap-6 md:grid md:grid-cols-3 md:gap-8">
           {channels.map((channel) => (
             <div
               key={channel.label}
