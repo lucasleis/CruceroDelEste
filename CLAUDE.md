@@ -1,5 +1,3 @@
-# CLAUDE.md — Expreso Río Paraná · Monorepo
-
 > Este archivo es el briefing global del monorepo. Cada sub-proyecto tiene su propio CLAUDE.md con instrucciones específicas. Leer este archivo primero, luego el CLAUDE.md del directorio en el que vayas a trabajar.
 
 ---
@@ -39,6 +37,7 @@ Ubicados en `frontend/src/components/travel/`.
 | FilterPanel | FilterPanel.tsx | Panel de filtros visual completo. onFilterChange preparada pero desconectada (LLE-126 cancelado — pendiente de conectar al implementar filtros en /resultados) |
 | SearchSummaryBar | SearchSummaryBar.tsx | Barra de resumen de búsqueda activa. onEditClick delegado a la página padre |
 | CityInput | CityInput.tsx | Selector de origen/destino. Recibe stops como prop (no fetchea). Valores prefijados: "stop:Nombre" o "province:Nombre". Props: allowedStopIds, onStopSelected, onProvinceSelected |
+| DestinationLinkCard | DestinationLinkCard.tsx | Card clickeable que linkea a /resultados?destinationId={stopId}. Props: stopId, stopName, country. Sin estado interno. Usa CSS custom properties del sistema de tokens. |
 
 ---
 
@@ -46,7 +45,7 @@ Ubicados en `frontend/src/components/travel/`.
 
 | Página | Ruta | Archivo | Descripción |
 |--------|------|---------|-------------|
-| Resultados | /resultados | app/resultados/page.tsx | Fetch GET /trips, mapea TripRead a TripCard. Amenities hardcodeadas hasta que backend las devuelva. Ver LLE-132 |
+| Resultados | /resultados | app/resultados/page.tsx | Fetch GET /trips, mapea TripRead a TripCard. Amenities hardcodeadas hasta que backend las devuelva. Ver LLE-132. Soporta query param `destinationId`: resuelve el stop via GET /stops, pre-llena destino en SearchSummaryBar y fetch de viajes. Flag `destinationResolved` evita llamada espuria antes de resolución. |
 
 ---
 
@@ -57,6 +56,29 @@ Ubicados en `frontend/src/types/`.
 | Archivo | Exporta | Descripción |
 |---------|---------|-------------|
 | trips.ts | StopRead | Forma de una parada devuelta por GET /stops. Importar desde aquí, no desde componentes. |
+
+---
+
+## Backend — Servicio de email
+
+`backend/app/services/email.py` — servicio Resend con Jinja2. Completamente implementado, pendiente de wiring con el flujo de compra (sprint MercadoPago).
+
+- Templates en: `backend/templates/email/` (path correcto — NO usar `backend/app/email_templates/`)
+- Variables de contexto inyectadas por `_context_for()`: `first_name`, `last_name`, `booking_id`, `seat_number`, `seat_type`, `origin`, `destination`, `departure_at` (DateTime), `arrival_at` (DateTime), `total_amount` (Integer en centavos), `frontend_url`
+- Variables opcionales (condicionales en templates): `return_trip_url`, `boarding_point`, `survey_url`
+- Semántica de errores: `send_confirmation_email` re-lanza `EmailDeliveryError` (para que MP reintente). `send_reminder_email` y `send_feedback_email` tragan errores por pasajero y retornan `bool`.
+- `StrictUndefined` activo — todas las variables opcionales usan `{% if x is defined %}` en los templates.
+- `total_amount` se formatea a pesos en el template: `{{ "%.2f"|format(total_amount / 100) }}`
+- `booking_id` es UUID — TODO: reemplazar con `booking_code` corto (ej: ERP-00423) cuando se agregue el campo al modelo.
+- `boarding_point` — `Stop` no tiene campo `address`. Pendiente: agregar `Stop.address` o inyectar desde config map en send logic.
+
+**Templates disponibles:**
+
+| Archivo | Descripción |
+|---------|-------------|
+| `confirmation.html` / `.txt` | Confirmación de compra. Navy header, tabla estructurada, aviso DNI/pasaporte, bloque cross-sell condicional. |
+| `reminder.html` / `.txt` | Recordatorio pre-viaje. Boarding point con fallback, 3 recordatorios numerados, bloque Starlink. |
+| `feedback.html` / `.txt` | Post-viaje. CTA condicional con fallback de texto cuando `survey_url` no está definido. |
 
 ---
 
@@ -89,6 +111,7 @@ Este proyecto usa un flujo de tres capas: **Claude** (arquitectura y revisión) 
 ### Cómo arrancar una conversación nueva
 
 Decile a Claude: "Leé CLAUDE.md y continuamos. El próximo paso es [descripción breve]."
+
 Claude va a leer el archivo, entender el estado del proyecto, y retomar desde donde quedó sin necesidad de re-explicar nada.
 
 ### Prompt de arranque para conversación nueva
@@ -96,14 +119,17 @@ Claude va a leer el archivo, entender el estado del proyecto, y retomar desde do
 Copiar y pegar al inicio de cada conversación nueva:
 
 ---
+
 Leé el documento "CLAUDE.md" del proyecto "Expresio Rio Parana" en Linear. Ese documento tiene todo el contexto: stack, reglas de negocio, componentes construidos y proceso de trabajo.
 
 Una vez leído:
 
 Buscá los tickets del proyecto "Expresio Rio Parana" en estado Todo o In Progress, analizá dependencias y bloqueantes, y proponé el próximo paso con justificación.
+
 Si no podés acceder a Linear, indicalo y pedile a Lucas que pegue el contenido de CLAUDE.md manualmente.
 
 No arranques a implementar nada hasta que Lucas apruebe explícitamente el paso propuesto.
+
 ---
 
 ---
@@ -140,6 +166,12 @@ No arranques a implementar nada hasta que Lucas apruebe explícitamente el paso 
 
 6 warnings de Starlette (`HTTP_422_UNPROCESSABLE_ENTITY` deprecated) — no requieren acción.
 
+## Estado de la suite de tests (frontend-admin)
+
+| Fecha | Resultado | Comando |
+|-------|-----------|---------|
+| 29/07/2026 | ✅ 29/29 passed | `cd frontend-admin && npx vitest run` |
+
 ---
 
 ## Regla de negocio crítica — AR↔PY
@@ -153,13 +185,20 @@ Esta regla también está enforced en el frontend: al seleccionar un origen en S
 ## Riesgos activos
 
 ### 🔴 Doble venta de asientos
+
 El cliente vende simultáneamente por SOR, Plataforma 10 y Central de Pasajes. Sin sincronización con SOR, puede venderse el mismo asiento dos veces. No está definido si SOR tiene API. Acción requerida antes del lanzamiento.
 
 ### 🟡 Norma de trazabilidad de equipaje (RESOL-2026-4-APN-ST#MEC)
+
 Exige vinculación nominal entre cada equipaje y el pasajero. El campo `luggage_count` actual no es suficiente. El módulo de Control de Pasajeros (QR) es el lugar natural para implementarlo. No afecta el MVP directamente.
 
 ### 🟡 Disponibilidad del cliente
+
 El dueño está en un conflicto societario interno. El interlocutor real del proyecto es SPK_2. Prever demoras en materiales (logos, fotos, textos, datos de flota).
+
+### 🟡 Facturación electrónica AFIP (LLE-296)
+
+Al vender pasajes en Argentina hay obligación legal de emitir comprobantes fiscales (A/B/C según condición tributaria). No implementado. Requiere información del cliente antes de estimar. Ver LLE-296.
 
 ---
 
@@ -172,6 +211,7 @@ El dueño está en un conflicto societario interno. El interlocutor real del pro
 - Sistema de puntos / millas
 - Integración con SOR / Plataforma 10
 - Viajes recurrentes (LLE-117 — bloqueado por decisiones de producto)
+- Facturación electrónica AFIP (LLE-296 — post-MVP obligatorio, pendiente info cliente)
 
 ---
 
