@@ -1,20 +1,24 @@
-¡Hola, {{ first_name }}!
+Hola {{ first_name }},
 
-Tu pasaje con Crucero Del Este quedó confirmado.
+Tu pasaje está confirmado.
 
-Detalles del viaje
-------------------
-Reserva:    {{ booking_id }}
-Pasajero:   {{ first_name }} {{ last_name }}
-Origen:     {{ origin }}
-Destino:    {{ destination }}
-Salida:     {{ departure_at.strftime('%d/%m/%Y %H:%M') }}
-Llegada:    {{ arrival_at.strftime('%d/%m/%Y %H:%M') }}
-Asiento:    {{ seat_number }} ({{ seat_type }})
-Total:      ${{ total_amount }} ARS
+Número de boleto: {{ booking_id }}
+Origen:           {{ origin }}
+Destino:          {{ destination }}
+Fecha de salida:  {{ departure_at.strftime('%d/%m/%Y') }}
+Hora de salida:   {{ departure_at.strftime('%H:%M') }}
+Asiento:          {{ seat_number }} — {{ seat_type }}
+Total abonado:    $ {{ "%.2f"|format(total_amount / 100) }} ARS
+
+Recordá llevar tu DNI o pasaporte (servicio internacional).
 
 Consultá tu reserva en:
 {{ frontend_url }}/bookings/{{ booking_id }}
 
-¡Buen viaje!
-El equipo de Crucero Del Este
+{% if return_trip_url is defined %}
+¿Vas a volver? Comprá tu pasaje de vuelta con 5% de descuento:
+{{ return_trip_url }}
+
+{% endif %}
+Expreso Río Paraná — servicio de transporte internacional
+Este es un email automático, por favor no responder.

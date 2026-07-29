@@ -1,13 +1,21 @@
-¡{{ first_name }}, gracias por viajar con nosotros!
+Hola {{ first_name }},
 
-Esperamos que tu viaje de {{ origin }} a {{ destination }} haya sido cómodo.
+¿Cómo estuvo tu viaje?
 
-Tu opinión nos ayuda a mejorar. ¿Nos contás cómo te fue?
+{{ origin }} → {{ destination }} · {{ departure_at.strftime('%d/%m/%Y') }}
 
-Dejá tu opinión acá:
-{{ frontend_url }}/bookings/{{ booking_id }}/feedback
+Tu opinión nos ayuda a mejorar el servicio para todos los pasajeros.
+Son menos de 30 segundos.
 
-Reserva: {{ booking_id }}
+{% if survey_url is defined %}
+Calificá tu viaje acá:
+{{ survey_url }}
+{% else %}
+Próximamente podrás calificar tu viaje desde nuestra web.
+{% endif %}
 
-¡Gracias!
-El equipo de Crucero Del Este
+Gracias por viajar con nosotros.
+Esperamos verte en el próximo viaje.
+
+Expreso Río Paraná — servicio de transporte internacional
+Este es un email automático, por favor no responder.
