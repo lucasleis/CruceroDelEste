@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { SearchSummaryBar } from "@/components/travel/SearchSummaryBar";
 import { FilterPanel, type FilterState } from "@/components/travel/FilterPanel";
 import { TripCard } from "@/components/travel/TripCard";
-import { searchTrips } from "@/api";
-import type { TripRead } from "@/types/trips";
+import { searchTrips, getStops } from "@/api";
+import type { TripRead, StopRead } from "@/types/trips";
 
 type SeatType = "cama" | "semi-cama" | "ejecutivo";
 
@@ -154,7 +154,10 @@ export function ResultadosContent() {
   const destinationProvince = searchParams.get("destination_province") ?? "";
   const date = searchParams.get("date") ?? "";
   const passengers = Number(searchParams.get("passengers") ?? "1");
+  const destinationId = searchParams.get("destinationId") ?? "";
 
+  const [resolvedDestination, setResolvedDestination] = useState<StopRead | null>(null);
+  const [destinationResolved, setDestinationResolved] = useState(!destinationId);
   const [trips, setTrips] = useState<TripRead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,7 +168,34 @@ export function ResultadosContent() {
   });
 
   useEffect(() => {
+    if (!destinationId) return;
     let cancelled = false;
+
+    async function resolveDestination() {
+      try {
+        const stops = await getStops();
+        if (cancelled) return;
+        const match = stops.find((s) => s.id === destinationId) ?? null;
+        setResolvedDestination(match);
+      } catch {
+        // fail silently — trips fetch will run with empty destination
+      } finally {
+        if (!cancelled) setDestinationResolved(true);
+      }
+    }
+
+    resolveDestination();
+    return () => { cancelled = true; };
+  }, [destinationId]);
+
+  useEffect(() => {
+    // When destinationId is present, wait until resolution completes before fetching.
+    if (!destinationResolved) return;
+
+    let cancelled = false;
+
+    const effectiveDestination = resolvedDestination?.name ?? destinationStop;
+    const effectiveDestinationProvince = resolvedDestination ? "" : destinationProvince;
 
     async function fetchTrips() {
       setLoading(true);
@@ -174,8 +204,8 @@ export function ResultadosContent() {
         const data = await searchTrips({
           origin: originStop,
           originProvince,
-          destination: destinationStop,
-          destinationProvince,
+          destination: effectiveDestination,
+          destinationProvince: effectiveDestinationProvince,
           departureDate: date,
         });
         if (!cancelled) {
@@ -198,7 +228,7 @@ export function ResultadosContent() {
     return () => {
       cancelled = true;
     };
-  }, [originStop, originProvince, destinationStop, destinationProvince, date]);
+  }, [originStop, originProvince, destinationStop, destinationProvince, date, resolvedDestination, destinationResolved]);
 
   const filteredTrips = useMemo(() => applyFilters(trips, filters), [trips, filters]);
 
@@ -208,7 +238,7 @@ export function ResultadosContent() {
     <div style={{ background: "var(--color-surface)", minHeight: "100vh" }}>
       <SearchSummaryBar
         origin={originProvince || originStop}
-        destination={destinationProvince || destinationStop}
+        destination={resolvedDestination?.name ?? (destinationProvince || destinationStop)}
         date={formatSearchDate(date)}
         passengerCount={passengers}
         onEditClick={() => router.back()}
