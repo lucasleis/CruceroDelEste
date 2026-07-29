@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Confirmación de tu pasaje — Expreso Río Paraná</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
+
+  <!-- Preheader (hidden inbox preview text) -->
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
+    Tu pasaje está confirmado. {{origin}} → {{destination}} el {{departure_date}}. ¡Buen viaje!
+    &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+  </div>
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+
+        <!-- Outer container -->
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:#1a2744;border-radius:6px 6px 0 0;padding:28px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <p style="margin:0;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">
+                      Expreso Río Paraná
+                    </p>
+                    <p style="margin:4px 0 0 0;font-size:12px;color:#a8b8d8;letter-spacing:0.5px;text-transform:uppercase;">
+                      Buenos Aires ↔ Asunción
+                    </p>
+                  </td>
+                  <td align="right">
+                    <p style="margin:0;font-size:11px;color:#a8b8d8;text-transform:uppercase;letter-spacing:0.5px;">
+                      Confirmación
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background-color:#ffffff;padding:32px 32px 0 32px;">
+
+              <p style="margin:0 0 8px 0;font-size:16px;color:#333333;">
+                Hola, <strong>{{passenger_name}}</strong>
+              </p>
+              <p style="margin:0 0 28px 0;font-size:15px;color:#555555;line-height:1.5;">
+                Tu reserva fue confirmada. A continuación encontrás el detalle de tu viaje.
+              </p>
+
+              <!-- Booking ID banner -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f4fa;border-left:4px solid #2c5282;border-radius:0 4px 4px 0;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:14px 18px;">
+                    <p style="margin:0;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.6px;">Número de boleto</p>
+                    <!-- TODO: replace with short booking_code once field exists -->
+                    <p style="margin:4px 0 0 0;font-size:15px;font-weight:600;color:#1a2744;font-family:monospace,monospace;">
+                      {{booking_id}}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Trip details table -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb;border-radius:6px;margin-bottom:28px;">
+                <tr>
+                  <td colspan="2" style="background-color:#f9fafb;border-bottom:1px solid #e5e7eb;padding:12px 18px;border-radius:6px 6px 0 0;">
+                    <p style="margin:0;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.6px;">Detalle del viaje</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:14px 18px 10px 18px;width:50%;vertical-align:top;">
+                    <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Origen</p>
+                    <p style="margin:4px 0 0 0;font-size:15px;font-weight:600;color:#1a2744;">{{origin}}</p>
+                  </td>
+                  <td style="padding:14px 18px 10px 18px;width:50%;vertical-align:top;border-left:1px solid #e5e7eb;">
+                    <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Destino</p>
+                    <p style="margin:4px 0 0 0;font-size:15px;font-weight:600;color:#1a2744;">{{destination}}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="border-top:1px solid #e5e7eb;"></td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 18px 10px 18px;vertical-align:top;">
+                    <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Fecha de salida</p>
+                    <p style="margin:4px 0 0 0;font-size:15px;font-weight:600;color:#1a2744;">{{departure_date}}</p>
+                  </td>
+                  <td style="padding:12px 18px 10px 18px;vertical-align:top;border-left:1px solid #e5e7eb;">
+                    <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Hora de salida</p>
+                    <p style="margin:4px 0 0 0;font-size:15px;font-weight:600;color:#1a2744;">{{departure_time}}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="border-top:1px solid #e5e7eb;"></td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 18px 14px 18px;vertical-align:top;">
+                    <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Asiento</p>
+                    <p style="margin:4px 0 0 0;font-size:15px;font-weight:600;color:#1a2744;">{{seat_number}}</p>
+                  </td>
+                  <td style="padding:12px 18px 14px 18px;vertical-align:top;border-left:1px solid #e5e7eb;">
+                    <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Clase</p>
+                    <p style="margin:4px 0 0 0;font-size:15px;font-weight:600;color:#1a2744;">{{seat_type}}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="border-top:1px solid #e5e7eb;padding:12px 18px 14px 18px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td>
+                          <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Total abonado</p>
+                          <p style="margin:4px 0 0 0;font-size:20px;font-weight:700;color:#1a2744;">$&nbsp;{{price_paid}}</p>
+                        </td>
+                        <td align="right" valign="bottom">
+                          <p style="margin:0;font-size:11px;color:#16a34a;font-weight:600;background-color:#dcfce7;padding:4px 10px;border-radius:12px;display:inline-block;">
+                            ✓ Pago confirmado
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Important reminder -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#fffbeb;border:1px solid #fde68a;border-radius:6px;margin-bottom:32px;">
+                <tr>
+                  <td style="padding:14px 18px;">
+                    <p style="margin:0;font-size:13px;font-weight:600;color:#92400e;">Recordá llevar tu DNI o pasaporte</p>
+                    <p style="margin:6px 0 0 0;font-size:13px;color:#78350f;line-height:1.5;">
+                      Este es un servicio internacional. El documento de identidad es obligatorio para el cruce de frontera.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Cross-sell block — visually separated -->
+          <tr>
+            <td style="background-color:#f0f4fa;border-top:2px solid #e5e7eb;padding:28px 32px;">
+              <p style="margin:0 0 6px 0;font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.6px;">
+                Opcional
+              </p>
+              <p style="margin:0 0 6px 0;font-size:16px;font-weight:700;color:#1a2744;">
+                ¿Vas a volver?
+              </p>
+              <p style="margin:0 0 18px 0;font-size:14px;color:#555555;line-height:1.5;">
+                Comprá tu pasaje de vuelta y obtené un <strong>5% de descuento</strong> en tu próxima compra.
+              </p>
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="background-color:#2c5282;border-radius:5px;">
+                    <a href="{{return_trip_url}}" style="display:inline-block;padding:12px 24px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">
+                      Ver pasajes de vuelta →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f9fafb;border-top:1px solid #e5e7eb;border-radius:0 0 6px 6px;padding:20px 32px;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;text-align:center;">
+                Expreso Río Paraná &mdash; servicio de transporte internacional<br>
+                Este es un email automático, por favor no responder.<br>
+                <a href="https://expresorioparana.com" style="color:#6b7280;text-decoration:underline;">expresorioparana.com</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
