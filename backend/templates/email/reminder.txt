@@ -1,18 +1,27 @@
-¡{{ first_name }}, te recordamos tu viaje!
+Hola {{ first_name }},
 
-Te esperamos pronto en Crucero Del Este. Datos de tu próximo viaje:
+Tu viaje se acerca. Acá te recordamos los detalles.
 
-Reserva:    {{ booking_id }}
-Origen:     {{ origin }}
-Destino:    {{ destination }}
-Salida:     {{ departure_at.strftime('%d/%m/%Y %H:%M') }}
-Asiento:    {{ seat_number }} ({{ seat_type }})
+Número de boleto: {{ booking_id }}
+Origen:           {{ origin }}
+Destino:          {{ destination }}
+Fecha de salida:  {{ departure_at.strftime('%d/%m/%Y') }}
+Hora de salida:   {{ departure_at.strftime('%H:%M') }}
+Asiento:          {{ seat_number }} — {{ seat_type }}
 
-Recordá presentarte en la terminal al menos 30 minutos antes de la salida
-con tu documento.
+Punto de embarque:
+{% if boarding_point is defined %}{{ boarding_point }}{% else %}la terminal de salida{% endif %}
+
+Antes de viajar
+---------------
+1. Llegá 30 minutos antes — el embarque cierra puntualmente.
+2. Llevá tu DNI o pasaporte vigente — es obligatorio para el cruce de frontera.
+3. Equipaje — consultá la franquicia con el personal al momento del abordaje.
+
+Disfrutá WiFi Starlink durante todo el viaje.
 
 Consultá tu reserva en:
 {{ frontend_url }}/bookings/{{ booking_id }}
 
-¡Nos vemos a bordo!
-El equipo de Crucero Del Este
+Expreso Río Paraná — servicio de transporte internacional
+Este es un email automático, por favor no responder.
