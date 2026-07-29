@@ -127,7 +127,7 @@ describe("BookingsPage — comportamiento de React Query", () => {
   });
 
   it("bookings_fetch_inicial_con_filtro_all — llama getBookings sin parámetros y renderiza filas", async () => {
-    getBookingsMock.mockResolvedValue([BOOKING_CONFIRMED, BOOKING_PENDING]);
+    getBookingsMock.mockResolvedValue({ items: [BOOKING_CONFIRMED, BOOKING_PENDING], total: 2 });
 
     renderBookings();
 
@@ -136,14 +136,14 @@ describe("BookingsPage — comportamiento de React Query", () => {
     });
 
     expect(getBookingsMock).toHaveBeenCalledTimes(1);
-    expect(getBookingsMock).toHaveBeenCalledWith();
+    expect(getBookingsMock).toHaveBeenCalledWith({ skip: 0, limit: 50 });
     expect(screen.getByText("maria@example.com")).toBeInTheDocument();
   });
 
   it("bookings_refetch_al_cambiar_filtro — click en Confirmadas llama getBookings con booking_status confirmed", async () => {
     getBookingsMock
-      .mockResolvedValueOnce([BOOKING_CONFIRMED, BOOKING_PENDING])
-      .mockResolvedValueOnce([BOOKING_CONFIRMED]);
+      .mockResolvedValueOnce({ items: [BOOKING_CONFIRMED, BOOKING_PENDING], total: 2 })
+      .mockResolvedValueOnce({ items: [BOOKING_CONFIRMED], total: 1 });
 
     renderBookings();
 
@@ -155,7 +155,7 @@ describe("BookingsPage — comportamiento de React Query", () => {
     await user.click(screen.getByRole("button", { name: "Confirmadas" }));
 
     await waitFor(() => {
-      expect(getBookingsMock).toHaveBeenCalledWith({ booking_status: "confirmed" });
+      expect(getBookingsMock).toHaveBeenCalledWith({ booking_status: "confirmed", skip: 0, limit: 50 });
     });
 
     expect(screen.getByText("juan@example.com")).toBeInTheDocument();
