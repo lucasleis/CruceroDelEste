@@ -34,6 +34,7 @@ interface SearchBarInitialValues {
   initialDestination?: string
   initialDepartureDate?: Date
   initialPassengers?: PassengerValue
+  initialTripType?: "one-way" | "round-trip"
 }
 
 interface SearchBarProps {
@@ -53,7 +54,9 @@ const Divider = () => (
 )
 
 export function SearchBar({ onSearch, initialValues }: SearchBarProps) {
-  const [tripType, setTripType] = useState<TripType>("round-trip")
+  const [tripType, setTripType] = useState<TripType>(
+    initialValues?.initialTripType ?? "round-trip"
+  )
   const [origin, setOrigin] = useState(initialValues?.initialOrigin ?? "")
   const [destination, setDestination] = useState(initialValues?.initialDestination ?? "")
   const [departureDate, setDepartureDate] = useState<Date | undefined>(initialValues?.initialDepartureDate)

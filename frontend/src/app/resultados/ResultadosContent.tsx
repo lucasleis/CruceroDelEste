@@ -241,6 +241,7 @@ export function ResultadosContent() {
   const date = searchParams.get("date") ?? "";
   const passengers = Number(searchParams.get("passengers") ?? "1");
   const destinationId = searchParams.get("destinationId") ?? "";
+  const tripType = (searchParams.get("tripType") ?? "one-way") as "one-way" | "round-trip";
 
   const [resolvedDestination, setResolvedDestination] = useState<StopRead | null>(null);
   const [destinationResolved, setDestinationResolved] = useState(!destinationId);
@@ -353,6 +354,7 @@ export function ResultadosContent() {
   })();
 
   function handleMobileSearch(value: {
+    tripType?: "one-way" | "round-trip";
     originStop?: string;
     originProvince?: string;
     destinationStop?: string;
@@ -376,7 +378,9 @@ export function ResultadosContent() {
       ? `destination_province=${encodeURIComponent(value.destinationProvince)}`
       : `destination=${encodeURIComponent(value.destinationStop ?? "")}`;
 
-    router.push(`/resultados?${originParam}&${destinationParam}&date=${searchDate}&passengers=${totalPassengers}`);
+    router.push(
+      `/resultados?${originParam}&${destinationParam}&date=${searchDate}&passengers=${totalPassengers}&tripType=${value.tripType ?? "one-way"}`
+    );
   }
 
   return (
@@ -428,6 +432,7 @@ export function ResultadosContent() {
                 initialDestination,
                 initialDepartureDate,
                 initialPassengers,
+                initialTripType: tripType,
               }}
             />
           )}
