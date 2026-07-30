@@ -2,12 +2,30 @@ import type { StopRead, TripRead, SeatRead, BookingRead } from "@/types/trips"
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
+let stopsCache: StopRead[] | null = null
+let stopsCachePromise: Promise<StopRead[]> | null = null
+
 export async function getStops(): Promise<StopRead[]> {
-  const response = await fetch(`${BASE_URL}/stops`)
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`)
-  }
-  return response.json()
+  if (stopsCache !== null) return stopsCache
+
+  if (stopsCachePromise !== null) return stopsCachePromise
+
+  stopsCachePromise = fetch(`${BASE_URL}/stops`, { next: { revalidate: 300 } })
+    .then((response) => {
+      if (!response.ok) throw new Error(`Request failed with status ${response.status}`)
+      return response.json() as Promise<StopRead[]>
+    })
+    .then((data) => {
+      stopsCache = data
+      stopsCachePromise = null
+      return data
+    })
+    .catch((err) => {
+      stopsCachePromise = null
+      throw err
+    })
+
+  return stopsCachePromise
 }
 
 export async function getValidDestinations(stopId: string): Promise<StopRead[]> {

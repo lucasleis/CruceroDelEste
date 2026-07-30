@@ -244,7 +244,6 @@ export function ResultadosContent() {
   const tripType = (searchParams.get("tripType") ?? "one-way") as "one-way" | "round-trip";
 
   const [resolvedDestination, setResolvedDestination] = useState<StopRead | null>(null);
-  const [destinationResolved, setDestinationResolved] = useState(!destinationId);
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [trips, setTrips] = useState<TripRead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -256,39 +255,27 @@ export function ResultadosContent() {
   });
 
   useEffect(() => {
-    if (!destinationId) return;
     let cancelled = false;
 
-    async function resolveDestination() {
-      try {
-        const stops = await getStops();
-        if (cancelled) return;
-        const match = stops.find((s) => s.id === destinationId) ?? null;
-        setResolvedDestination(match);
-      } catch {
-        // fail silently — trips fetch will run with empty destination
-      } finally {
-        if (!cancelled) setDestinationResolved(true);
-      }
-    }
-
-    resolveDestination();
-    return () => { cancelled = true; };
-  }, [destinationId]);
-
-  useEffect(() => {
-    // When destinationId is present, wait until resolution completes before fetching.
-    if (!destinationResolved) return;
-
-    let cancelled = false;
-
-    const effectiveDestination = resolvedDestination?.name ?? destinationStop;
-    const effectiveDestinationProvince = resolvedDestination ? "" : destinationProvince;
-
-    async function fetchTrips() {
+    async function fetchAll() {
       setLoading(true);
       setError(null);
+
       try {
+        const stopsPromise = destinationId ? getStops() : Promise.resolve([] as StopRead[]);
+
+        let resolvedDest: StopRead | null = null;
+
+        if (destinationId) {
+          const stops = await stopsPromise;
+          if (cancelled) return;
+          resolvedDest = stops.find((s) => s.id === destinationId) ?? null;
+          setResolvedDestination(resolvedDest);
+        }
+
+        const effectiveDestination = resolvedDest?.name ?? destinationStop;
+        const effectiveDestinationProvince = resolvedDest ? "" : destinationProvince;
+
         const data = await searchTrips({
           origin: originStop,
           originProvince,
@@ -296,6 +283,7 @@ export function ResultadosContent() {
           destinationProvince: effectiveDestinationProvince,
           departureDate: date,
         });
+
         if (!cancelled) {
           setTrips(data);
         }
@@ -311,12 +299,12 @@ export function ResultadosContent() {
       }
     }
 
-    fetchTrips();
+    fetchAll();
 
     return () => {
       cancelled = true;
     };
-  }, [originStop, originProvince, destinationStop, destinationProvince, date, resolvedDestination, destinationResolved]);
+  }, [originStop, originProvince, destinationStop, destinationProvince, date, destinationId]);
 
   const filteredTrips = useMemo(() => applyFilters(trips, filters), [trips, filters]);
 
