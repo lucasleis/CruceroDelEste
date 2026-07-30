@@ -29,8 +29,16 @@ interface SearchParams {
   passengers: PassengerValue
 }
 
+interface SearchBarInitialValues {
+  initialOrigin?: string
+  initialDestination?: string
+  initialDepartureDate?: Date
+  initialPassengers?: PassengerValue
+}
+
 interface SearchBarProps {
   onSearch: (params: SearchParams) => void
+  initialValues?: SearchBarInitialValues
 }
 
 const SearchIcon = () => (
@@ -44,13 +52,15 @@ const Divider = () => (
   <div style={{ width: 1, height: 32, background: "var(--color-border)", flexShrink: 0, margin: "0 clamp(8px, 1.5vw, 16px)" }} />
 )
 
-export function SearchBar({ onSearch }: SearchBarProps) {
+export function SearchBar({ onSearch, initialValues }: SearchBarProps) {
   const [tripType, setTripType] = useState<TripType>("round-trip")
-  const [origin, setOrigin] = useState("")
-  const [destination, setDestination] = useState("")
-  const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined)
+  const [origin, setOrigin] = useState(initialValues?.initialOrigin ?? "")
+  const [destination, setDestination] = useState(initialValues?.initialDestination ?? "")
+  const [departureDate, setDepartureDate] = useState<Date | undefined>(initialValues?.initialDepartureDate)
   const [returnDate, setReturnDate] = useState<Date | undefined>(undefined)
-  const [passengers, setPassengers] = useState<PassengerValue>({ adults: 1, children: 0, class: "cualquiera" })
+  const [passengers, setPassengers] = useState<PassengerValue>(
+    initialValues?.initialPassengers ?? { adults: 1, children: 0, class: "cualquiera" }
+  )
 
   const [stops, setStops] = useState<StopRead[]>([])
   const [loadingStops, setLoadingStops] = useState(true)
@@ -181,67 +191,73 @@ export function SearchBar({ onSearch }: SearchBarProps) {
 
   if (mounted && isMobile) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", width: "100%", padding: "0 16px", boxSizing: "border-box" }}>
+      <div style={{ display: "flex", justifyContent: "center", width: "100%", boxSizing: "border-box" }}>
         <div style={{
           width: "100%",
-          maxWidth: "480px",
           background: "white",
           borderRadius: "var(--radius-lg)",
           boxShadow: "var(--shadow-md)",
+          border: "1px solid var(--color-border)",
           padding: "8px",
           display: "flex",
           flexDirection: "column",
           gap: "0px",
         }}>
           {/* TripTypeSelector — ancho completo */}
-          <div style={{ padding: "4px" }}>
-            <div style={{ width: "100%" }}>
-              <TripTypeSelector value={tripType} onChange={handleTripTypeChange} />
+          <div className="search-bar-mobile-trip-type" style={{ padding: "4px" }}>
+            <TripTypeSelector value={tripType} onChange={handleTripTypeChange} />
+          </div>
+
+          {/* Origen + Destino — misma fila */}
+          <div style={{
+            borderTop: "1px solid var(--color-border)",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "0",
+          }}>
+            {/* Origen */}
+            <div style={{ padding: "12px 12px 12px 16px", position: "relative", borderRight: "1px solid var(--color-border)" }}>
+              <CityInput
+                label="Origen"
+                value={origin}
+                onChange={handleOriginChange}
+                icon="pin"
+                stops={stops}
+                loadingStops={loadingStops}
+                errorStops={errorStops}
+                onStopSelected={handleOriginStopSelected}
+                onProvinceSelected={handleOriginProvinceSelected}
+              />
+              {originError && (
+                <span style={{ display: "block", fontSize: "0.7rem", color: "#e53e3e", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+                  Seleccioná un origen
+                </span>
+              )}
             </div>
-          </div>
 
-          {/* Origen */}
-          <div style={{ borderTop: "1px solid var(--color-border)", padding: "12px 16px", position: "relative" }}>
-            <CityInput
-              label="Origen"
-              value={origin}
-              onChange={handleOriginChange}
-              icon="pin"
-              stops={stops}
-              loadingStops={loadingStops}
-              errorStops={errorStops}
-              onStopSelected={handleOriginStopSelected}
-              onProvinceSelected={handleOriginProvinceSelected}
-            />
-            {originError && (
-              <span style={{ display: "block", fontSize: "0.7rem", color: "#e53e3e", fontFamily: "var(--font-body)", marginTop: "4px" }}>
-                Seleccioná un origen
-              </span>
-            )}
-          </div>
-
-          {/* Destino */}
-          <div style={{ borderTop: "1px solid var(--color-border)", padding: "12px 16px", position: "relative" }}>
-            <CityInput
-              label="Destino"
-              value={destination}
-              onChange={(value) => { setDestination(value); if (value !== "") setDestinationError(false) }}
-              icon="pin-filled"
-              stops={stops}
-              loadingStops={loadingStops}
-              errorStops={errorStops}
-              allowedStopIds={allowedDestinationIds}
-            />
-            {destinationError && (
-              <span style={{ display: "block", fontSize: "0.7rem", color: "#e53e3e", fontFamily: "var(--font-body)", marginTop: "4px" }}>
-                Seleccioná un destino
-              </span>
-            )}
-            {destinationFetchError && (
-              <span style={{ display: "block", fontSize: "0.7rem", color: "var(--color-accent)", fontFamily: "var(--font-body)", marginTop: "4px" }}>
-                {destinationFetchError}
-              </span>
-            )}
+            {/* Destino */}
+            <div style={{ padding: "12px 16px 12px 12px", position: "relative" }}>
+              <CityInput
+                label="Destino"
+                value={destination}
+                onChange={(value) => { setDestination(value); if (value !== "") setDestinationError(false) }}
+                icon="pin-filled"
+                stops={stops}
+                loadingStops={loadingStops}
+                errorStops={errorStops}
+                allowedStopIds={allowedDestinationIds}
+              />
+              {destinationError && (
+                <span style={{ display: "block", fontSize: "0.7rem", color: "#e53e3e", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+                  Seleccioná un destino
+                </span>
+              )}
+              {destinationFetchError && (
+                <span style={{ display: "block", fontSize: "0.7rem", color: "var(--color-accent)", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+                  {destinationFetchError}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Fechas — dos columnas */}
@@ -279,7 +295,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
           </div>
 
           {/* Pasajeros */}
-          <div style={{ borderTop: "1px solid var(--color-border)", padding: "12px 16px" }}>
+          <div style={{ borderTop: "1px solid var(--color-border)", padding: "12px 16px", display: "flex", justifyContent: "center" }}>
             <PassengerSelector value={passengers} onChange={setPassengers} />
           </div>
 
@@ -288,13 +304,19 @@ export function SearchBar({ onSearch }: SearchBarProps) {
             <BlueButton
               variant="navy"
               leftIcon={<SearchIcon />}
-              style={{ width: "100%", fontSize: "15px", padding: "14px 20px", borderRadius: "var(--radius-md)" }}
+              style={{ width: "100%", fontSize: "var(--text-sm)", padding: "14px 20px", borderRadius: "var(--radius-md)" }}
               onClick={handleSearchClick}
             >
               Buscar
             </BlueButton>
           </div>
         </div>
+        <style>{`
+          .search-bar-mobile-trip-type button {
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+        `}</style>
       </div>
     )
   }

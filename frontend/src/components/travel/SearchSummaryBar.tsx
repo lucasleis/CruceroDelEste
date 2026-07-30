@@ -1,6 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Bus, ArrowRight, MapPin, Calendar, User, Pencil } from "lucide-react";
+
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
 
 interface SearchSummaryBarProps {
   origin: string;
@@ -38,6 +50,73 @@ export function SearchSummaryBar({
   onEditClick,
   className,
 }: SearchSummaryBarProps) {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    const rowStyle: React.CSSProperties = {
+      display: "flex",
+      alignItems: "center",
+      gap: "10px",
+      padding: "14px 16px",
+      borderBottom: "1px solid var(--color-border)",
+    };
+
+    return (
+      <div
+        className={className}
+        style={{
+          background: "var(--color-white)",
+          boxShadow: "var(--shadow-sm)",
+          padding: "0",
+          width: "100%",
+        }}
+      >
+        <div style={rowStyle}>
+          <Bus size={18} color="var(--color-text-primary)" />
+          <span style={routeTextStyle}>{origin}</span>
+          <ArrowRight size={14} color="var(--color-text-muted)" />
+          <MapPin size={18} color="var(--color-text-primary)" />
+          <span style={routeTextStyle}>{destination}</span>
+        </div>
+
+        <div style={rowStyle}>
+          <Calendar size={18} color="var(--color-text-primary)" />
+          <span style={bodyTextStyle}>{date}</span>
+        </div>
+
+        <div style={{ ...rowStyle, borderBottom: "none" }}>
+          <User size={18} color="var(--color-text-primary)" />
+          <span style={bodyTextStyle}>
+            {passengerCount} pasajero{passengerCount === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={onEditClick}
+          style={{
+            width: "100%",
+            padding: "14px 16px",
+            background: "transparent",
+            color: "var(--color-primary)",
+            border: "1px solid var(--color-primary)",
+            borderRadius: "var(--radius-sm)",
+            fontFamily: "var(--font-body)",
+            fontSize: "14px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+          }}
+        >
+          <Pencil size={14} color="var(--color-primary)" />
+          Editar búsqueda
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       className={className}

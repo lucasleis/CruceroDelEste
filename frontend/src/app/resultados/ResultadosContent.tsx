@@ -2,11 +2,95 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { SlidersHorizontal, ArrowUpDown } from "lucide-react";
 import { SearchSummaryBar } from "@/components/travel/SearchSummaryBar";
 import { FilterPanel, type FilterState } from "@/components/travel/FilterPanel";
 import { TripCard } from "@/components/travel/TripCard";
+import { SearchBar } from "@/components/search/SearchBar";
 import { searchTrips, getStops } from "@/api";
 import type { TripRead, StopRead } from "@/types/trips";
+
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
+
+function useIsMobileSearchBar(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 960);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
+
+function EmptyStateIllustration() {
+  return (
+    <svg
+      width="200"
+      height="180"
+      viewBox="0 0 200 180"
+      fill="none"
+      style={{ display: "block", margin: "0 auto 24px" }}
+    >
+      <circle cx="90" cy="95" r="68" fill="#e8eaf0" />
+
+      <circle cx="28" cy="60" r="9" fill="#c5cae9" />
+      <circle cx="40" cy="53" r="12" fill="#c5cae9" />
+      <circle cx="54" cy="58" r="9" fill="#c5cae9" />
+      <rect x="28" y="58" width="35" height="11" fill="#c5cae9" />
+
+      <circle cx="130" cy="42" r="6" fill="#c5cae9" />
+      <circle cx="139" cy="37" r="8" fill="#c5cae9" />
+      <circle cx="149" cy="41" r="6" fill="#c5cae9" />
+      <rect x="130" y="41" width="25" height="8" fill="#c5cae9" />
+
+      <rect x="52" y="28" width="72" height="124" rx="6" fill="white" stroke="var(--color-primary)" strokeWidth="2" />
+
+      <circle cx="52" cy="90" r="8" fill="#e8eaf0" />
+
+      <circle cx="124" cy="90" r="8" fill="#e8eaf0" />
+
+      <line x1="60" y1="90" x2="116" y2="90" stroke="var(--color-primary)" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.35" />
+
+      <rect x="64" y="40" width="48" height="38" rx="5" fill="white" stroke="var(--color-primary)" strokeWidth="2" />
+
+      <rect x="69" y="47" width="10" height="8" rx="2" fill="var(--color-primary)" opacity="0.15" stroke="var(--color-primary)" strokeWidth="1.5" />
+      <rect x="84" y="47" width="10" height="8" rx="2" fill="var(--color-primary)" opacity="0.15" stroke="var(--color-primary)" strokeWidth="1.5" />
+      <rect x="99" y="47" width="8" height="8" rx="2" fill="var(--color-primary)" opacity="0.15" stroke="var(--color-primary)" strokeWidth="1.5" />
+
+      <circle cx="73" cy="80" r="5" fill="white" stroke="var(--color-primary)" strokeWidth="2" />
+      <circle cx="103" cy="80" r="5" fill="white" stroke="var(--color-primary)" strokeWidth="2" />
+
+      <line x1="70" y1="106" x2="106" y2="106" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" opacity="0.4" />
+      <line x1="78" y1="116" x2="98" y2="116" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" opacity="0.4" />
+
+      <path
+        d="M 124 75 Q 148 60 150 78"
+        stroke="var(--color-primary)"
+        strokeWidth="1.5"
+        strokeDasharray="4 3"
+        fill="none"
+        opacity="0.6"
+      />
+
+      <path
+        d="M152 64 C146 64 142 69 142 75 C142 82 152 94 152 94 C152 94 162 82 162 75 C162 69 158 64 152 64 Z"
+        fill="var(--color-primary)"
+      />
+
+      <circle cx="152" cy="75" r="4" fill="white" />
+    </svg>
+  );
+}
 
 type SeatType = "cama" | "semi-cama" | "ejecutivo";
 
@@ -147,6 +231,8 @@ function applyFilters(trips: TripRead[], filters: FilterState): TripRead[] {
 export function ResultadosContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
+  const isMobileSearchBar = useIsMobileSearchBar();
 
   const originStop = searchParams.get("origin") ?? "";
   const originProvince = searchParams.get("origin_province") ?? "";
@@ -234,25 +320,134 @@ export function ResultadosContent() {
 
   const cardProps = useMemo(() => filteredTrips.map(mapTripToCardProps), [filteredTrips]);
 
+  const initialOrigin = originProvince
+    ? `province:${originProvince}`
+    : originStop
+    ? `stop:${originStop}`
+    : undefined;
+
+  const initialDestination = (() => {
+    if (resolvedDestination) return `stop:${resolvedDestination.name}`;
+    if (destinationProvince) return `province:${destinationProvince}`;
+    if (destinationStop) return `stop:${destinationStop}`;
+    return undefined;
+  })();
+
+  const initialDepartureDate = (() => {
+    if (!date) return undefined;
+    const [year, month, day] = date.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  })();
+
+  const initialPassengers = { adults: passengers, children: 0, class: "cualquiera" as const };
+
+  function handleMobileSearch(value: {
+    originStop?: string;
+    originProvince?: string;
+    destinationStop?: string;
+    destinationProvince?: string;
+    departureDate: Date | undefined;
+    passengers: { adults: number; children: number };
+  }) {
+    const searchDate = value.departureDate?.toISOString().split("T")[0];
+    if (!searchDate) return;
+    if (!value.originStop && !value.originProvince) return;
+    if (!value.destinationStop && !value.destinationProvince) return;
+
+    const totalPassengers = value.passengers.adults + value.passengers.children;
+
+    const originParam = value.originProvince
+      ? `origin_province=${encodeURIComponent(value.originProvince)}`
+      : `origin=${encodeURIComponent(value.originStop ?? "")}`;
+
+    const destinationParam = value.destinationProvince
+      ? `destination_province=${encodeURIComponent(value.destinationProvince)}`
+      : `destination=${encodeURIComponent(value.destinationStop ?? "")}`;
+
+    router.push(`/resultados?${originParam}&${destinationParam}&date=${searchDate}&passengers=${totalPassengers}`);
+  }
+
   return (
-    <div style={{ background: "var(--color-surface)", minHeight: "100vh" }}>
-      <SearchSummaryBar
-        origin={originProvince || originStop}
-        destination={resolvedDestination?.name ?? (destinationProvince || destinationStop)}
-        date={formatSearchDate(date)}
-        passengerCount={passengers}
-        onEditClick={() => router.back()}
-      />
+    <div style={{ background: "var(--color-white)", minHeight: "100vh" }}>
+      {isMobileSearchBar ? (
+        <div style={{ padding: "16px 16px 8px 16px" }}>
+          <SearchBar
+            onSearch={handleMobileSearch}
+            initialValues={{
+              initialOrigin,
+              initialDestination,
+              initialDepartureDate,
+              initialPassengers,
+            }}
+          />
+        </div>
+      ) : (
+        <SearchSummaryBar
+          origin={originProvince || originStop}
+          destination={resolvedDestination?.name ?? (destinationProvince || destinationStop)}
+          date={formatSearchDate(date)}
+          passengerCount={passengers}
+          onEditClick={() => router.back()}
+        />
+      )}
 
       <div
-        style={{
-          display: "flex",
-          gap: "24px",
-          padding: "24px",
-          alignItems: "flex-start",
-        }}
+        style={
+          isMobile
+            ? { display: "block", padding: "16px" }
+            : { display: "flex", gap: "24px", padding: "24px", alignItems: "flex-start" }
+        }
       >
-        <FilterPanel filters={filters} onFilterChange={setFilters} />
+        {isMobile ? (
+          <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
+            <button
+              type="button"
+              onClick={() => {}}
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                padding: "12px",
+                background: "transparent",
+                color: "var(--color-primary)",
+                border: "1px solid var(--color-primary)",
+                borderRadius: "var(--radius-sm)",
+                fontFamily: "var(--font-body)",
+                fontSize: "14px",
+                cursor: "pointer",
+              }}
+            >
+              <SlidersHorizontal size={16} />
+              Filtros
+            </button>
+            <button
+              type="button"
+              onClick={() => {}}
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                padding: "12px",
+                background: "transparent",
+                color: "var(--color-primary)",
+                border: "1px solid var(--color-primary)",
+                borderRadius: "var(--radius-sm)",
+                fontFamily: "var(--font-body)",
+                fontSize: "14px",
+                cursor: "pointer",
+              }}
+            >
+              <ArrowUpDown size={16} />
+              Ordenar
+            </button>
+          </div>
+        ) : (
+          <FilterPanel filters={filters} onFilterChange={setFilters} />
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1 }}>
           {loading && (
@@ -282,29 +477,142 @@ export function ResultadosContent() {
           )}
 
           {!loading && !error && trips.length === 0 && (
-            <p
-              style={{
-                textAlign: "center",
-                color: "var(--color-text-muted)",
-                fontFamily: "var(--font-body)",
-                padding: "48px 0",
-              }}
-            >
-              No encontramos viajes para esta búsqueda.
-            </p>
+            isMobile ? (
+              <div style={{ padding: "32px 16px" }}>
+                <EmptyStateIllustration />
+                <p
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontWeight: 700,
+                    fontSize: "22px",
+                    color: "var(--color-text-primary)",
+                    textAlign: "center",
+                    marginBottom: "8px",
+                  }}
+                >
+                  No encontramos viajes para esta búsqueda.
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "14px",
+                    color: "var(--color-text-muted)",
+                    textAlign: "center",
+                    marginBottom: "32px",
+                  }}
+                >
+                  Probá cambiando la fecha, el horario o quitando algunos filtros.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  style={{
+                    width: "100%",
+                    padding: "16px",
+                    background: "var(--color-primary)",
+                    color: "var(--color-white)",
+                    border: "none",
+                    borderRadius: "var(--radius-sm)",
+                    fontFamily: "var(--font-body)",
+                    fontWeight: 600,
+                    fontSize: "16px",
+                    cursor: "pointer",
+                    marginBottom: "12px",
+                  }}
+                >
+                  Modificar búsqueda
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilters({ seatTypes: [], departurePeriods: [], amenities: [] })}
+                  style={{
+                    width: "100%",
+                    padding: "16px",
+                    background: "transparent",
+                    color: "var(--color-primary)",
+                    border: "1px solid var(--color-primary)",
+                    borderRadius: "var(--radius-sm)",
+                    fontFamily: "var(--font-body)",
+                    fontWeight: 600,
+                    fontSize: "16px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            ) : (
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "var(--color-text-muted)",
+                  fontFamily: "var(--font-body)",
+                  padding: "48px 0",
+                }}
+              >
+                No encontramos viajes para esta búsqueda.
+              </p>
+            )
           )}
 
           {!loading && !error && trips.length > 0 && filteredTrips.length === 0 && (
-            <p
-              style={{
-                textAlign: "center",
-                color: "var(--color-text-muted)",
-                fontFamily: "var(--font-body)",
-                padding: "48px 0",
-              }}
-            >
-              Ningún viaje coincide con los filtros aplicados.
-            </p>
+            isMobile ? (
+              <div style={{ padding: "32px 16px" }}>
+                <EmptyStateIllustration />
+                <p
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontWeight: 700,
+                    fontSize: "22px",
+                    color: "var(--color-text-primary)",
+                    textAlign: "center",
+                    marginBottom: "8px",
+                  }}
+                >
+                  No encontramos viajes para esta búsqueda.
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "14px",
+                    color: "var(--color-text-muted)",
+                    textAlign: "center",
+                    marginBottom: "32px",
+                  }}
+                >
+                  Probá quitando algunos filtros.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setFilters({ seatTypes: [], departurePeriods: [], amenities: [] })}
+                  style={{
+                    width: "100%",
+                    padding: "16px",
+                    background: "transparent",
+                    color: "var(--color-primary)",
+                    border: "1px solid var(--color-primary)",
+                    borderRadius: "var(--radius-sm)",
+                    fontFamily: "var(--font-body)",
+                    fontWeight: 600,
+                    fontSize: "16px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            ) : (
+              <p
+                style={{
+                  textAlign: "center",
+                  color: "var(--color-text-muted)",
+                  fontFamily: "var(--font-body)",
+                  padding: "48px 0",
+                }}
+              >
+                Ningún viaje coincide con los filtros aplicados.
+              </p>
+            )
           )}
 
           {!loading &&
