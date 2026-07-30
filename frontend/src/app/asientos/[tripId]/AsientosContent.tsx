@@ -33,6 +33,17 @@ const PLANTA_BAJA: (string | null | { label: string })[][] = [
   ["56", null, "48", "47"],
 ];
 
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
+
 interface AsientosContentProps {
   tripId: string;
 }
@@ -40,6 +51,7 @@ interface AsientosContentProps {
 export function AsientosContent({ tripId }: AsientosContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
 
   const passengersParam = Number(searchParams.get("passengers"));
   const passengerCount =
@@ -192,13 +204,13 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
             key={rowIndex}
             style={{
               display: "grid",
-              gridTemplateColumns: `repeat(${row.length}, 48px)`,
+              gridTemplateColumns: `repeat(${row.length}, 36px)`,
               gap: "8px",
             }}
           >
             {row.map((cell, colIndex) => {
               if (cell === null) {
-                return <div key={colIndex} style={{ width: "48px", height: "48px" }} />;
+                return <div key={colIndex} style={{ width: "36px", height: "36px" }} />;
               }
 
               if (typeof cell === "object") {
@@ -206,8 +218,8 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
                   <div
                     key={colIndex}
                     style={{
-                      width: "48px",
-                      height: "48px",
+                      width: "36px",
+                      height: "36px",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -258,8 +270,8 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
                   onClick={() => toggleSeat(seatNumber)}
                   disabled={isOccupied}
                   style={{
-                    width: "48px",
-                    height: "48px",
+                    width: "36px",
+                    height: "36px",
                     borderRadius: "var(--radius-sm)",
                     fontFamily: "var(--font-body)",
                     fontWeight: 600,
@@ -289,8 +301,20 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
   };
 
   return (
-    <div style={{ background: "var(--color-surface)", minHeight: "100vh", padding: "24px" }}>
-      <div style={{ display: "flex", gap: "24px", maxWidth: "1200px", margin: "0 auto", alignItems: "flex-start" }}>
+    <div style={{
+      background: "var(--color-surface)",
+      minHeight: "100vh",
+      padding: isMobile ? "16px" : "24px",
+      paddingBottom: isMobile ? "96px" : "24px",
+    }}>
+      <div style={{
+        display: "flex",
+        flexDirection: isMobile ? "column" : "row",
+        gap: "24px",
+        maxWidth: "1200px",
+        margin: "0 auto",
+        alignItems: "flex-start",
+      }}>
       <div style={{ flex: "1", minWidth: 0, display: "flex", flexDirection: "column", gap: "16px" }}>
         <div
           style={{
@@ -390,13 +414,15 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
                 </button>
               </div>
 
-              {renderGrid(activeFloor === "alta" ? PLANTA_ALTA : PLANTA_BAJA)}
+              <div style={isMobile ? { display: "flex", justifyContent: "center" } : undefined}>
+                {renderGrid(activeFloor === "alta" ? PLANTA_ALTA : PLANTA_BAJA)}
+              </div>
             </div>
           </>
         )}
       </div>
 
-      <div style={{ width: "320px", flexShrink: 0 }}>
+      <div style={{ width: isMobile ? "100%" : "320px", flexShrink: isMobile ? undefined : 0 }}>
         <div
           style={{
             background: "var(--color-white)",
@@ -483,8 +509,26 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
         </div>
 
         {!loading && !error && seats.length > 0 && (
-          <div style={{ marginTop: "16px", width: "100%" }}>
-            <BlueButton variant="blue" onClick={handleContinuar} disabled={selected.length === 0} arrow style={{ width: "100%" }}>
+          <div style={isMobile ? {
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: "12px 16px",
+            background: "var(--color-white)",
+            borderTop: "1px solid var(--color-border)",
+            zIndex: 50,
+          } : {
+            marginTop: "16px",
+            width: "100%",
+          }}>
+            <BlueButton
+              variant="blue"
+              onClick={handleContinuar}
+              disabled={selected.length === 0}
+              arrow
+              style={{ width: "100%" }}
+            >
               Continuar
             </BlueButton>
           </div>
