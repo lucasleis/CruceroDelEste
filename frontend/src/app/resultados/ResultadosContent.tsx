@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { SlidersHorizontal, ArrowUpDown } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, Bus, Pencil } from "lucide-react";
 import { SearchSummaryBar } from "@/components/travel/SearchSummaryBar";
 import { FilterPanel, type FilterState } from "@/components/travel/FilterPanel";
 import { TripCard } from "@/components/travel/TripCard";
@@ -244,6 +244,7 @@ export function ResultadosContent() {
 
   const [resolvedDestination, setResolvedDestination] = useState<StopRead | null>(null);
   const [destinationResolved, setDestinationResolved] = useState(!destinationId);
+  const [searchExpanded, setSearchExpanded] = useState(false);
   const [trips, setTrips] = useState<TripRead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -341,6 +342,16 @@ export function ResultadosContent() {
 
   const initialPassengers = { adults: passengers, children: 0, class: "cualquiera" as const };
 
+  const collapsedSummary = (() => {
+    const orig = initialOrigin?.replace(/^(stop:|province:)/, "") ?? "";
+    const dest = initialDestination?.replace(/^(stop:|province:)/, "") ?? "";
+    const dateLabel = initialDepartureDate
+      ? initialDepartureDate.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
+      : "";
+    const pax = `${passengers} pasajero${passengers === 1 ? "" : "s"}`;
+    return [orig, dest].filter(Boolean).join(" → ") + (dateLabel ? ` · ${dateLabel}` : "") + ` · ${pax}`;
+  })();
+
   function handleMobileSearch(value: {
     originStop?: string;
     originProvince?: string;
@@ -349,6 +360,7 @@ export function ResultadosContent() {
     departureDate: Date | undefined;
     passengers: { adults: number; children: number };
   }) {
+    setSearchExpanded(false);
     const searchDate = value.departureDate?.toISOString().split("T")[0];
     if (!searchDate) return;
     if (!value.originStop && !value.originProvince) return;
@@ -370,16 +382,55 @@ export function ResultadosContent() {
   return (
     <div style={{ background: "var(--color-white)", minHeight: "100vh" }}>
       {isMobileSearchBar ? (
-        <div style={{ padding: "16px 16px 8px 16px" }}>
-          <SearchBar
-            onSearch={handleMobileSearch}
-            initialValues={{
-              initialOrigin,
-              initialDestination,
-              initialDepartureDate,
-              initialPassengers,
+        <div style={{ padding: "16px 16px 8px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+          {/* Card colapsado — siempre visible, actúa como toggle */}
+          <button
+            type="button"
+            onClick={() => setSearchExpanded((prev) => !prev)}
+            style={{
+              width: "100%",
+              background: "#eef0f8",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-md)",
+              boxShadow: "var(--shadow-sm)",
+              padding: "12px 16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              cursor: "pointer",
+              textAlign: "left",
+              gap: "8px",
             }}
-          />
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+              <Bus size={16} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+              <span style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "var(--text-sm)",
+                color: "var(--color-text-primary)",
+                fontWeight: 500,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}>
+                {collapsedSummary}
+              </span>
+            </div>
+            <Pencil size={14} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+          </button>
+
+          {/* SearchBar — solo visible cuando expandido */}
+          {searchExpanded && (
+            <SearchBar
+              onSearch={handleMobileSearch}
+              initialValues={{
+                initialOrigin,
+                initialDestination,
+                initialDepartureDate,
+                initialPassengers,
+              }}
+            />
+          )}
         </div>
       ) : (
         <SearchSummaryBar
