@@ -59,6 +59,13 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
       ? Math.floor(passengersParam)
       : null;
 
+  useEffect(() => {
+    if (passengerCount === null) {
+      toast.error("No pudimos recuperar tu búsqueda. Buscá tu viaje de nuevo.");
+      router.push("/resultados");
+    }
+  }, [passengerCount, router]);
+
   const [seats, setSeats] = useState<SeatRead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -182,7 +189,12 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
   }
 
   function handleContinuar() {
-    if (passengerCount !== null && selected.length !== passengerCount) {
+    // Inalcanzable en la práctica: el useEffect de arriba redirige a
+    // /resultados antes de que el usuario pueda llegar a este botón sin un
+    // passengerCount válido. Guarda defensiva + narrowing de TS.
+    if (passengerCount === null) return;
+
+    if (selected.length !== passengerCount) {
       toast.error(`Seleccioná exactamente ${passengerCount} asiento${passengerCount === 1 ? "" : "s"} para continuar.`);
       return;
     }
@@ -190,9 +202,7 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
     const params = new URLSearchParams();
     params.set("seats", selected.join(","));
     params.set("seat_ids", selected.map((n) => seatsByNumber.get(n)?.id ?? "").join(","));
-    if (passengerCount !== null) {
-      params.set("passengers", String(passengerCount));
-    }
+    params.set("passengers", String(passengerCount));
     router.push(`/compra/${tripId}?${params.toString()}`);
   }
 
@@ -299,6 +309,12 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
     fontFamily: "var(--font-body)",
     padding: "48px 0",
   };
+
+  if (passengerCount === null) {
+    // El useEffect de arriba ya disparó el redirect a /resultados — no
+    // renderizamos el selector de asientos (sin tope) mientras eso ocurre.
+    return null;
+  }
 
   return (
     <div style={{

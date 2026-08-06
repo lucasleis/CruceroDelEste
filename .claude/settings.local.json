@@ -107,7 +107,10 @@
       "Bash(pg_isready)",
       "mcp__claude_ai_Linear__get_document",
       "Bash(npx vitest *)",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(mkdir -p \"/mnt/c/Users/lucas/Codigos/CruceroDelEste/frontend/src/app/asientos/[tripId]/__tests__\")",
+      "Bash(mkdir -p \"/mnt/c/Users/lucas/Codigos/CruceroDelEste/frontend/src/app/compra/[tripId]/__tests__\")",
+      "Read(//dev/**)"
     ]
   }
 }

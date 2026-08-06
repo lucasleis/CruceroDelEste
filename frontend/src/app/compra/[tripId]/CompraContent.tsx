@@ -68,7 +68,7 @@ function validatePassenger(
 
 type SubmitResult =
   | { kind: "idle" }
-  | { kind: "invalid_seats" }
+  | { kind: "invalid_selection" }
   | { kind: "not_found" }
   | { kind: "trip_not_available" }
   | { kind: "seat_unavailable" }
@@ -81,9 +81,9 @@ const SUBMIT_ERROR_CONFIG: Record<
   Exclude<SubmitResult["kind"], "idle">,
   { title: string; body: string }
 > = {
-  invalid_seats: {
-    title: "No pudimos resolver alguno de los asientos seleccionados.",
-    body: "Volvé a intentar.",
+  invalid_selection: {
+    title: "Hubo un problema con los asientos seleccionados.",
+    body: "Volvé a elegirlos para continuar.",
   },
   not_found: {
     title: "El viaje ya no está disponible.",
@@ -194,8 +194,13 @@ export function CompraContent({ tripId }: CompraContentProps) {
       return;
     }
 
-    if (seatIds.some((id) => !id)) {
-      setSubmitResult({ kind: "invalid_seats" });
+    // LLE-336: valida que la cantidad de asientos coincida con la cantidad
+    // de formularios de pasajero antes de armar el payload — evita un 422
+    // genérico del backend para un mismatch que ya se puede detectar acá.
+    // "ambos vacíos" queda explícito, no como efecto colateral de la
+    // comparación de longitudes.
+    if (seatIds.length === 0 || passengers.length === 0 || seatIds.length !== passengers.length) {
+      setSubmitResult({ kind: "invalid_selection" });
       return;
     }
 
@@ -244,7 +249,9 @@ export function CompraContent({ tripId }: CompraContentProps) {
         if (data.detail === "international_route_required") {
           setSubmitResult({ kind: "international_route_required" });
         } else {
-          // 422 de validación pydantic (incluye el caso de ?passengers — LLE-336).
+          // 422 de validación pydantic. El mismatch seat_ids/passengers ya se
+          // valida client-side arriba (LLE-336) — esto queda como red de
+          // contención si igual llega al backend por algún otro motivo.
           setSubmitResult({ kind: "generic" });
         }
         setSubmitting(false);
@@ -522,6 +529,20 @@ export function CompraContent({ tripId }: CompraContentProps) {
                 }}
               >
                 Elegir otro asiento →
+              </a>
+            )}
+            {submitResult.kind === "invalid_selection" && (
+              <a
+                href={`/asientos/${tripId}`}
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-primary)",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  marginTop: "4px",
+                }}
+              >
+                Elegir asientos de nuevo →
               </a>
             )}
             {(submitResult.kind === "not_found" || submitResult.kind === "trip_not_available") && (
