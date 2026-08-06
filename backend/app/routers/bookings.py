@@ -237,10 +237,9 @@ async def get_booking(
     if booking is None:
         raise _FORBIDDEN
 
-    if booking.confirmed_at is None:
-        raise _FORBIDDEN
-    window = timedelta(minutes=_CONFIRMATION_TOKEN_WINDOW_MINUTES)
-    if datetime.now(timezone.utc) - booking.confirmed_at >= window:
-        raise _FORBIDDEN
+    if booking.confirmed_at is not None:
+        window = timedelta(minutes=_CONFIRMATION_TOKEN_WINDOW_MINUTES)
+        if datetime.now(timezone.utc) - booking.confirmed_at >= window:
+            raise _FORBIDDEN
 
     return BookingRead.model_validate(booking)

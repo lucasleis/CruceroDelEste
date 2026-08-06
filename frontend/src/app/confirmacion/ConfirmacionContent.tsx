@@ -70,40 +70,85 @@ export function ConfirmacionContent() {
   const token = searchParams.get("token") ?? "";
 
   const [booking, setBooking] = useState<BookingRead | null>(null);
-  const [loading, setLoading] = useState(status === "approved");
-  const [fetchError, setFetchError] = useState(false);
+  const [pollState, setPollState] = useState<
+    "polling" | "confirmed" | "expired" | "exhausted" | "token_invalid"
+  >("polling");
+
+  // Máximo tiempo de polling: ~16 min es el peor caso real hasta que un
+  // booking pasa a "expired" (15 min de expires_at + hasta 1 min de latencia
+  // de expire_bookings_job). 17 min da margen.
+  const MAX_POLL_MS = 17 * 60 * 1000;
+
+  function nextDelayMs(attempt: number): number {
+    return Math.min(30_000, 2_000 * 2 ** attempt);
+  }
 
   useEffect(() => {
     if (status !== "approved") return;
 
-    window.history.replaceState({}, "", "/confirmacion");
-
     let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let replacedUrl = false;
+    const pollStartedAt = Date.now();
 
-    async function fetchBooking() {
-      setLoading(true);
-      setFetchError(false);
-      try {
-        const data = await getBooking(externalReference, token);
-        if (!cancelled) {
-          setBooking(data);
-        }
-      } catch (error) {
-        console.error("[ConfirmacionContent] fetch error:", error);
-        if (!cancelled) {
-          setFetchError(true);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+    function replaceUrlOnce() {
+      if (replacedUrl) return;
+      replacedUrl = true;
+      window.history.replaceState({}, "", "/confirmacion");
     }
 
-    fetchBooking();
+    async function poll(attempt: number) {
+      let data: BookingRead;
+      try {
+        data = await getBooking(externalReference, token);
+      } catch (error) {
+        // Checkpoint 1: no apliques un resultado (ni siquiera un error) si
+        // el componente ya se desmontó mientras el fetch estaba en vuelo.
+        if (cancelled) return;
+        console.error("[ConfirmacionContent] fetch error:", error);
+        setPollState("token_invalid");
+        replaceUrlOnce();
+        return;
+      }
+
+      // Checkpoint 1 (rama de éxito): mismo chequeo antes de tocar estado.
+      if (cancelled) return;
+
+      // El primer fetch (éxito o error) ya resolvió acá — limpiamos la URL
+      // ahora, sin importar en qué status haya quedado el booking. No se
+      // repite en re-polls porque replaceUrlOnce() es no-op después de la
+      // primera vez.
+      replaceUrlOnce();
+
+      if (data.status === "confirmed") {
+        setBooking(data);
+        setPollState("confirmed");
+        return; // terminal — no se programa nada más
+      }
+
+      if (data.status === "expired") {
+        setPollState("expired");
+        return; // terminal — no se programa nada más
+      }
+
+      // status === "pending_payment"
+      const elapsed = Date.now() - pollStartedAt;
+      if (elapsed >= MAX_POLL_MS) {
+        setPollState("exhausted");
+        return; // terminal — no se programa nada más
+      }
+
+      // Checkpoint 2: no programes el próximo timeout si ya se desmontó
+      // mientras esperábamos el fetch anterior.
+      if (cancelled) return;
+      timeoutId = setTimeout(() => poll(attempt + 1), nextDelayMs(attempt));
+    }
+
+    poll(0);
 
     return () => {
       cancelled = true;
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
     };
   }, [status, externalReference, token]);
 
@@ -124,7 +169,7 @@ export function ConfirmacionContent() {
           gap: "16px",
         }}
       >
-        {status === "approved" && loading && (
+        {status === "approved" && pollState === "polling" && (
           <div style={cardStyle}>
             <p
               style={{
@@ -134,12 +179,101 @@ export function ConfirmacionContent() {
                 margin: 0,
               }}
             >
-              Cargando tu comprobante...
+              Estamos confirmando tu pago…
             </p>
           </div>
         )}
 
-        {status === "approved" && !loading && fetchError && (
+        {status === "approved" && pollState === "exhausted" && (
+          <div style={cardStyle}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+              <ClockIcon />
+              <h1
+                style={{
+                  fontFamily: "var(--font-display)",
+                  color: "var(--color-text-primary)",
+                  fontWeight: 700,
+                  fontSize: "28px",
+                  textAlign: "center",
+                  margin: 0,
+                }}
+              >
+                Tu pago está en proceso
+              </h1>
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text-muted)",
+                  fontSize: "16px",
+                  textAlign: "center",
+                  margin: 0,
+                }}
+              >
+                Te vamos a confirmar por email en cuanto se acredite — no hace falta que hagas nada más.
+              </p>
+              {paymentId && (
+                <p
+                  style={{
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-muted)",
+                    fontSize: "14px",
+                    textAlign: "center",
+                    margin: 0,
+                    marginTop: "12px",
+                  }}
+                >
+                  ID de pago: {paymentId}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {status === "approved" && pollState === "expired" && (
+          <div style={cardStyle}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+              <XIcon />
+              <h1
+                style={{
+                  fontFamily: "var(--font-display)",
+                  color: "var(--color-accent)",
+                  fontWeight: 700,
+                  fontSize: "28px",
+                  textAlign: "center",
+                  margin: 0,
+                }}
+              >
+                Tu reserva venció
+              </h1>
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text-muted)",
+                  fontSize: "16px",
+                  textAlign: "center",
+                  margin: 0,
+                }}
+              >
+                Los asientos fueron liberados. Si todavía querés viajar, hacé una nueva búsqueda.
+              </p>
+              <a
+                href="/resultados"
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-primary)",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  textAlign: "center",
+                  marginTop: "12px",
+                }}
+              >
+                Buscar viajes →
+              </a>
+            </div>
+          </div>
+        )}
+
+        {status === "approved" && pollState === "token_invalid" && (
           <div style={cardStyle}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
               <XIcon />
@@ -184,7 +318,7 @@ export function ConfirmacionContent() {
           </div>
         )}
 
-        {status === "approved" && !loading && !fetchError && booking && (
+        {status === "approved" && pollState === "confirmed" && booking && (
           <>
             <div style={{ ...cardStyle, alignItems: "center", textAlign: "center" }}>
               <CheckIcon />

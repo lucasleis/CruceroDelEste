@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.booking import expire_booking
 from app.services.payment import generate_confirmation_token
 from app.models.booking import Booking, BookingStatusEnum, Passenger
 from app.models.trip import (
@@ -406,6 +407,43 @@ async def test_get_booking_returns_200_with_correct_shape(
     assert set(pax.keys()) == {"id", "seat_id", "first_name", "last_name", "dni", "email", "phone", "luggage_count"}
     assert pax["first_name"] == "Ana"
     assert pax["email"] == "ana@example.com"
+
+
+async def test_get_booking_pending_payment_returns_200_with_status(
+    client: AsyncClient, db: AsyncSession
+):
+    # LLE-333: a valid token for a booking still awaiting MP confirmation
+    # must return the real state, not a 403 the frontend can't distinguish
+    # from "unauthorized".
+    booking = await _make_booking_in_db(db)
+    await db.commit()
+
+    token = generate_confirmation_token(booking.id)
+    resp = await client.get(f"/bookings/{booking.id}?token={token}")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "pending_payment"
+    assert data["confirmed_at"] is None
+
+
+async def test_get_booking_expired_returns_200_with_status(
+    client: AsyncClient, db: AsyncSession
+):
+    # Real state transition via expire_booking() — the same function
+    # expire_bookings_job calls — no time mocking needed since it doesn't
+    # check expires_at itself, only booking.status.
+    booking = await _make_booking_in_db(db)
+    await expire_booking(db, booking.id)
+    await db.commit()
+
+    token = generate_confirmation_token(booking.id)
+    resp = await client.get(f"/bookings/{booking.id}?token={token}")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "expired"
+    assert data["confirmed_at"] is None
 
 
 async def test_get_booking_nonexistent_returns_403(client: AsyncClient):
