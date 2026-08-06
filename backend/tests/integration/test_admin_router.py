@@ -648,6 +648,26 @@ async def test_create_price_tranche_adjacent_ranges_do_not_overlap(
     assert resp.status_code == 201
 
 
+async def test_create_price_tranche_gap_between_ranges_returns_422(
+    client: AsyncClient, db: AsyncSession
+):
+    await _make_admin(db)
+    trip = await _make_trip(db)
+    await _make_tranche(db, trip, SeatTypeEnum.cama, min_sold=0, max_sold=6, price=24500)
+    token = await _login(client, "admin@test.com", "secret")
+
+    # [7, 12) leaves sold_count=6 uncovered — must be rejected, not accepted.
+    # TrancheGapError maps to 422 (pre-existing mapping in admin.py — out of scope here).
+    resp = await client.post(
+        f"/admin/trips/{trip.id}/price-tranches",
+        headers=_auth(token),
+        json={"seat_type": "cama", "min_sold": 7, "max_sold": 12, "price": 26000},
+    )
+
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "tranche_gap"
+
+
 async def test_create_price_tranche_different_seat_type_does_not_conflict(
     client: AsyncClient, db: AsyncSession
 ):

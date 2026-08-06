@@ -102,7 +102,9 @@
       "Bash(xxd)",
       "Bash(pytest tests/ -x -q)",
       "Bash(grep *)",
-      "Bash(python3 -)"
+      "Bash(python3 -)",
+      "Bash(python3 -c \"import app.errors, app.services.pricing, app.routers.admin_catalog, app.routers.bookings\")",
+      "Bash(pg_isready)"
     ]
   }
 }

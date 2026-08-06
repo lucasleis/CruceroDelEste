@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.booking import AdminUser, Booking, BookingStatusEnum, Passenger
 from app.models.trip import (
     CountryEnum,
+    PriceTranche,
     Route,
     Seat,
     SeatLayout,
@@ -20,6 +21,7 @@ from app.models.trip import (
     Trip,
     TripStatusEnum,
 )
+from app.routers.admin_catalog import compute_coverage
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -981,3 +983,53 @@ async def test_delete_trip_not_found_returns_404(client: AsyncClient, db: AsyncS
 
     assert resp.status_code == 404
     assert resp.json()["detail"] == "not_found"
+
+
+# ---------------------------------------------------------------------------
+# compute_coverage (pure function — half-open, 0-based interval model)
+# ---------------------------------------------------------------------------
+
+
+def _tranche(seat_type: SeatTypeEnum, min_sold: int, max_sold: int) -> PriceTranche:
+    return PriceTranche(seat_type=seat_type, min_sold=min_sold, max_sold=max_sold, price=1)
+
+
+def test_compute_coverage_zero_capacity_is_complete():
+    # total=0 → nothing to cover → is_complete must be True, not False.
+    coverage = compute_coverage([], SeatTypeEnum.cama, total=0)
+
+    assert coverage.is_complete is True
+    assert coverage.first_gap is None
+    assert coverage.total == 0
+
+
+def test_compute_coverage_no_tranches_configured_is_incomplete():
+    coverage = compute_coverage([], SeatTypeEnum.cama, total=10)
+
+    assert coverage.is_complete is False
+    assert coverage.first_gap == 0
+
+
+def test_compute_coverage_adjacent_tranches_are_complete():
+    tranches = [
+        _tranche(SeatTypeEnum.cama, 0, 6),
+        _tranche(SeatTypeEnum.cama, 6, 12),
+    ]
+
+    coverage = compute_coverage(tranches, SeatTypeEnum.cama, total=12)
+
+    assert coverage.is_complete is True
+    assert coverage.first_gap is None
+
+
+def test_compute_coverage_detects_gap_between_tranches():
+    # [0,6) + [7,12) leaves sold_count=6 uncovered — same bug as pricing.py.
+    tranches = [
+        _tranche(SeatTypeEnum.cama, 0, 6),
+        _tranche(SeatTypeEnum.cama, 7, 12),
+    ]
+
+    coverage = compute_coverage(tranches, SeatTypeEnum.cama, total=12)
+
+    assert coverage.is_complete is False
+    assert coverage.first_gap == 6

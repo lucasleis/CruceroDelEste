@@ -21,7 +21,7 @@ from app.models.trip import (
     Trip,
     TripStatusEnum,
 )
-from app.services.pricing import NoPriceTranche, get_current_price
+from app.services.pricing import NoPriceTranche, NoPriceTranchesConfigured, get_current_price
 
 _NOW = datetime.now(timezone.utc)
 _DEPARTURE = _NOW + timedelta(days=1)
@@ -98,16 +98,15 @@ async def _add_sold_seats(
 # Tests
 # ---------------------------------------------------------------------------
 
-async def test_no_tranches_raises_no_price_tranche(db: AsyncSession):
+async def test_no_tranches_raises_no_price_tranches_configured(db: AsyncSession):
     trip = await _make_trip(db)
     await db.commit()
 
-    with pytest.raises(NoPriceTranche) as exc_info:
+    with pytest.raises(NoPriceTranchesConfigured) as exc_info:
         await get_current_price(db, trip.id, SeatTypeEnum.cama)
 
     assert exc_info.value.trip_id == trip.id
     assert exc_info.value.seat_type == SeatTypeEnum.cama
-    assert exc_info.value.sold_count == 0
 
 
 async def test_one_tranche_zero_sold_returns_price(db: AsyncSession):
@@ -200,12 +199,12 @@ async def test_sold_seats_of_other_type_not_counted(db: AsyncSession):
 
 
 async def test_semi_cama_no_tranche_raises(db: AsyncSession):
-    # Cama tranche exists but semi_cama has none → NoPriceTranche for semi_cama.
+    # Cama tranche exists but semi_cama has none → NoPriceTranchesConfigured for semi_cama.
     trip = await _make_trip(db)
     await _add_tranche(db, trip, SeatTypeEnum.cama, min_sold=0, max_sold=10, price=24500)
     await db.commit()
 
-    with pytest.raises(NoPriceTranche) as exc_info:
+    with pytest.raises(NoPriceTranchesConfigured) as exc_info:
         await get_current_price(db, trip.id, SeatTypeEnum.semi_cama)
 
     assert exc_info.value.seat_type == SeatTypeEnum.semi_cama

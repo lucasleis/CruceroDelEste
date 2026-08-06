@@ -27,6 +27,15 @@ class NoPriceTranche(Exception):
         )
 
 
+class NoPriceTranchesConfigured(Exception):
+    def __init__(self, trip_id: UUID, seat_type: SeatTypeEnum) -> None:
+        self.trip_id = trip_id
+        self.seat_type = seat_type
+        super().__init__(
+            f"No price tranches configured at all for trip {trip_id} / {seat_type.value}"
+        )
+
+
 async def get_current_price(
     db: AsyncSession,
     trip_id: UUID,
@@ -68,6 +77,14 @@ async def _resolve_tranche(
     )
     tranche = result.scalar_one_or_none()
     if tranche is None:
+        any_result = await db.execute(
+            select(PriceTranche.id).where(
+                PriceTranche.trip_id == trip_id,
+                PriceTranche.seat_type == seat_type,
+            ).limit(1)
+        )
+        if any_result.scalar_one_or_none() is None:
+            raise NoPriceTranchesConfigured(trip_id, seat_type)
         raise NoPriceTranche(trip_id, seat_type, sold_count)
     return tranche.price
 
@@ -133,7 +150,7 @@ async def add_price_tranche(
     if sorted_tranches[0].min_sold != 0:
         raise TrancheMustStartAtZeroError()
     for i in range(1, len(sorted_tranches)):
-        if sorted_tranches[i].min_sold > sorted_tranches[i - 1].max_sold + 1:
+        if sorted_tranches[i].min_sold != sorted_tranches[i - 1].max_sold:
             raise TrancheGapError()
 
     db.add(new_tranche)

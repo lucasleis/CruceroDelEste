@@ -272,11 +272,38 @@ async def test_post_bookings_no_price_tranche_returns_500(
 ):
     trip = await _make_scheduled_trip(db)
     seat = await _make_seat(db, trip)
-    # No price tranche → NoPriceTranche re-raised from router → 500.
+    # No price tranche configured at all → NoPriceTranchesConfigured re-raised from router → 500.
 
     resp = await client.post("/bookings", json=_booking_payload(trip.id, seat.id))
 
     assert resp.status_code == 500
+    assert resp.json()["detail"] == "no_price_tranches_configured"
+
+
+async def test_post_bookings_gap_between_existing_tranches_returns_500_no_price_tranche(
+    client: AsyncClient, db: AsyncSession
+):
+    """Reproduces the original LLE-331 bug against a real booking request.
+
+    Tranches [0,3) and [4,6) are inserted directly via the model, bypassing
+    add_price_tranche's (now-fixed) gap validation — simulating rows that were
+    already sitting in a dev database before the fix existed. Three cama seats
+    are already sold, so the 4th booking prices at sold_count=3, which falls
+    in the gap. This must raise NoPriceTranche (a tranche-configuration gap),
+    not NoPriceTranchesConfigured (total absence) — the two are distinguished
+    by whether any tranche exists for the seat_type at all.
+    """
+    trip = await _make_scheduled_trip(db)
+    await _add_tranche(db, trip, SeatTypeEnum.cama, min_sold=0, max_sold=3, price=24500)
+    await _add_tranche(db, trip, SeatTypeEnum.cama, min_sold=4, max_sold=6, price=26000)
+    for i in range(3):
+        await _make_seat(db, trip, f"S0{i}", status=SeatStatusEnum.sold)
+    seat = await _make_seat(db, trip, "S04")
+
+    resp = await client.post("/bookings", json=_booking_payload(trip.id, seat.id))
+
+    assert resp.status_code == 500
+    assert resp.json()["detail"] == "no_price_tranche_available"
 
 
 async def test_post_bookings_same_country_returns_422(client: AsyncClient, db: AsyncSession):

@@ -87,7 +87,7 @@ class TrancheGapError(Exception):
     pass
 
 
-from app.services.pricing import NoPriceTranche
+from app.services.pricing import NoPriceTranche, NoPriceTranchesConfigured
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -135,6 +135,15 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
             content={"detail": "not_found"},
+        )
+
+    @app.exception_handler(NoPriceTranchesConfigured)
+    async def no_price_tranches_configured_handler(
+        request: Request, exc: NoPriceTranchesConfigured
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": "no_price_tranches_configured"},
         )
 
     @app.exception_handler(NoPriceTranche)

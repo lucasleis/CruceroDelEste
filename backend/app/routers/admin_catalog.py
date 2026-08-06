@@ -49,20 +49,17 @@ router = APIRouter(prefix="/admin", tags=["admin-catalog"])
 def compute_coverage(
     tranches: list, seat_type: SeatTypeEnum, total: int
 ) -> TrancheCoverage:
-    if total == 0:
-        return TrancheCoverage(is_complete=False, first_gap=None, total=0)
-
     relevant = sorted(
         [t for t in tranches if t.seat_type == seat_type],
         key=lambda t: t.min_sold,
     )
-    expected = 1
+    expected = 0
     for t in relevant:
         if t.min_sold > expected:
             return TrancheCoverage(is_complete=False, first_gap=expected, total=total)
-        expected = max(expected, t.max_sold + 1)
+        expected = max(expected, t.max_sold)
 
-    is_complete = expected > total
+    is_complete = expected >= total
     return TrancheCoverage(
         is_complete=is_complete,
         first_gap=None if is_complete else expected,

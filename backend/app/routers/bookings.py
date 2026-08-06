@@ -35,7 +35,7 @@ from app.services.payment import (
     generate_confirmation_token,
     _CONFIRMATION_TOKEN_WINDOW_MINUTES,
 )
-from app.services.pricing import NoPriceTranche
+from app.services.pricing import NoPriceTranche, NoPriceTranchesConfigured
 
 _REFUND_WINDOW_DAYS = 10
 
@@ -91,6 +91,13 @@ async def create_booking_endpoint(
         )
     except InternationalRouteRequiredError:
         raise HTTPException(status_code=422, detail="international_route_required")
+    except NoPriceTranchesConfigured:
+        logger.error(
+            "no_price_tranches_configured_on_booking trip_id=%s seat_ids=%s",
+            booking_in.trip_id,
+            booking_in.seat_ids,
+        )
+        raise
     except NoPriceTranche:
         logger.error(
             "no_price_tranche_on_booking trip_id=%s seat_ids=%s",

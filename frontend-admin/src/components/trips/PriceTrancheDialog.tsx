@@ -41,16 +41,16 @@ function computeAllGaps(
     .sort((a, b) => a.min_sold - b.min_sold);
 
   const gaps: { from: number; to: number }[] = [];
-  let expected = 1;
+  let expected = 0;
 
   for (const t of relevant) {
     if (t.min_sold > expected) {
-      gaps.push({ from: expected, to: t.min_sold - 1 });
+      gaps.push({ from: expected, to: t.min_sold });
     }
-    expected = Math.max(expected, t.max_sold + 1);
+    expected = Math.max(expected, t.max_sold);
   }
 
-  if (expected <= total) {
+  if (expected < total) {
     gaps.push({ from: expected, to: total });
   }
 

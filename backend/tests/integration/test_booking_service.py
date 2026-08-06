@@ -34,7 +34,7 @@ from app.services.booking import (
     create_booking,
     expire_booking,
 )
-from app.services.pricing import NoPriceTranche
+from app.services.pricing import NoPriceTranchesConfigured
 
 _NOW = datetime.now(timezone.utc)
 _DEPARTURE = _NOW + timedelta(days=1)
@@ -178,7 +178,7 @@ async def test_create_booking_no_price_tranche_raises(db: AsyncSession):
     # No price tranches inserted.
     await db.commit()
 
-    with pytest.raises(NoPriceTranche):
+    with pytest.raises(NoPriceTranchesConfigured):
         await create_booking(
             db,
             trip_id=trip.id,
