@@ -50,3 +50,6 @@ class TripRead(BaseModel):
     available_seats_count: int
     current_price_cama: int | None
     current_price_semi_cama: int | None
+    # None en list_trips (no se calcula ahí, sin consumidor hoy); valor real
+    # sólo en get_trip. No asumir True por default.
+    seat_layout_supported: bool | None = None

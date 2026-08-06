@@ -21,6 +21,8 @@ export interface TripRead {
   available_seats_count: number
   current_price_cama: number | null
   current_price_semi_cama: number | null
+  // null en GET /trips (no se calcula ahí); valor real sólo en GET /trips/{id}.
+  seat_layout_supported: boolean | null
 }
 
 export type SeatStatus = "available" | "reserved" | "sold" | "blocked"

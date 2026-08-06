@@ -110,7 +110,15 @@
       "Bash(env)",
       "Bash(mkdir -p \"/mnt/c/Users/lucas/Codigos/CruceroDelEste/frontend/src/app/asientos/[tripId]/__tests__\")",
       "Bash(mkdir -p \"/mnt/c/Users/lucas/Codigos/CruceroDelEste/frontend/src/app/compra/[tripId]/__tests__\")",
-      "Read(//dev/**)"
+      "Read(//dev/**)",
+      "Bash(xargs -I{} echo {})",
+      "Bash(python3 -c ' *)",
+      "Bash(export PGPASSWORD=crucero)",
+      "Bash(psql -h 172.29.224.1 -U crucero -d crucerodeleste -c \"select seat_number, seat_type, display_order from seat_layout_seats order by seat_layout_id, display_order limit 10;\")",
+      "Bash(psql -h 172.29.224.1 -U crucero -d crucerodeleste -c \"select id, name from seat_layouts;\")",
+      "Bash(psql -h 172.29.224.1 -U crucero -d crucerodeleste -c \"select seat_layout_id, count\\(*\\) from trips group by seat_layout_id;\")",
+      "Bash(pytest tests/integration/test_trips_router.py -q)",
+      "Bash(tee /tmp/claude-1000/-mnt-c-Users-lucas-Codigos-CruceroDelEste/e640fa61-f643-419e-b312-c61d5ef24fed/scratchpad/full_suite_run.log)"
     ]
   }
 }

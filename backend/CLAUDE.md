@@ -273,7 +273,7 @@ Módulos críticos:
 12. Claims JWT con nombre "crucero-admin" — actualizar al definir nombre final.
 13. `HTTP_422_UNPROCESSABLE_ENTITY` deprecada en Starlette 1.3 (LLE-64).
 14. Gap de cobertura — rendering de templates de email no testeado (LLE-69).
-15. Numeración de asientos provisional: `C01`…`Cnn` / `S01`…`Snn`. Si los planos del cliente usan otro formato, requiere migración (LLE-63).
+15. Numeración de asientos real: `"1"`…`"60"` (sin prefijo), definida en `scripts/seed_layout_seats.py` y hardcodeada en `AsientosContent.tsx` (`PLANTA_ALTA`/`PLANTA_BAJA`). Si los planos del cliente usan otro formato, requiere migración (LLE-63).
 16. `mp_chargeback_id` nullable — si se necesita reconciliar con MP, implementar `GET /v1/chargebacks?payment_id={id}`.
 17. Tests de reembolso no validan secuencia MP-antes-DB.
 18. `GET /admin/stops` no existe — solo existe `GET /stops` (público). El frontend-admin usa el endpoint público para leer paradas.
@@ -298,7 +298,7 @@ Módulos críticos:
 ### #016 — Catálogo admin
 - `SeatLayout`: tabla separada, `name` UNIQUE. Layouts los carga el desarrollador.
 - FK `seat_layout_id` en `Trip`: nullable en DB, requerido en `TripCreate`.
-- Auto-generación de seats al crear Trip: numeración `C01`…`Cnn` / `S01`…`Snn`.
+- Auto-generación de seats al crear Trip: numeración real `"1"`…`"60"` (sin prefijo).
 - CRUD stops, routes, trips con validaciones de integridad referencial.
 
 ### #036 — CORS

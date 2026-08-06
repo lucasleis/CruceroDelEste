@@ -135,6 +135,11 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
     };
   }, [tripId]);
 
+  // trip.seat_layout_supported es null en GET /trips (list) y solo se
+  // calcula en GET /trips/{id} — que es lo que consume esta página. Tratamos
+  // false/null/undefined todos como "no soportado" (fail-closed).
+  const layoutUnsupported = trip !== null && !trip.seat_layout_supported;
+
   const seatsByNumber = new Map(seats.map((seat) => [seat.seat_number, seat]));
 
   function formatDateTime(iso: string): string {
@@ -370,17 +375,24 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
 
         {loading && <p style={mutedTextStyle}>Cargando asientos...</p>}
 
-        {!loading && error && (
+        {!loading && !tripLoading && layoutUnsupported && (
+          <p style={mutedTextStyle}>
+            Este viaje usa una configuración de asientos no soportada.
+            Contactanos para completar tu compra.
+          </p>
+        )}
+
+        {!loading && !layoutUnsupported && error && (
           <p style={mutedTextStyle}>
             No se pudieron cargar los asientos. Intentá de nuevo más tarde.
           </p>
         )}
 
-        {!loading && !error && seats.length === 0 && (
+        {!loading && !layoutUnsupported && !error && seats.length === 0 && (
           <p style={mutedTextStyle}>No hay asientos disponibles para este viaje.</p>
         )}
 
-        {!loading && !error && seats.length > 0 && (
+        {!loading && !layoutUnsupported && !error && seats.length > 0 && (
           <>
             <div
               style={{
@@ -524,7 +536,7 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
           )}
         </div>
 
-        {!loading && !error && seats.length > 0 && (
+        {!loading && !layoutUnsupported && !error && seats.length > 0 && (
           <div style={isMobile ? {
             position: "fixed",
             bottom: 0,

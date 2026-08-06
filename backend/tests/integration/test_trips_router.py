@@ -12,12 +12,14 @@ from app.models.trip import (
     PriceTranche,
     Route,
     Seat,
+    SeatLayout,
     SeatStatusEnum,
     SeatTypeEnum,
     Stop,
     Trip,
     TripStatusEnum,
 )
+from app.routers.trips import SUPPORTED_SEAT_LAYOUT_NAME
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +242,89 @@ async def test_list_trips_filter_by_departure_date(client: AsyncClient, db: Asyn
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
+
+
+async def test_list_trips_seat_layout_supported_is_none(
+    client: AsyncClient, db: AsyncSession
+):
+    # list_trips no calcula seat_layout_supported (sin selectinload de
+    # seat_layout ahí) — el campo opcional del schema no debe romper el
+    # endpoint y debe llegar como null.
+    layout = SeatLayout(
+        name=SUPPORTED_SEAT_LAYOUT_NAME, total_cama=12, total_semi_cama=48
+    )
+    db.add(layout)
+    await db.flush()
+
+    route = await _make_route(db)
+    trip = await _make_trip(db, route)
+    trip.seat_layout_id = layout.id
+    await _add_tranche(db, trip, SeatTypeEnum.cama)
+    await db.commit()
+
+    resp = await client.get("/trips")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["seat_layout_supported"] is None
+
+
+# ---------------------------------------------------------------------------
+# GET /trips/{trip_id}
+# ---------------------------------------------------------------------------
+
+async def test_get_trip_seat_layout_supported_true_for_matching_layout(
+    client: AsyncClient, db: AsyncSession
+):
+    layout = SeatLayout(
+        name=SUPPORTED_SEAT_LAYOUT_NAME, total_cama=12, total_semi_cama=48
+    )
+    db.add(layout)
+    await db.flush()
+
+    route = await _make_route(db)
+    trip = await _make_trip(db, route)
+    trip.seat_layout_id = layout.id
+    await _add_tranche(db, trip, SeatTypeEnum.cama)
+    await db.commit()
+
+    resp = await client.get(f"/trips/{trip.id}")
+    assert resp.status_code == 200
+    assert resp.json()["seat_layout_supported"] is True
+
+
+async def test_get_trip_seat_layout_supported_false_for_different_layout(
+    client: AsyncClient, db: AsyncSession
+):
+    layout = SeatLayout(
+        name="Otro Layout - Piso Único", total_cama=10, total_semi_cama=20
+    )
+    db.add(layout)
+    await db.flush()
+
+    route = await _make_route(db)
+    trip = await _make_trip(db, route)
+    trip.seat_layout_id = layout.id
+    await _add_tranche(db, trip, SeatTypeEnum.cama)
+    await db.commit()
+
+    resp = await client.get(f"/trips/{trip.id}")
+    assert resp.status_code == 200
+    assert resp.json()["seat_layout_supported"] is False
+
+
+async def test_get_trip_seat_layout_supported_false_when_layout_id_none(
+    client: AsyncClient, db: AsyncSession
+):
+    route = await _make_route(db)
+    trip = await _make_trip(db, route)
+    assert trip.seat_layout_id is None
+    await _add_tranche(db, trip, SeatTypeEnum.cama)
+    await db.commit()
+
+    resp = await client.get(f"/trips/{trip.id}")
+    assert resp.status_code == 200
+    assert resp.json()["seat_layout_supported"] is False
 
 
 # ---------------------------------------------------------------------------

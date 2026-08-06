@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.deps import get_db, trip_load_options
 from app.errors import NotFoundError
@@ -25,6 +26,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/trips", tags=["trips"])
 stops_router = APIRouter(prefix="/stops", tags=["stops"])
+
+# Único layout soportado hoy por el frontend (grillas hardcodeadas en
+# AsientosContent.tsx). Mismo valor que scripts/seed_layout_seats.py,
+# scripts/seed_seat_layout.py y scripts/seed_routes_and_trips.py.
+# Ver LLE-338.
+SUPPORTED_SEAT_LAYOUT_NAME = "Standard - 2 Pisos"
 
 
 @router.get("", response_model=list[TripRead])
@@ -108,7 +115,9 @@ async def get_trip(
     db: AsyncSession = Depends(get_db),
 ) -> TripRead:
     result = await db.execute(
-        select(Trip).options(trip_load_options()).where(Trip.id == trip_id)
+        select(Trip)
+        .options(trip_load_options(), selectinload(Trip.seat_layout))
+        .where(Trip.id == trip_id)
     )
     trip = result.scalar_one_or_none()
     if trip is None:
@@ -127,6 +136,10 @@ async def get_trip(
         available_seats_count=counts.get(trip.id, 0),
         current_price_cama=prices.get(trip.id, {}).get(SeatTypeEnum.cama),
         current_price_semi_cama=prices.get(trip.id, {}).get(SeatTypeEnum.semi_cama),
+        seat_layout_supported=(
+            trip.seat_layout is not None
+            and trip.seat_layout.name == SUPPORTED_SEAT_LAYOUT_NAME
+        ),
     )
 
 
