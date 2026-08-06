@@ -11,8 +11,7 @@ type ResultState =
   | { kind: "success"; refundRequestId: string }
   | { kind: "window_expired"; refundRequestId: string }
   | { kind: "email_not_found" }
-  | { kind: "not_found" }
-  | { kind: "not_refundable" }
+  | { kind: "not_confirmed_or_missing" }
   | { kind: "rate_limited" }
   | { kind: "error" };
 
@@ -59,17 +58,11 @@ function ResultBanner({ result }: { result: ResultState }) {
       title: "El email no coincide",
       body: "El email ingresado no corresponde a esta reserva. Verificá que sea el mismo con el que compraste o el de alguno de los pasajeros.",
     },
-    not_found: {
+    not_confirmed_or_missing: {
       bg: "#fef2f2",
       border: "#fecaca",
-      title: "Reserva no encontrada",
-      body: "No encontramos ninguna reserva con ese número. Verificá que esté copiado correctamente.",
-    },
-    not_refundable: {
-      bg: "#fef2f2",
-      border: "#fecaca",
-      title: "Esta reserva no puede cancelarse",
-      body: "Esta reserva no está en un estado que permita solicitar un reembolso (ya fue cancelada, reembolsada o no está confirmada).",
+      title: "No pudimos procesar la solicitud",
+      body: "No encontramos una reserva confirmada con esos datos. Verificá el número de reserva y el email ingresados.",
     },
     rate_limited: {
       bg: "#fef2f2",
@@ -150,13 +143,8 @@ export function ArrepentimientoContent() {
         return;
       }
 
-      if (res.status === 404) {
-        setResult({ kind: "not_found" });
-        return;
-      }
-
-      if (res.status === 409) {
-        setResult({ kind: "not_refundable" });
+      if (res.status === 403) {
+        setResult({ kind: "not_confirmed_or_missing" });
         return;
       }
 
