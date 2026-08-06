@@ -104,7 +104,10 @@
       "Bash(grep *)",
       "Bash(python3 -)",
       "Bash(python3 -c \"import app.errors, app.services.pricing, app.routers.admin_catalog, app.routers.bookings\")",
-      "Bash(pg_isready)"
+      "Bash(pg_isready)",
+      "mcp__claude_ai_Linear__get_document",
+      "Bash(npx vitest *)",
+      "Bash(env)"
     ]
   }
 }

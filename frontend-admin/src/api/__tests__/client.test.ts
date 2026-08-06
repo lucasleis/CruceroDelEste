@@ -1,57 +1,29 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type { InternalAxiosRequestConfig } from "axios";
 import apiClient from "@/api/client";
 
-// The axios interceptors are the real security surface of the admin panel:
-// every request must carry the JWT, and any 401 must evict the session. We
-// exercise the actual interceptor handlers registered on the axios instance —
-// no network call, but the real logic runs.
+// Session auth is a httpOnly cookie set by POST /admin/login and sent
+// automatically by the browser via `withCredentials: true` — there is no
+// token in JS-accessible storage. The only client-side logic left to test is
+// the response interceptor's 401 handling (redirect to /login).
 
-type FulfilledRequest = (
-  config: InternalAxiosRequestConfig,
-) => InternalAxiosRequestConfig;
 type RejectedResponse = (error: unknown) => Promise<unknown>;
 
-function requestInterceptor(): FulfilledRequest {
+function responseErrorInterceptor(): RejectedResponse {
   // axios stores registered handlers on the manager; index 0 is the one
   // client.ts registers.
-  const handler = (apiClient.interceptors.request as unknown as {
-    handlers: { fulfilled: FulfilledRequest }[];
-  }).handlers[0];
-  return handler.fulfilled;
-}
-
-function responseErrorInterceptor(): RejectedResponse {
   const handler = (apiClient.interceptors.response as unknown as {
     handlers: { rejected: RejectedResponse }[];
   }).handlers[0];
   return handler.rejected;
 }
 
-function makeConfig(): InternalAxiosRequestConfig {
-  return { headers: {} } as InternalAxiosRequestConfig;
-}
+describe("apiClient", () => {
+  it("no registra un interceptor de request (no hay token que inyectar)", () => {
+    const requestHandlers = (apiClient.interceptors.request as unknown as {
+      handlers: unknown[];
+    }).handlers;
 
-describe("interceptor de request (inyección de JWT)", () => {
-  it("agrega el header Authorization Bearer cuando hay token en localStorage", () => {
-    // arrange
-    localStorage.setItem("admin_token", "abc.123.xyz");
-
-    // act
-    const config = requestInterceptor()(makeConfig());
-
-    // assert
-    expect(config.headers.Authorization).toBe("Bearer abc.123.xyz");
-  });
-
-  it("no agrega header Authorization cuando no hay token", () => {
-    // arrange: sin token (setup limpia localStorage entre tests)
-
-    // act
-    const config = requestInterceptor()(makeConfig());
-
-    // assert
-    expect(config.headers.Authorization).toBeUndefined();
+    expect(requestHandlers.filter(Boolean)).toHaveLength(0);
   });
 });
 
@@ -64,7 +36,7 @@ describe("interceptor de response (manejo de 401)", () => {
     // @ts-expect-error location es read-only en la definición de lib.dom
     delete window.location;
     // @ts-expect-error asignamos un stub mínimo
-    window.location = { href: "" } as Location;
+    window.location = { href: "", pathname: "/viajes" } as Location;
   });
 
   afterEach(() => {
@@ -72,29 +44,28 @@ describe("interceptor de response (manejo de 401)", () => {
     window.location = originalLocation;
   });
 
-  it("borra el token y redirige a /login ante un 401", async () => {
-    // arrange
-    localStorage.setItem("admin_token", "expired.token");
+  it("redirige a /login ante un 401", async () => {
     const error = { response: { status: 401 } };
 
-    // act + assert: el interceptor re-propaga el error
     await expect(responseErrorInterceptor()(error)).rejects.toBe(error);
 
-    // assert: sesión purgada y redirección disparada
-    expect(localStorage.getItem("admin_token")).toBeNull();
     expect(window.location.href).toBe("/login");
   });
 
-  it("no toca la sesión ni redirige ante errores que no son 401", async () => {
-    // arrange
-    localStorage.setItem("admin_token", "valid.token");
-    const error = { response: { status: 500 } };
+  it("no redirige si ya está en /login", async () => {
+    window.location.pathname = "/login";
+    const error = { response: { status: 401 } };
 
-    // act
     await expect(responseErrorInterceptor()(error)).rejects.toBe(error);
 
-    // assert: el token sobrevive y no hubo redirección
-    expect(localStorage.getItem("admin_token")).toBe("valid.token");
+    expect(window.location.href).toBe("");
+  });
+
+  it("no redirige ante errores que no son 401", async () => {
+    const error = { response: { status: 500 } };
+
+    await expect(responseErrorInterceptor()(error)).rejects.toBe(error);
+
     expect(window.location.href).toBe("");
   });
 });

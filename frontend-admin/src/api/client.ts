@@ -5,19 +5,13 @@ const apiClient = axios.create({
   withCredentials: true,
 });
 
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("admin_token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
+// Session is carried by the httpOnly `admin_token` cookie (set by
+// POST /admin/login) alongside `withCredentials: true` above — there is no
+// token in JS-accessible storage, and never should be (LLE-334).
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && window.location.pathname !== "/login") {
-      localStorage.removeItem("admin_token");
       window.location.href = "/login";
     }
     return Promise.reject(error);

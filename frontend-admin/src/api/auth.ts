@@ -1,8 +1,7 @@
 import apiClient from "./client";
 
 export interface LoginResponse {
-  access_token: string;
-  token_type: string;
+  ok: boolean;
 }
 
 export interface MeResponse {

@@ -45,7 +45,11 @@ async def _make_admin(
 async def _login(client: AsyncClient, email: str, password: str) -> str:
     resp = await client.post("/admin/login", json={"email": email, "password": password})
     assert resp.status_code == 200
-    return resp.json()["access_token"]
+    # Session travels via the httpOnly cookie (persisted automatically by the
+    # test client's cookie jar) — the response body no longer carries a token
+    # (LLE-334). We still return the cookie value so existing call sites that
+    # build an (now-inert) Authorization header via _auth() keep working.
+    return resp.cookies["admin_token"]
 
 
 def _auth(token: str) -> dict:
@@ -144,7 +148,7 @@ async def _make_booking_with_passenger(db: AsyncSession, trip: Trip) -> Booking:
 # POST /admin/login
 # ---------------------------------------------------------------------------
 
-async def test_login_valid_credentials_returns_token(
+async def test_login_valid_credentials_returns_ok_and_sets_cookie(
     client: AsyncClient, db: AsyncSession
 ):
     await _make_admin(db, email="admin@test.com", password="secret")
@@ -155,10 +159,11 @@ async def test_login_valid_credentials_returns_token(
     )
 
     assert resp.status_code == 200
-    data = resp.json()
-    assert data["token_type"] == "bearer"
-    assert isinstance(data["access_token"], str)
-    assert len(data["access_token"]) > 0
+    # LLE-334: the body no longer carries the JWT — the session lives only in
+    # the httpOnly cookie set on the response.
+    assert resp.json() == {"ok": True}
+    assert "admin_token" in resp.cookies
+    assert len(resp.cookies["admin_token"]) > 0
 
 
 async def test_login_wrong_password_returns_401(

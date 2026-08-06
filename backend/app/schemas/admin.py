@@ -16,8 +16,7 @@ class AdminLoginRequest(BaseModel):
 
 
 class AdminLoginResponse(BaseModel):
-    access_token: str
-    token_type: Literal["bearer"] = "bearer"
+    ok: bool = True
 
 
 class AdminMeResponse(BaseModel):

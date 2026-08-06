@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -6,8 +6,10 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import LoginPage from "@/pages/LoginPage";
 
 // The network layer (api/auth -> axios) is mocked: we are testing the page's
-// behaviour (store token + navigate on success, show error on failure), not
-// MercadoPago-style external HTTP. What we mock is only the `login` call.
+// own behaviour (call setAuthenticated + navigate on success, show error on
+// failure), not the HTTP call itself. Session state lives in a httpOnly
+// cookie the browser manages — LoginPage never touches localStorage
+// (LLE-334), which is asserted directly below via a spy.
 const loginMock = vi.fn();
 vi.mock("@/api/auth", () => ({
   login: (email: string, password: string) => loginMock(email, password),
@@ -38,7 +40,9 @@ function renderLogin() {
 
 async function fillAndSubmit(email: string, password: string) {
   const user = userEvent.setup();
+  await user.clear(screen.getByLabelText("Email"));
   await user.type(screen.getByLabelText("Email"), email);
+  await user.clear(screen.getByLabelText("Contraseña"));
   await user.type(screen.getByLabelText("Contraseña"), password);
   await user.click(screen.getByRole("button", { name: /ingresar/i }));
 }
@@ -49,26 +53,22 @@ describe("LoginPage", () => {
     navigateMock.mockReset();
   });
 
-  it("guarda el token y navega al dashboard cuando las credenciales son válidas", async () => {
-    // arrange: login succeeds and the real auth module would persist the token;
-    // the mock simulates that side-effect so we can assert on localStorage.
-    loginMock.mockImplementation(async () => {
-      localStorage.setItem("admin_token", "jwt.token.value");
-      return { access_token: "jwt.token.value", token_type: "bearer" };
-    });
+  it("navega al dashboard cuando las credenciales son válidas", async () => {
+    // arrange: login succeeds (the real POST /admin/login sets a httpOnly
+    // cookie server-side — nothing for the client to persist).
+    loginMock.mockResolvedValue({ ok: true });
     renderLogin();
 
     // act
     await fillAndSubmit("admin@example.com", "secret123");
 
-    // assert: token persistido y redirección al panel
+    // assert: redirección al panel
     await waitFor(() => {
-      expect(localStorage.getItem("admin_token")).toBe("jwt.token.value");
+      expect(navigateMock).toHaveBeenCalledWith("/dashboard", { replace: true });
     });
-    expect(navigateMock).toHaveBeenCalledWith("/dashboard", { replace: true });
   });
 
-  it("muestra un mensaje de error y no guarda token cuando el login falla", async () => {
+  it("muestra un mensaje de error y no navega cuando el login falla", async () => {
     // arrange: la API rechaza (401 → excepción)
     loginMock.mockRejectedValue(new Error("401"));
     renderLogin();
@@ -76,23 +76,42 @@ describe("LoginPage", () => {
     // act
     await fillAndSubmit("admin@example.com", "wrong-password");
 
-    // assert: mensaje de error visible, sin token ni navegación
+    // assert: mensaje de error visible, sin navegación
     expect(await screen.findByText("Email o contraseña incorrectos.")).toBeInTheDocument();
-    expect(localStorage.getItem("admin_token")).toBeNull();
     expect(navigateMock).not.toHaveBeenCalledWith("/dashboard", { replace: true });
   });
 
-  it("muestra el formulario aunque ya exista un token guardado (la redirección la maneja el router)", async () => {
-    // The redirect-when-already-authenticated behaviour lives at the router level
-    // (RootRedirect / ProtectedRoute), not in LoginPage itself.  This test verifies
-    // that LoginPage renders the form without crashing when a token is present.
-    localStorage.setItem("admin_token", "existing.token");
+  it("nunca lee ni escribe localStorage, en ningún punto de su ciclo de vida", async () => {
+    // La sesión vive enteramente en una cookie httpOnly manejada por el
+    // browser; la lógica de redirect-si-ya-autenticado vive en el router
+    // (RootRedirect / ProtectedRoute — ver router.test.tsx), no en esta
+    // página. Este test prueba activamente que LoginPage no toca
+    // localStorage: ni al montar, ni en un submit exitoso, ni en uno fallido.
+    const getItemSpy = vi.spyOn(Storage.prototype, "getItem");
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
 
+    loginMock.mockResolvedValue({ ok: true });
     renderLogin();
-
     await waitFor(() => {
       expect(screen.getByLabelText("Email")).toBeInTheDocument();
     });
-    expect(loginMock).not.toHaveBeenCalled();
+    expect(getItemSpy).not.toHaveBeenCalled();
+    expect(setItemSpy).not.toHaveBeenCalled();
+
+    await fillAndSubmit("admin@example.com", "secret123");
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith("/dashboard", { replace: true });
+    });
+    expect(getItemSpy).not.toHaveBeenCalled();
+    expect(setItemSpy).not.toHaveBeenCalled();
+
+    loginMock.mockRejectedValue(new Error("401"));
+    await fillAndSubmit("admin@example.com", "wrong-password");
+    await screen.findByText("Email o contraseña incorrectos.");
+    expect(getItemSpy).not.toHaveBeenCalled();
+    expect(setItemSpy).not.toHaveBeenCalled();
+
+    getItemSpy.mockRestore();
+    setItemSpy.mockRestore();
   });
 });

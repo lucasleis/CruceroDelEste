@@ -46,7 +46,11 @@ async def _login(client: AsyncClient) -> str:
         "/admin/login", json={"email": "admin@test.com", "password": "secret"}
     )
     assert resp.status_code == 200
-    return resp.json()["access_token"]
+    # Session travels via the httpOnly cookie (persisted automatically by the
+    # test client's cookie jar) — the response body no longer carries a token
+    # (LLE-334). We still return the cookie value so existing call sites that
+    # build an (now-inert) Authorization header via _auth() keep working.
+    return resp.cookies["admin_token"]
 
 
 def _auth(token: str) -> dict:

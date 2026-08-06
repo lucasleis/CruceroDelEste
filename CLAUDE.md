@@ -172,6 +172,8 @@ No arranques a implementar nada hasta que Lucas apruebe explícitamente el paso 
 |-------|-----------|---------|
 | 29/07/2026 | ✅ 29/29 passed | `cd frontend-admin && npx vitest run` |
 
+06/08/2026 — LLE-334 reescribió la suite completa contra cookie httpOnly (antes certificaba localStorage).
+
 ---
 
 ## Regla de negocio crítica — AR↔PY

@@ -1,24 +1,32 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import AppRouter from "@/router";
+import { getMe } from "@/api/auth";
 
 // AuthProvider calls getMe on mount to determine the initial auth state.
-// Resolve when a token is present in localStorage, reject otherwise — this
-// mirrors what the real API module does.
+// Session is a httpOnly cookie the browser sends automatically — there is no
+// client-readable token, so each test controls the mocked getMe() resolution
+// directly instead of touching localStorage (LLE-334).
 vi.mock("@/api/auth", () => ({
-  getMe: vi.fn(() =>
-    localStorage.getItem("admin_token")
-      ? Promise.resolve({ id: "1", email: "admin@test.com" })
-      : Promise.reject(new Error("Unauthorized")),
-  ),
+  getMe: vi.fn(),
   logout: vi.fn().mockResolvedValue(undefined),
 }));
 
+const getMeMock = vi.mocked(getMe);
+
+function mockAuthenticated() {
+  getMeMock.mockResolvedValue({ id: "1", email: "admin@test.com" });
+}
+
+function mockUnauthenticated() {
+  getMeMock.mockRejectedValue(new Error("Unauthorized"));
+}
+
 // ProtectedRoute / RootRedirect guard the whole admin panel. We render the real
 // router tree at a given URL and assert what the user actually lands on, based
-// solely on the presence of a token in localStorage.
+// on the session state resolved through getMe() — the real signal the app uses.
 
 function renderAt(path: string) {
   return render(
@@ -31,52 +39,48 @@ function renderAt(path: string) {
 }
 
 describe("protección de rutas del admin", () => {
-  it("redirige al login cuando se entra a una ruta protegida sin token", async () => {
-    // arrange: sin token (setup limpia localStorage)
+  beforeEach(() => {
+    getMeMock.mockReset();
+  });
 
-    // act
+  it("redirige al login cuando se entra a una ruta protegida sin sesión", async () => {
+    mockUnauthenticated();
+
     renderAt("/viajes");
 
-    // assert: aterriza en el LoginPage
     await waitFor(() => {
       expect(screen.getByText("Panel de administración")).toBeInTheDocument();
     });
   });
 
-  it("redirige al login ante una ruta desconocida sin token", async () => {
-    // arrange: sin token
+  it("redirige al login ante una ruta desconocida sin sesión", async () => {
+    mockUnauthenticated();
 
-    // act
     renderAt("/ruta-que-no-existe");
 
-    // assert
     await waitFor(() => {
       expect(screen.getByText("Panel de administración")).toBeInTheDocument();
     });
   });
 
-  it("desde la raíz con token redirige al dashboard, no al login", async () => {
-    // arrange
-    localStorage.setItem("admin_token", "valid.token");
+  it("desde la raíz con sesión válida redirige al dashboard, no al login", async () => {
+    mockAuthenticated();
 
-    // act
     renderAt("/");
 
-    // assert: RootRedirect lleva al dashboard (placeholder + link del sidebar,
-    // de ahí el getAllByText) y NO muestra el login.
+    // RootRedirect lleva al dashboard (placeholder + link del sidebar, de ahí
+    // el getAllByText) y NO muestra el login.
     await waitFor(() => {
       expect(screen.getAllByText("Dashboard").length).toBeGreaterThan(0);
     });
     expect(screen.queryByText("Panel de administración")).not.toBeInTheDocument();
   });
 
-  it("desde la raíz sin token redirige al login", async () => {
-    // arrange: sin token
+  it("desde la raíz sin sesión redirige al login", async () => {
+    mockUnauthenticated();
 
-    // act
     renderAt("/");
 
-    // assert
     await waitFor(() => {
       expect(screen.getByText("Panel de administración")).toBeInTheDocument();
     });

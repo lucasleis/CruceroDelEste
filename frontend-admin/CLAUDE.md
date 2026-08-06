@@ -57,7 +57,7 @@ No leer todos los archivos de `src/pages/` ni `src/api/` al inicio — leer solo
 frontend-admin/
 ├── src/
 │   ├── api/              ← funciones de llamada a la API, una por dominio
-│   │   ├── client.ts     ← instancia axios con interceptor de auth y redirect 401
+│   │   ├── client.ts     ← instancia axios, withCredentials:true (cookie httpOnly) + redirect a /login en 401
 │   │   ├── auth.ts
 │   │   ├── bookings.ts
 │   │   ├── chargebacks.ts
@@ -108,8 +108,9 @@ frontend-admin/
 ### API client
 ```ts
 import apiClient from "./client";
-// apiClient es una instancia axios con Authorization header automático
-// y redirect a /login en 401
+// apiClient es una instancia axios con withCredentials:true — la sesión
+// viaja en una cookie httpOnly (admin_token), no hay token en JS-accessible
+// storage. El interceptor de response redirige a /login en 401. (LLE-334)
 ```
 
 ### React Query
@@ -214,7 +215,7 @@ El sidebar muestra: Dashboard, Viajes, Reservas, Reembolsos, Contracargos, Catá
 Base URL: `VITE_API_BASE_URL` (default: `http://localhost:8000`)
 
 ### Auth
-- `POST /admin/login` → `{ access_token, token_type }`
+- `POST /admin/login` → `{ ok: true }` (setea cookie httpOnly `admin_token`; el body no lleva el token — LLE-334)
 
 ### Trips
 - `GET /admin/trips` → `AdminTripRead[]`

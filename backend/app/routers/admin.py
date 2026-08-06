@@ -96,7 +96,7 @@ async def login(
         max_age=settings.jwt_expiry_minutes * 60,
     )
 
-    return AdminLoginResponse(access_token=token, token_type="bearer")
+    return AdminLoginResponse(ok=True)
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
