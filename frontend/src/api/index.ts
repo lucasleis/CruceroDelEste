@@ -83,6 +83,26 @@ export async function getBooking(bookingId: string, token: string): Promise<Book
   return response.json()
 }
 
+export async function createBooking(payload: {
+  trip_id: string
+  contact_email: string
+  seat_ids: string[]
+  passengers: {
+    seat_id: string
+    first_name: string
+    last_name: string
+    dni: string
+    email: string
+    phone: string | null
+  }[]
+}): Promise<Response> {
+  return fetch(`${BASE_URL}/bookings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function refundRequest(bookingId: string, email: string): Promise<Response> {
   return fetch(`${BASE_URL}/bookings/${bookingId}/refund-request`, {
     method: "POST",

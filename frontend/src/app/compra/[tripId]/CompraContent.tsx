@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BlueButton } from "@/components/core/BlueButton";
+import { createBooking } from "@/api";
 
 interface PassengerForm {
   nombres: string;
@@ -65,6 +66,55 @@ function validatePassenger(
   return errors;
 }
 
+type SubmitResult =
+  | { kind: "idle" }
+  | { kind: "invalid_seats" }
+  | { kind: "not_found" }
+  | { kind: "trip_not_available" }
+  | { kind: "seat_unavailable" }
+  | { kind: "international_route_required" }
+  | { kind: "rate_limited" }
+  | { kind: "payment_gateway_error" }
+  | { kind: "generic" };
+
+const SUBMIT_ERROR_CONFIG: Record<
+  Exclude<SubmitResult["kind"], "idle">,
+  { title: string; body: string }
+> = {
+  invalid_seats: {
+    title: "No pudimos resolver alguno de los asientos seleccionados.",
+    body: "Volvé a intentar.",
+  },
+  not_found: {
+    title: "El viaje ya no está disponible.",
+    body: "Puede que se haya eliminado o dado de baja. Volvé a buscar tu viaje.",
+  },
+  trip_not_available: {
+    title: "Este viaje ya no está disponible.",
+    body: "Fue cancelado o ya salió. Volvé a la búsqueda para ver otras opciones.",
+  },
+  seat_unavailable: {
+    title: "Ese asiento ya no está disponible.",
+    body: "Alguien lo reservó mientras completabas tus datos. Volvé a elegir un asiento.",
+  },
+  international_route_required: {
+    title: "Este viaje no es válido.",
+    body: "La ruta seleccionada no cumple con el requisito de tramo internacional.",
+  },
+  rate_limited: {
+    title: "Demasiados intentos.",
+    body: "Esperá un momento antes de volver a intentarlo.",
+  },
+  payment_gateway_error: {
+    title: "Hubo un problema con la pasarela de pago.",
+    body: "Tus datos no se perdieron. Esperá un momento y volvé a intentar.",
+  },
+  generic: {
+    title: "No pudimos confirmar la reserva.",
+    body: "Intentá nuevamente.",
+  },
+};
+
 const inputStyle: React.CSSProperties = {
   fontFamily: "var(--font-body)",
   fontSize: "14px",
@@ -108,7 +158,7 @@ export function CompraContent({ tripId }: CompraContentProps) {
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitResult, setSubmitResult] = useState<SubmitResult>({ kind: "idle" });
 
   function handleFieldChange(
     index: number,
@@ -145,36 +195,80 @@ export function CompraContent({ tripId }: CompraContentProps) {
     }
 
     if (seatIds.some((id) => !id)) {
-      setSubmitError("No pudimos resolver alguno de los asientos seleccionados. Volvé a intentar.");
+      setSubmitResult({ kind: "invalid_seats" });
       return;
     }
 
     setSubmitting(true);
-    setSubmitError(null);
+    setSubmitResult({ kind: "idle" });
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          trip_id: tripId,
-          contact_email: passengers[0].email,
-          seat_ids: seatIds,
-          passengers: passengers.map((p, index) => ({
-            seat_id: seatIds[index],
-            first_name: p.nombres,
-            last_name: p.apellidos,
-            dni: p.dni,
-            email: p.email,
-            phone: p.telefono || null,
-          })),
-        }),
+      const res = await createBooking({
+        trip_id: tripId,
+        contact_email: passengers[0].email,
+        seat_ids: seatIds,
+        passengers: passengers.map((p, index) => ({
+          seat_id: seatIds[index],
+          first_name: p.nombres,
+          last_name: p.apellidos,
+          dni: p.dni,
+          email: p.email,
+          phone: p.telefono || null,
+        })),
       });
-      if (!res.ok) throw new Error(`status ${res.status}`);
-      const data = await res.json();
-      window.location.href = data.init_point;
+
+      if (res.status === 201) {
+        const data = await res.json();
+        window.location.href = data.init_point;
+        return;
+      }
+
+      if (res.status === 404) {
+        setSubmitResult({ kind: "not_found" });
+        setSubmitting(false);
+        return;
+      }
+
+      if (res.status === 409) {
+        const data = await res.json();
+        if (data.detail === "seat_unavailable") {
+          setSubmitResult({ kind: "seat_unavailable" });
+        } else {
+          setSubmitResult({ kind: "trip_not_available" });
+        }
+        setSubmitting(false);
+        return;
+      }
+
+      if (res.status === 422) {
+        const data = await res.json();
+        if (data.detail === "international_route_required") {
+          setSubmitResult({ kind: "international_route_required" });
+        } else {
+          // 422 de validación pydantic (incluye el caso de ?passengers — LLE-336).
+          setSubmitResult({ kind: "generic" });
+        }
+        setSubmitting(false);
+        return;
+      }
+
+      if (res.status === 429) {
+        setSubmitResult({ kind: "rate_limited" });
+        setSubmitting(false);
+        return;
+      }
+
+      if (res.status === 502) {
+        setSubmitResult({ kind: "payment_gateway_error" });
+        setSubmitting(false);
+        return;
+      }
+
+      // 500 y cualquier otro código no listado explícitamente.
+      setSubmitResult({ kind: "generic" });
+      setSubmitting(false);
     } catch (err) {
       console.error("[CompraContent] booking POST error:", err);
-      setSubmitError("No pudimos confirmar la reserva. Intentá nuevamente.");
+      setSubmitResult({ kind: "generic" });
       setSubmitting(false);
     }
   }
@@ -383,17 +477,68 @@ export function CompraContent({ tripId }: CompraContentProps) {
           );
         })}
 
-        {submitError && (
-          <p
+        {submitResult.kind !== "idle" && (
+          <div
             style={{
-              fontFamily: "var(--font-body)",
-              color: "var(--color-accent)",
-              fontSize: "14px",
-              margin: 0,
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              borderRadius: "var(--radius-md)",
+              padding: "16px 20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px",
             }}
           >
-            {submitError}
-          </p>
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                color: "var(--color-text-primary)",
+                fontWeight: 700,
+                fontSize: "14px",
+                margin: 0,
+              }}
+            >
+              {SUBMIT_ERROR_CONFIG[submitResult.kind].title}
+            </p>
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                color: "var(--color-text-body)",
+                fontSize: "14px",
+                margin: 0,
+              }}
+            >
+              {SUBMIT_ERROR_CONFIG[submitResult.kind].body}
+            </p>
+            {submitResult.kind === "seat_unavailable" && (
+              <a
+                href={`/asientos/${tripId}`}
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-primary)",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  marginTop: "4px",
+                }}
+              >
+                Elegir otro asiento →
+              </a>
+            )}
+            {(submitResult.kind === "not_found" || submitResult.kind === "trip_not_available") && (
+              <a
+                href="/resultados"
+                style={{
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-primary)",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  marginTop: "4px",
+                }}
+              >
+                Buscar otro viaje →
+              </a>
+            )}
+          </div>
         )}
 
         <BlueButton
