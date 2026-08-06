@@ -64,11 +64,11 @@ Ubicados en `frontend/src/types/`.
 `backend/app/services/email.py` — servicio Resend con Jinja2. Completamente implementado, pendiente de wiring con el flujo de compra (sprint MercadoPago).
 
 - Templates en: `backend/templates/email/` (path correcto — NO usar `backend/app/email_templates/`)
-- Variables de contexto inyectadas por `_context_for()`: `first_name`, `last_name`, `booking_id`, `seat_number`, `seat_type`, `origin`, `destination`, `departure_at` (DateTime), `arrival_at` (DateTime), `total_amount` (Integer en centavos), `frontend_url`
+- Variables de contexto inyectadas por `_context_for()`: `first_name`, `last_name`, `booking_id`, `seat_number`, `seat_type`, `origin`, `destination`, `departure_at` (DateTime), `arrival_at` (DateTime), `total_amount` (Integer en pesos), `frontend_url`
 - Variables opcionales (condicionales en templates): `return_trip_url`, `boarding_point`, `survey_url`
 - Semántica de errores: `send_confirmation_email` re-lanza `EmailDeliveryError` (para que MP reintente). `send_reminder_email` y `send_feedback_email` tragan errores por pasajero y retornan `bool`.
 - `StrictUndefined` activo — todas las variables opcionales usan `{% if x is defined %}` en los templates.
-- `total_amount` se formatea a pesos en el template: `{{ "%.2f"|format(total_amount / 100) }}`
+- `total_amount` ya está en pesos; se formatea en el template como: `{{ "%.2f"|format(total_amount) }}` (LLE-332 — antes dividía por 100 asumiendo centavos, era incorrecto)
 - `booking_id` es UUID — TODO: reemplazar con `booking_code` corto (ej: ERP-00423) cuando se agregue el campo al modelo.
 - `boarding_point` — `Stop` no tiene campo `address`. Pendiente: agregar `Stop.address` o inyectar desde config map en send logic.
 

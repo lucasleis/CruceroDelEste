@@ -8,7 +8,7 @@ Destino:          {{ destination }}
 Fecha de salida:  {{ departure_at.strftime('%d/%m/%Y') }}
 Hora de salida:   {{ departure_at.strftime('%H:%M') }}
 Asiento:          {{ seat_number }} — {{ seat_type }}
-Total abonado:    $ {{ "%.2f"|format(total_amount / 100) }} ARS
+Total abonado:    $ {{ "%.2f"|format(total_amount) }} ARS
 
 Recordá llevar tu DNI o pasaporte (servicio internacional).
 

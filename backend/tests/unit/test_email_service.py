@@ -77,6 +77,11 @@ async def test_send_confirmation_payload():
     assert isinstance(payload["html"], str) and payload["html"]
     assert isinstance(payload["text"], str) and payload["text"]
 
+    # LLE-332: total_amount (24500, in pesos) must render as-is, not divided
+    # by 100. No thousands separator — that's the template's actual output.
+    assert "$ 24500.00 ARS" in payload["html"]
+    assert "$ 24500.00 ARS" in payload["text"]
+
 
 @pytest.mark.asyncio
 async def test_send_confirmation_skips_non_confirmed_booking():
