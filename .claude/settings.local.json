@@ -125,7 +125,14 @@
       "Bash(python3 -m json.tool)",
       "Bash(pkill -f \"uvicorn app.main:app\")",
       "Bash(echo \"started $!\")",
-      "Bash(echo \"diff exit: $?\")"
+      "Bash(echo \"diff exit: $?\")",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(xargs '-I{}' perl -0777 -ne 'while \\(/catch\\\\s*\\(\\\\\\([^\\)]*\\\\\\)\\)?\\\\s*\\\\{\\\\s*\\\\}/gs\\) { print \"$ARGV: match\\\\n\" }' '{}')",
+      "Bash(awk 'NR<=240')",
+      "Bash(clear)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('tag_name:', d.get\\('tag_name'\\)\\); print\\('published_at:', d.get\\('published_at'\\)\\)\")",
+      "Bash(python3 *)"
     ]
   }
 }
