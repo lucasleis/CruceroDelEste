@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
 import LoginPage from "@/pages/LoginPage";
 
@@ -29,12 +30,17 @@ vi.mock("react-router-dom", async () => {
 });
 
 function renderLogin() {
+  // AuthProvider calls useQueryClient() (LLE-342 — clears the cache on
+  // logout), so it needs a QueryClientProvider ancestor same as in main.tsx.
+  const queryClient = new QueryClient();
   return render(
-    <AuthProvider>
-      <MemoryRouter>
-        <LoginPage />
-      </MemoryRouter>
-    </AuthProvider>,
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <MemoryRouter>
+          <LoginPage />
+        </MemoryRouter>
+      </AuthProvider>
+    </QueryClientProvider>,
   );
 }
 

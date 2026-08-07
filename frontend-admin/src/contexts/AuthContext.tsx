@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { getMe, logout as logoutApi } from "@/api/auth";
 
 interface AuthContextValue {
@@ -14,6 +15,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     getMe()
@@ -25,6 +27,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function logout() {
     await logoutApi();
     setIsAuthenticated(false);
+    // El fix de LLE-342 saca el 401 que hoy fuerza un full reload en sesión
+    // vencida (interceptor de client.ts) — ese reload era lo único que
+    // limpiaba el caché de React Query al cerrar sesión. Sin este clear(),
+    // reservas/viajes cacheados quedarían en memoria después del logout.
+    queryClient.clear();
   }
 
   return (

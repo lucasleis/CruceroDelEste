@@ -102,9 +102,13 @@ async def login(
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(
     response: Response,
-    _admin: AdminUser = Depends(get_current_admin),
 ) -> dict:
-    response.delete_cookie("admin_token")
+    response.delete_cookie(
+        "admin_token",
+        httponly=True,
+        secure=(settings.environment == "production"),
+        samesite="strict",
+    )
     return {"ok": True}
 
 

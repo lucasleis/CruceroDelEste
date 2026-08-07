@@ -3,10 +3,12 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import jwt
 from httpx import AsyncClient
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.booking import AdminUser, Booking, BookingStatusEnum, Passenger
 from app.models.trip import (
     CountryEnum,
@@ -54,6 +56,20 @@ async def _login(client: AsyncClient, email: str, password: str) -> str:
 
 def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
+
+
+def _expired_token(admin_id: uuid.UUID) -> str:
+    """Build a JWT with the same claims as app.routers.admin.login, but
+    already expired — mirrors the token shape without going through a real
+    login (which always issues a token valid for jwt_expiry_minutes)."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(admin_id),
+        "exp": now - timedelta(minutes=1),
+        "iss": "crucero-admin",
+        "aud": "crucero-admin-api",
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
 
 async def _make_layout(
@@ -199,6 +215,46 @@ async def test_login_token_grants_access_to_protected_endpoint(
     resp = await client.get("/admin/bookings", headers=_auth(token))
 
     assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# POST /admin/logout
+# ---------------------------------------------------------------------------
+
+async def test_logout_valid_session_returns_200_and_clears_cookie(
+    client: AsyncClient, db: AsyncSession
+):
+    await _make_admin(db)
+    await _login(client, "admin@test.com", "secret")
+
+    resp = await client.post("/admin/logout")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
+    set_cookie = resp.headers.get("set-cookie", "")
+    assert "admin_token=" in set_cookie
+    # An expired/zeroed cookie is how the browser is told to delete it.
+    assert "Max-Age=0" in set_cookie or "expires=Thu, 01 Jan 1970" in set_cookie
+
+
+async def test_logout_expired_session_returns_200_and_clears_cookie(
+    client: AsyncClient, db: AsyncSession
+):
+    # LLE-342: logout used to depend on get_current_admin, so an expired JWT
+    # made it 401 before delete_cookie ever ran — the user could never log
+    # out of a stale session. This must return 200 regardless of token state.
+    admin = await _make_admin(db)
+    expired = _expired_token(admin.id)
+
+    resp = await client.post(
+        "/admin/logout", cookies={"admin_token": expired}
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
+    set_cookie = resp.headers.get("set-cookie", "")
+    assert "admin_token=" in set_cookie
+    assert "Max-Age=0" in set_cookie or "expires=Thu, 01 Jan 1970" in set_cookie
 
 
 # ---------------------------------------------------------------------------

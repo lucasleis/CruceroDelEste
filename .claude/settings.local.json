@@ -132,7 +132,10 @@
       "Bash(awk 'NR<=240')",
       "Bash(clear)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('tag_name:', d.get\\('tag_name'\\)\\); print\\('published_at:', d.get\\('published_at'\\)\\)\")",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(TESTCONTAINERS_RYUK_DISABLED=true uv run pytest tests/integration/test_admin_router.py -k \"logout\" -v)",
+      "Bash(TESTCONTAINERS_RYUK_DISABLED=true uv run pytest tests/integration/test_admin_router.py -v)",
+      "Bash(TESTCONTAINERS_RYUK_DISABLED=true uv run pytest)"
     ]
   }
 }

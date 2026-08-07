@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
 import AppRouter from "@/router";
 import { getMe } from "@/api/auth";
@@ -29,12 +30,17 @@ function mockUnauthenticated() {
 // on the session state resolved through getMe() — the real signal the app uses.
 
 function renderAt(path: string) {
+  // AuthProvider calls useQueryClient() (LLE-342 — clears the cache on
+  // logout), so it needs a QueryClientProvider ancestor same as in main.tsx.
+  const queryClient = new QueryClient();
   return render(
-    <AuthProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <AppRouter />
-      </MemoryRouter>
-    </AuthProvider>,
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <AppRouter />
+        </MemoryRouter>
+      </AuthProvider>
+    </QueryClientProvider>,
   );
 }
 
