@@ -118,7 +118,14 @@
       "Bash(psql -h 172.29.224.1 -U crucero -d crucerodeleste -c \"select id, name from seat_layouts;\")",
       "Bash(psql -h 172.29.224.1 -U crucero -d crucerodeleste -c \"select seat_layout_id, count\\(*\\) from trips group by seat_layout_id;\")",
       "Bash(pytest tests/integration/test_trips_router.py -q)",
-      "Bash(tee /tmp/claude-1000/-mnt-c-Users-lucas-Codigos-CruceroDelEste/e640fa61-f643-419e-b312-c61d5ef24fed/scratchpad/full_suite_run.log)"
+      "Bash(tee /tmp/claude-1000/-mnt-c-Users-lucas-Codigos-CruceroDelEste/e640fa61-f643-419e-b312-c61d5ef24fed/scratchpad/full_suite_run.log)",
+      "Bash(pg_lsclusters)",
+      "Bash(python3 -m venv --help)",
+      "Bash(uv --version)",
+      "Bash(python3 -m json.tool)",
+      "Bash(pkill -f \"uvicorn app.main:app\")",
+      "Bash(echo \"started $!\")",
+      "Bash(echo \"diff exit: $?\")"
     ]
   }
 }

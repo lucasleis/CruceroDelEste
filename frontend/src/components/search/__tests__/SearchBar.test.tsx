@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SearchBar } from "@/components/search/SearchBar";
+import { getStops, getValidDestinations } from "@/api";
 import type { StopRead } from "@/types/trips";
 
 vi.mock("@/components/search/TripTypeSelector", () => ({
@@ -25,9 +26,19 @@ vi.mock("@/components/search/DateInput", () => ({
   ),
 }))
 
-// SearchBar fetches the stop catalogue on mount. We mock global.fetch (the only
-// external dependency) so the component logic — client-side validation and the
-// AR↔PY opposite-country destination filtering — runs for real.
+// SearchBar carga el catálogo de paradas via getStops/getValidDestinations
+// (src/api/index.ts). Mockeamos la capa de servicio en vez de fetch global:
+// getStops() cachea a nivel de módulo entre llamadas reales, lo que rompía
+// el aislamiento entre tests cuando se mockeaba fetch (LLE-358). Mockear el
+// módulo de servicio evita depender de esa caché por completo — cada test
+// controla su propio getStops/getValidDestinations independientemente.
+vi.mock("@/api", () => ({
+  getStops: vi.fn(),
+  getValidDestinations: vi.fn(),
+}))
+
+const mockedGetStops = vi.mocked(getStops);
+const mockedGetValidDestinations = vi.mocked(getValidDestinations);
 
 const STOPS: StopRead[] = [
   { id: "ar-1", name: "Buenos Aires", country: "AR", province: "Buenos Aires", created_at: "" },
@@ -35,27 +46,20 @@ const STOPS: StopRead[] = [
   { id: "py-2", name: "Encarnación", country: "PY", province: "Itapúa", created_at: "" },
 ];
 
-function mockFetchOk(data: unknown) {
-  return vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => data,
-  } as Response);
-}
-
 describe("SearchBar — validación de búsqueda", () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", mockFetchOk(STOPS));
+    mockedGetStops.mockResolvedValue(STOPS);
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.resetAllMocks();
   });
 
   it("no dispara onSearch y muestra errores cuando faltan origen, destino y fecha", async () => {
     // arrange: catálogo cargado, sin selección del usuario
     const onSearch = vi.fn();
     render(<SearchBar onSearch={onSearch} />);
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    await waitFor(() => expect(getStops).toHaveBeenCalled());
     const user = userEvent.setup();
 
     // act: buscar sin completar nada
@@ -71,13 +75,12 @@ describe("SearchBar — validación de búsqueda", () => {
     // arrange
     const onSearch = vi.fn();
     render(<SearchBar onSearch={onSearch} />);
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
     const user = userEvent.setup();
 
     // act: abrir el input de Origen y elegir la provincia argentina "Buenos Aires"
     await user.click(screen.getByText("Origen"));
-    // el dropdown de origen muestra la provincia AR; la seleccionamos
-    await user.click(screen.getByText("Buenos Aires", { selector: "div" }));
+    // el dropdown de origen muestra la provincia AR una vez que getStops resuelve
+    await user.click(await screen.findByText("Buenos Aires", { selector: "div" }));
 
     // abrir el input de Destino
     await user.click(screen.getByText("Destino"));
@@ -91,65 +94,59 @@ describe("SearchBar — validación de búsqueda", () => {
 
 describe("SearchBar — estados de carga/error de fetchStops", () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.resetAllMocks();
   });
 
-  it("fetchStops pendiente → paradas no visibles en el dropdown de origen", async () => {
-    // fetch nunca resuelve — loadingStops permanece true
-    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise(() => {})));
+  it("getStops pendiente → el input de Origen queda deshabilitado y no se abre", async () => {
+    // getStops nunca resuelve — loadingStops permanece true
+    mockedGetStops.mockReturnValue(new Promise(() => {}));
     const onSearch = vi.fn();
     render(<SearchBar onSearch={onSearch} />);
 
-    // intentar abrir el dropdown de origen (disabled cuando loadingStops=true)
+    // CityInput muestra el placeholder "Cargando..." mientras loadingStops=true
+    // (se renderiza siempre, no solo con el dropdown abierto) — es el estado
+    // de carga en sí, no una inferencia a partir de un dropdown vacío
+    expect(screen.getAllByText("Cargando...")).toHaveLength(2);
+
+    // intentar abrir el dropdown de origen (toggleOpen() es no-op cuando disabled=true)
     await userEvent.setup().click(screen.getByText("Origen"));
 
-    // no debe haber paradas ni encabezados de país en pantalla
-    expect(screen.queryByText("Argentina")).not.toBeInTheDocument();
-    expect(screen.queryByText("Paraguay")).not.toBeInTheDocument();
+    // el dropdown no llegó a montarse: su input de búsqueda no existe en el DOM
+    expect(screen.queryByPlaceholderText("Buscar parada...")).not.toBeInTheDocument();
   });
 
   it("fetchStops falla → el componente renderiza sin lanzar excepción", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")));
+    mockedGetStops.mockRejectedValue(new Error("network error"));
     const onSearch = vi.fn();
 
     // no debe lanzar durante el render ni el efecto
     render(<SearchBar onSearch={onSearch} />);
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
 
-    // el componente sigue en pie — los labels están presentes
+    // el componente sigue en pie — los labels están presentes y el estado de
+    // error se refleja en el placeholder que CityInput muestra
     expect(screen.getByText("Origen")).toBeInTheDocument();
     expect(screen.getByText("Destino")).toBeInTheDocument();
+    // errorStops se refleja en el placeholder de ambos CityInput (Origen y Destino)
+    expect(await screen.findAllByText("Error al cargar")).toHaveLength(2);
   });
 
   it("getValidDestinations falla → destino bloqueado, no se abre a todos", async () => {
-    // /stops → éxito; /stops/.../valid-destinations → falla
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation((url: string) => {
-        if (url.includes("valid-destinations")) {
-          return Promise.reject(new Error("gateway error"));
-        }
-        return Promise.resolve({
-          ok: true,
-          json: async () => STOPS,
-        } as Response);
-      })
-    );
+    mockedGetStops.mockResolvedValue(STOPS);
+    mockedGetValidDestinations.mockRejectedValue(new Error("gateway error"));
 
     const onSearch = vi.fn();
     render(<SearchBar onSearch={onSearch} />);
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
-
     const user = userEvent.setup();
 
     // abrir origen y seleccionar la parada AR "Buenos Aires" (stop:, no provincia)
     await user.click(screen.getByText("Origen"));
-    await user.click(screen.getByText("└ Buenos Aires"));
+    await user.click(await screen.findByText("└ Buenos Aires"));
 
-    // esperar a que getValidDestinations falle y el estado se actualice
-    await waitFor(() =>
-      expect(fetch).toHaveBeenCalledWith(expect.stringContaining("valid-destinations"))
-    );
+    // esperar a que getValidDestinations falle y el estado se actualice —
+    // el mensaje de error visible es la evidencia de que el catch corrió
+    expect(
+      await screen.findByText(/No se pudieron cargar los destinos disponibles/)
+    ).toBeInTheDocument();
 
     // abrir el dropdown de destino
     await user.click(screen.getByText("Destino"));
@@ -164,23 +161,22 @@ describe("SearchBar — estados de carga/error de fetchStops", () => {
 
 describe("SearchBar — validación one-way vs round-trip", () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", mockFetchOk(STOPS));
+    mockedGetStops.mockResolvedValue(STOPS);
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.resetAllMocks();
   });
 
   it("round-trip sin fecha de vuelta → onSearch no llamado", async () => {
     // arrange: estado inicial es round-trip
     const onSearch = vi.fn();
     render(<SearchBar onSearch={onSearch} />);
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
     const user = userEvent.setup();
 
     // seleccionar origen: provincia "Buenos Aires" (AR)
     await user.click(screen.getByText("Origen"));
-    await user.click(screen.getByText("Buenos Aires", { selector: "div" }));
+    await user.click(await screen.findByText("Buenos Aires", { selector: "div" }));
 
     // seleccionar destino: provincia "Central" (PY)
     await user.click(screen.getByText("Destino"));
@@ -200,7 +196,6 @@ describe("SearchBar — validación one-way vs round-trip", () => {
     // arrange
     const onSearch = vi.fn();
     render(<SearchBar onSearch={onSearch} />);
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
     const user = userEvent.setup();
 
     // cambiar a one-way
@@ -208,7 +203,7 @@ describe("SearchBar — validación one-way vs round-trip", () => {
 
     // seleccionar origen: provincia "Buenos Aires" (AR)
     await user.click(screen.getByText("Origen"));
-    await user.click(screen.getByText("Buenos Aires", { selector: "div" }));
+    await user.click(await screen.findByText("Buenos Aires", { selector: "div" }));
 
     // seleccionar destino: provincia "Central" (PY)
     await user.click(screen.getByText("Destino"));
