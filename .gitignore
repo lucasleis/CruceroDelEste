@@ -10,5 +10,4 @@ build/
 node_modules/
 
 
-./frontend/.gitignore
-./frontend/.claude
+.claude/settings.local.json
