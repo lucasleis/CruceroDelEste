@@ -168,6 +168,7 @@ async def test_post_bookings_happy_path_201(client: AsyncClient, db: AsyncSessio
     assert "id" in data
     assert "expires_at" in data
     assert "init_point" in data
+    assert isinstance(data["booking_code"], str) and data["booking_code"]
     assert data["init_point"].startswith("https://")
 
     assert len(data["passengers"]) == 1

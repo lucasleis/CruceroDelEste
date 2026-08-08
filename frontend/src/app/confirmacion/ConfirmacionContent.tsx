@@ -352,7 +352,7 @@ export function ConfirmacionContent() {
                   marginTop: "12px",
                 }}
               >
-                Reserva Nº {booking.id.slice(0, 8).toUpperCase()}
+                Reserva Nº {booking.booking_code}
               </p>
             </div>
 

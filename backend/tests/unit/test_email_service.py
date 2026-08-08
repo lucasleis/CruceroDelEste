@@ -49,6 +49,7 @@ def _make_booking(*, status: BookingStatusEnum = BookingStatusEnum.confirmed) ->
 
     booking = MagicMock()
     booking.id = uuid.uuid4()
+    booking.booking_code = "ERP-7K3M-9QX2"
     booking.status = status
     booking.passengers = [passenger]
     booking.trip = trip
@@ -73,7 +74,7 @@ async def test_send_confirmation_payload():
 
     assert payload["from"] == "no-reply@expresorioparana.com"
     assert payload["to"] == [passenger.email]
-    assert str(booking.id)[:8] in payload["subject"]
+    assert booking.booking_code in payload["subject"]
     assert isinstance(payload["html"], str) and payload["html"]
     assert isinstance(payload["text"], str) and payload["text"]
 

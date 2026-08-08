@@ -128,7 +128,7 @@ export default function BookingsPage() {
                       className="py-3 font-mono text-xs text-neutral-900"
                       title={booking.id}
                     >
-                      {booking.id.slice(0, 8)}
+                      {booking.booking_code}
                     </TableCell>
                     <TableCell className="py-3 text-sm text-neutral-900">
                       {booking.passenger_count} pasajero(s)

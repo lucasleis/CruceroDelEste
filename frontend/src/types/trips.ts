@@ -54,6 +54,7 @@ export interface PassengerRead {
 
 export interface BookingRead {
   id: string
+  booking_code: string
   trip: TripSummary
   status: string
   contact_email: string

@@ -171,6 +171,7 @@ class AdminBookingRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    booking_code: str
     trip_id: UUID
     status: BookingStatusEnum
     contact_email: str
@@ -189,6 +190,7 @@ class AdminBookingListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    booking_code: str
     trip_id: UUID
     status: BookingStatusEnum
     contact_email: str

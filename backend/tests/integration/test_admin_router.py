@@ -314,6 +314,7 @@ async def test_list_bookings_returns_correct_shape(
 
     b = data["items"][0]
     assert b["id"] == str(booking.id)
+    assert b["booking_code"] == booking.booking_code
     assert b["trip_id"] == str(trip.id)
     assert b["status"] == "pending_payment"
     assert b["contact_email"] == "buyer@example.com"

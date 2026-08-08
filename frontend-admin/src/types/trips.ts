@@ -102,6 +102,7 @@ export interface PassengerRead {
 
 export interface AdminBookingRead {
   id: string;
+  booking_code: string;
   trip_id: string;
   status: BookingStatusEnum;
   contact_email: string;
@@ -118,6 +119,7 @@ export interface AdminBookingRead {
 
 export interface AdminBookingListItem {
   id: string;
+  booking_code: string;
   trip_id: string;
   status: BookingStatusEnum;
   contact_email: string;

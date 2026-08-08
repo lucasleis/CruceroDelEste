@@ -2,7 +2,7 @@ Hola {{ first_name }},
 
 Tu pasaje está confirmado.
 
-Número de boleto: {{ booking_id }}
+Número de boleto: {{ booking_code }}
 Origen:           {{ origin }}
 Destino:          {{ destination }}
 Fecha de salida:  {{ departure_at.strftime('%d/%m/%Y') }}
@@ -11,9 +11,6 @@ Asiento:          {{ seat_number }} — {{ seat_type }}
 Total abonado:    $ {{ "%.2f"|format(total_amount) }} ARS
 
 Recordá llevar tu DNI o pasaporte (servicio internacional).
-
-Consultá tu reserva en:
-{{ frontend_url }}/bookings/{{ booking_id }}
 
 {% if return_trip_url is defined %}
 ¿Vas a volver? Comprá tu pasaje de vuelta con 5% de descuento:

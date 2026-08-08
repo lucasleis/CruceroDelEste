@@ -70,7 +70,7 @@ def _context_for(booking: Booking, passenger: Passenger) -> dict:
     return {
         "first_name": passenger.first_name,
         "last_name": passenger.last_name,
-        "booking_id": str(booking.id),
+        "booking_code": booking.booking_code,
         "seat_number": seat.seat_number,
         "seat_type": seat.seat_type.value,
         "origin": trip.route.origin_stop.name,
@@ -117,7 +117,7 @@ async def send_confirmation_email(booking: Booking) -> None:
     failed: list[str] = []
     for passenger in booking.passengers:
         ctx = _context_for(booking, passenger)
-        subject = f"Confirmación de compra — Expreso Río Paraná #{ctx['booking_id'][:8]}"
+        subject = f"Confirmación de compra — Expreso Río Paraná #{ctx['booking_code']}"
         html = _render("confirmation.html", ctx)
         text = _render("confirmation.txt", ctx)
 

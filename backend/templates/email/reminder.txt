@@ -2,7 +2,7 @@ Hola {{ first_name }},
 
 Tu viaje se acerca. Acá te recordamos los detalles.
 
-Número de boleto: {{ booking_id }}
+Número de boleto: {{ booking_code }}
 Origen:           {{ origin }}
 Destino:          {{ destination }}
 Fecha de salida:  {{ departure_at.strftime('%d/%m/%Y') }}
@@ -19,9 +19,6 @@ Antes de viajar
 3. Equipaje — consultá la franquicia con el personal al momento del abordaje.
 
 Disfrutá WiFi Starlink durante todo el viaje.
-
-Consultá tu reserva en:
-{{ frontend_url }}/bookings/{{ booking_id }}
 
 Expreso Río Paraná — servicio de transporte internacional
 Este es un email automático, por favor no responder.

@@ -132,6 +132,7 @@ async def create_booking_endpoint(
 
     return BookingCreateResponse(
         id=booking.id,
+        booking_code=booking.booking_code,
         trip_id=booking.trip_id,
         status=booking.status,
         contact_email=booking.contact_email,

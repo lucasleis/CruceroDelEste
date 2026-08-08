@@ -63,7 +63,7 @@ export default function BookingDetailPage() {
             <ChevronLeft className="size-4" />
           </Button>
           <h1 className="text-2xl font-semibold text-neutral-900">
-            Reserva <span className="font-mono">{booking.id.slice(0, 8)}</span>
+            Reserva <span className="font-mono">{booking.booking_code}</span>
           </h1>
         </div>
         <Badge className={status.className}>{status.label}</Badge>
