@@ -135,7 +135,14 @@
       "Bash(python3 *)",
       "Bash(TESTCONTAINERS_RYUK_DISABLED=true uv run pytest tests/integration/test_admin_router.py -k \"logout\" -v)",
       "Bash(TESTCONTAINERS_RYUK_DISABLED=true uv run pytest tests/integration/test_admin_router.py -v)",
-      "Bash(TESTCONTAINERS_RYUK_DISABLED=true uv run pytest)"
+      "Bash(TESTCONTAINERS_RYUK_DISABLED=true uv run pytest)",
+      "Bash(sort -k9)",
+      "Bash(echo \"---exit: $?\")",
+      "Bash(TESTCONTAINERS_RYUK_DISABLED=true uv run pytest tests/unit/test_booking_code.py -v)",
+      "Bash(TESTCONTAINERS_RYUK_DISABLED=true uv run pytest tests/integration/test_booking_code_generation.py -v)",
+      "Bash(TESTCONTAINERS_RYUK_DISABLED=true uv run pytest tests/integration/test_booking_code_migration.py -v -s)",
+      "Bash(TESTCONTAINERS_RYUK_DISABLED=true uv run *)",
+      "Bash(TESTCONTAINERS_RYUK_DISABLED=true DATABASE_URL=\"postgresql+asyncpg://test:test@localhost:5432/test\" SYNC_DATABASE_URL=\"postgresql://test:test@localhost:5432/test\" uv run *)"
     ]
   }
 }

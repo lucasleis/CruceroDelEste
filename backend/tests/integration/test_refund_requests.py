@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking, BookingStatusEnum, Passenger, RefundRequest
+from app.services.booking_code import generate_booking_code
 from app.models.trip import (
     CountryEnum,
     PriceTranche,
@@ -69,6 +70,7 @@ async def _make_confirmed_booking(
     confirmed_at = now - timedelta(days=confirmed_days_ago)
     booking = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.confirmed,
         contact_email="buyer@example.com",
         total_amount=24500,
@@ -218,6 +220,7 @@ async def test_refund_request_pending_booking_returns_403(
     now = datetime.now(timezone.utc)
     booking = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.pending_payment,
         contact_email="buyer@example.com",
         total_amount=24500,

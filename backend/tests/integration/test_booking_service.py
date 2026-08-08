@@ -34,6 +34,7 @@ from app.services.booking import (
     create_booking,
     expire_booking,
 )
+from app.services.booking_code import generate_booking_code
 from app.services.pricing import NoPriceTranchesConfigured
 
 _NOW = datetime.now(timezone.utc)
@@ -139,6 +140,8 @@ async def test_create_booking_happy_path(db: AsyncSession):
     assert booking.status == BookingStatusEnum.pending_payment
     assert booking.contact_email == "buyer@example.com"
     assert booking.total_amount == 24500
+    assert booking.booking_code.startswith("ERP-")
+    assert len(booking.booking_code) == 13
     assert booking.trip_id == trip.id
     assert booking.expires_at > _NOW
 
@@ -245,6 +248,7 @@ async def test_confirm_booking_happy_path(db: AsyncSession):
 
     booking = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.pending_payment,
         contact_email="buyer@example.com",
         total_amount=24500,
@@ -288,6 +292,7 @@ async def test_confirm_already_confirmed_booking_is_idempotent(db: AsyncSession)
     original_confirmed_at = _NOW - timedelta(hours=1)
     booking = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.confirmed,
         contact_email="buyer@example.com",
         mp_payment_id="mp-old",
@@ -327,6 +332,7 @@ async def test_confirm_expired_booking_is_not_reactivated(db: AsyncSession):
 
     booking = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.expired,
         contact_email="buyer@example.com",
         total_amount=24500,
@@ -363,6 +369,7 @@ async def test_expire_booking_happy_path(db: AsyncSession):
 
     booking = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.pending_payment,
         contact_email="buyer@example.com",
         total_amount=24500,
@@ -401,6 +408,7 @@ async def test_expire_already_expired_booking_is_idempotent(db: AsyncSession):
 
     booking = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.expired,
         contact_email="buyer@example.com",
         total_amount=24500,

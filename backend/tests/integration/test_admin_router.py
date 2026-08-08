@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.booking import AdminUser, Booking, BookingStatusEnum, Passenger
+from app.services.booking_code import generate_booking_code
 from app.models.trip import (
     CountryEnum,
     PriceTranche,
@@ -140,6 +141,7 @@ async def _make_booking_with_passenger(db: AsyncSession, trip: Trip) -> Booking:
     now = datetime.now(timezone.utc)
     booking = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.pending_payment,
         contact_email="buyer@example.com",
         total_amount=24500,
@@ -348,6 +350,7 @@ async def test_list_bookings_filter_by_status(
 
     booking_pending = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.pending_payment,
         contact_email="buyer@example.com",
         total_amount=24500,
@@ -355,6 +358,7 @@ async def test_list_bookings_filter_by_status(
     )
     booking_confirmed = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.confirmed,
         contact_email="buyer@example.com",
         total_amount=24500,
@@ -445,6 +449,7 @@ async def test_list_bookings_pagination_limits_results(
         await db.flush()
         booking = Booking(
             trip_id=trip.id,
+            booking_code=generate_booking_code(),
             status=BookingStatusEnum.pending_payment,
             contact_email="buyer@example.com",
             total_amount=24500,
@@ -493,6 +498,7 @@ async def test_list_bookings_pagination_skip_offsets_results(
         await db.flush()
         booking = Booking(
             trip_id=trip.id,
+            booking_code=generate_booking_code(),
             status=BookingStatusEnum.pending_payment,
             contact_email="buyer@example.com",
             total_amount=24500,

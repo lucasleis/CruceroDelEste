@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import tasks.reminders as reminders
 from app.models.booking import Booking, BookingStatusEnum, Passenger
+from app.services.booking_code import generate_booking_code
 from app.models.trip import (
     CountryEnum,
     Route,
@@ -77,6 +78,7 @@ async def _seed_pending_booking(
         await db.flush()
         booking = Booking(
             trip_id=trip.id,
+            booking_code=generate_booking_code(),
             status=BookingStatusEnum.pending_payment,
             contact_email="ana@example.com",
             total_amount=24500,
@@ -173,6 +175,7 @@ async def _seed_confirmed_booking(
         await db.flush()
         booking = Booking(
             trip_id=trip.id,
+            booking_code=generate_booking_code(),
             status=BookingStatusEnum.confirmed,
             contact_email="ana@example.com",
             total_amount=24500,

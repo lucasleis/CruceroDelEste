@@ -8,6 +8,7 @@ from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import AdminUser, Booking, BookingStatusEnum, Passenger
+from app.services.booking_code import generate_booking_code
 from app.models.trip import (
     CountryEnum,
     PriceTranche,
@@ -132,6 +133,7 @@ async def _make_confirmed_booking(db: AsyncSession, trip: Trip) -> Booking:
     now = datetime.now(timezone.utc)
     booking = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.confirmed,
         contact_email="buyer@example.com",
         total_amount=24500,

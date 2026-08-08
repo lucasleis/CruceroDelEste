@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.booking import Booking, BookingStatusEnum, Passenger, RefundRequest
 from app.models.trip import CountryEnum, Seat, SeatStatusEnum, SeatTypeEnum
+from app.services.booking_code import generate_unique_booking_code
 from app.services.inventory import mark_seats_sold, reserve_seats
 from app.services.payment import PreferenceItem
 from app.services.pricing import get_current_price
@@ -76,15 +77,23 @@ async def create_booking(
             f"total_amount mismatch: booking total={total_amount}, items sum={computed}"
         )
 
+    booking_code = await generate_unique_booking_code(db)
+
     now = datetime.now(timezone.utc)
     booking = Booking(
         trip_id=trip_id,
+        booking_code=booking_code,
         status=BookingStatusEnum.pending_payment,
         contact_email=contact_email,
         total_amount=total_amount,
         expires_at=now + timedelta(minutes=settings.booking_expiry_minutes),
     )
     db.add(booking)
+    # Collision on booking_code here (after generate_unique_booking_code's own
+    # SELECT already found it free) means two requests generated the same code
+    # in the same instant — over a ~1.1e12 keyspace. Left uncaught: it surfaces
+    # as an IntegrityError -> 500, same as any other insertion failure. See
+    # app/services/booking_code.py docstring for the full reasoning (LLE-350).
     await db.flush()  # populate booking.id before creating passengers
 
     passenger_by_seat = {p.seat_id: p for p in passengers_data}

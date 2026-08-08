@@ -38,6 +38,10 @@ class Booking(Base):
     __tablename__ = "bookings"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Human-facing identifier (e.g. "ERP-7K3M-9QX2") — see app/services/booking_code.py.
+    # id (UUID) remains the PK and the only reference used internally (FKs, tokens,
+    # routing). booking_code exists purely for the user to read/quote it (LLE-350).
+    booking_code = Column(String(13), nullable=False, unique=True)
     trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id"), nullable=False)
     status = Column(
         Enum(BookingStatusEnum, name="booking_status"),

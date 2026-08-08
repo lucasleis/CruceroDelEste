@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.booking import expire_booking
 from app.services.payment import generate_confirmation_token
 from app.models.booking import Booking, BookingStatusEnum, Passenger
+from app.services.booking_code import generate_booking_code
 from app.models.trip import (
     CountryEnum,
     PriceTranche,
@@ -125,6 +126,7 @@ async def _make_booking_in_db(db: AsyncSession) -> Booking:
     now = datetime.now(timezone.utc)
     booking = Booking(
         trip_id=trip.id,
+        booking_code=generate_booking_code(),
         status=BookingStatusEnum.pending_payment,
         contact_email="buyer@example.com",
         total_amount=24500,
