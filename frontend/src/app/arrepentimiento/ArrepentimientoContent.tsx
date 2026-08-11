@@ -15,7 +15,7 @@ type ResultState =
   | { kind: "rate_limited" }
   | { kind: "error" };
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const BOOKING_CODE_RE = /^ERP-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/;
 
 const inputStyle: React.CSSProperties = {
   fontFamily: "var(--font-body)",
@@ -119,11 +119,11 @@ export function ArrepentimientoContent() {
     e.preventDefault();
     setFormError(null);
 
-    const trimmedId = bookingId.trim();
+    const trimmedId = bookingId.trim().toUpperCase();
     const trimmedEmail = email.trim();
 
-    if (!UUID_RE.test(trimmedId)) {
-      setFormError("El número de reserva no tiene un formato válido.");
+    if (!BOOKING_CODE_RE.test(trimmedId)) {
+      setFormError("El número de reserva no tiene un formato válido. Ej: ERP-7K3M-9QX2.");
       return;
     }
     if (!trimmedEmail) {
@@ -220,7 +220,7 @@ export function ArrepentimientoContent() {
             type="text"
             value={bookingId}
             onChange={(e) => setBookingId(e.target.value)}
-            placeholder="Ej: 3a547502-c723-4bbb-a05d-b4165f836768"
+            placeholder="Ej: ERP-7K3M-9QX2"
             style={inputStyle}
             required
           />

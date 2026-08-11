@@ -1,5 +1,6 @@
 import logging
 import hmac as hmac_lib
+import re
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -143,18 +144,31 @@ async def create_booking_endpoint(
     )
 
 
-@router.post("/{booking_id}/refund-request", response_model=RefundRequestRead, status_code=201)
+_BOOKING_CODE_RE = re.compile(r"^ERP-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$")
+
+
+@router.post("/{booking_code}/refund-request", response_model=RefundRequestRead, status_code=201)
 @limiter.limit("5/minute")
 async def create_refund_request_endpoint(
     request: Request,
-    booking_id: UUID,
+    booking_code: str,
     body: RefundRequestCreate,
     db: AsyncSession = Depends(get_db),
 ) -> RefundRequestRead:
+    # Normalize before validating/looking up — this endpoint is public and
+    # not every caller goes through the frontend's own trim/uppercase.
+    booking_code = booking_code.strip().upper()
+
+    if not _BOOKING_CODE_RE.match(booking_code):
+        # Same 403/"forbidden" as not-found/not-confirmed below — a distinct
+        # response for "malformed" would leak which codes are well-formed
+        # vs. which exist, breaking the anti-enumeration property.
+        raise HTTPException(status_code=403, detail="forbidden")
+
     result = await db.execute(
         select(Booking)
         .options(selectinload(Booking.passengers), selectinload(Booking.trip))
-        .where(Booking.id == booking_id)
+        .where(Booking.booking_code == booking_code)
     )
     booking = result.scalar_one_or_none()
     if booking is None or booking.status != BookingStatusEnum.confirmed:
