@@ -23,7 +23,7 @@ function jsonResponse(status: number, body: unknown = {}): Response {
   } as Response;
 }
 
-const VALID_BOOKING_ID = "3a547502-c723-4bbb-a05d-b4165f836768";
+const VALID_BOOKING_ID = "ERP-7K3M-9QX2";
 
 async function submitForm() {
   const user = userEvent.setup();
@@ -74,4 +74,21 @@ describe("ArrepentimientoContent — branching de status code", () => {
       });
     }
   );
+
+  it("número de reserva con formato inválido no llega a llamar al backend", async () => {
+    refundRequestMock.mockClear();
+    render(<ArrepentimientoContent />);
+    const user = userEvent.setup();
+
+    // O, 0, I y 1 no son parte del alfabeto real (booking_code.py) — nunca
+    // aparecen en un código generado por el backend.
+    await user.type(screen.getByLabelText("Número de reserva"), "ERP-0O1I-ABCD");
+    await user.type(screen.getByLabelText("Email de la compra"), "ana@example.com");
+    await user.click(screen.getByRole("button", { name: /solicitar cancelación/i }));
+
+    expect(
+      screen.getByText("El número de reserva no tiene un formato válido. Ej: ERP-7K3M-9QX2.")
+    ).toBeInTheDocument();
+    expect(refundRequestMock).not.toHaveBeenCalled();
+  });
 });

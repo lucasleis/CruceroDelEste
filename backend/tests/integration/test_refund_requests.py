@@ -1,6 +1,5 @@
-"""Integration tests for POST /bookings/{id}/refund-request."""
+"""Integration tests for POST /bookings/{booking_code}/refund-request."""
 
-import uuid
 from datetime import datetime, timedelta, timezone
 
 from httpx import AsyncClient
@@ -101,7 +100,7 @@ async def test_refund_request_happy_path_201(client: AsyncClient, db: AsyncSessi
     booking, _ = await _make_confirmed_booking(db)
 
     resp = await client.post(
-        f"/bookings/{booking.id}/refund-request",
+        f"/bookings/{booking.booking_code}/refund-request",
         json={"email": "ana@example.com"},
     )
 
@@ -135,7 +134,7 @@ async def test_refund_request_window_expired_10_days_422_persists_row(
     booking, _ = await _make_confirmed_booking(db, confirmed_days_ago=11)
 
     resp = await client.post(
-        f"/bookings/{booking.id}/refund-request",
+        f"/bookings/{booking.booking_code}/refund-request",
         json={"email": "ana@example.com"},
     )
 
@@ -171,7 +170,7 @@ async def test_refund_request_window_expired_24h_before_departure_422_persists_r
     )
 
     resp = await client.post(
-        f"/bookings/{booking.id}/refund-request",
+        f"/bookings/{booking.booking_code}/refund-request",
         json={"email": "ana@example.com"},
     )
 
@@ -197,11 +196,50 @@ async def test_refund_request_window_expired_24h_before_departure_422_persists_r
 
 async def test_refund_request_booking_not_found_returns_403(client: AsyncClient):
     resp = await client.post(
-        f"/bookings/{uuid.uuid4()}/refund-request",
+        "/bookings/ERP-2345-6789/refund-request",
         json={"email": "ana@example.com"},
     )
 
     assert resp.status_code == 403
+
+
+async def test_refund_request_invalid_format_not_found_and_not_confirmed_are_identical(
+    client: AsyncClient, db: AsyncSession
+):
+    """Malformed code, nonexistent code, and a not-confirmed booking must all
+    produce the exact same response (status + detail) — anti-enumeration."""
+    trip = await _make_trip(db)
+    seat = Seat(
+        trip_id=trip.id,
+        seat_number="3C",
+        seat_type=SeatTypeEnum.cama,
+        status=SeatStatusEnum.reserved,
+    )
+    db.add(seat)
+    await db.flush()
+
+    now = datetime.now(timezone.utc)
+    not_confirmed_booking = Booking(
+        trip_id=trip.id,
+        booking_code=generate_booking_code(),
+        status=BookingStatusEnum.pending_payment,
+        contact_email="buyer@example.com",
+        total_amount=24500,
+        expires_at=now + timedelta(minutes=15),
+    )
+    db.add(not_confirmed_booking)
+    await db.flush()
+
+    responses = []
+    for code in ("not-a-valid-code", "ERP-2345-6789", not_confirmed_booking.booking_code):
+        resp = await client.post(
+            f"/bookings/{code}/refund-request",
+            json={"email": "ana@example.com"},
+        )
+        responses.append((resp.status_code, resp.json()))
+
+    assert responses[0] == responses[1] == responses[2]
+    assert responses[0] == (403, {"detail": "forbidden"})
 
 
 async def test_refund_request_pending_booking_returns_403(
@@ -240,7 +278,7 @@ async def test_refund_request_pending_booking_returns_403(
     await db.flush()
 
     resp = await client.post(
-        f"/bookings/{booking.id}/refund-request",
+        f"/bookings/{booking.booking_code}/refund-request",
         json={"email": "ana@example.com"},
     )
 
@@ -257,7 +295,7 @@ async def test_refund_request_expired_booking_returns_403(
     await db.flush()
 
     resp = await client.post(
-        f"/bookings/{booking.id}/refund-request",
+        f"/bookings/{booking.booking_code}/refund-request",
         json={"email": "ana@example.com"},
     )
 
@@ -272,7 +310,7 @@ async def test_refund_request_already_refunded_returns_403(
     await db.flush()
 
     resp = await client.post(
-        f"/bookings/{booking.id}/refund-request",
+        f"/bookings/{booking.booking_code}/refund-request",
         json={"email": "ana@example.com"},
     )
 
@@ -285,7 +323,7 @@ async def test_refund_request_wrong_email_returns_422(
     booking, _ = await _make_confirmed_booking(db)
 
     resp = await client.post(
-        f"/bookings/{booking.id}/refund-request",
+        f"/bookings/{booking.booking_code}/refund-request",
         json={"email": "otro@example.com"},
     )
 
@@ -304,7 +342,7 @@ async def test_refund_request_mp_failure_returns_502_booking_stays_confirmed(
     }
 
     resp = await client.post(
-        f"/bookings/{booking.id}/refund-request",
+        f"/bookings/{booking.booking_code}/refund-request",
         json={"email": "ana@example.com"},
     )
 
@@ -335,7 +373,7 @@ async def test_refund_request_contact_email_accepted(
     # Submitting with the buyer's email must succeed.
 
     resp = await client.post(
-        f"/bookings/{booking.id}/refund-request",
+        f"/bookings/{booking.booking_code}/refund-request",
         json={"email": "buyer@example.com"},
     )
 
@@ -358,7 +396,7 @@ async def test_refund_request_unrelated_email_returns_422(
     booking, _ = await _make_confirmed_booking(db)
 
     resp = await client.post(
-        f"/bookings/{booking.id}/refund-request",
+        f"/bookings/{booking.booking_code}/refund-request",
         json={"email": "stranger@example.com"},
     )
 
@@ -373,7 +411,7 @@ async def test_refund_request_no_mp_payment_id_returns_500(
     booking, _ = await _make_confirmed_booking(db, mp_payment_id=None)
 
     resp = await client.post(
-        f"/bookings/{booking.id}/refund-request",
+        f"/bookings/{booking.booking_code}/refund-request",
         json={"email": "ana@example.com"},
     )
 
