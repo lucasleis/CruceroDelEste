@@ -303,8 +303,8 @@ Módulos críticos:
 
 ### #036 — CORS
 - `CORSMiddleware` en `app/main.py` antes de todos los routers.
-- Orígenes configurables via `CORS_ORIGINS` (comma-separated env var).
-- Producción: `https://expresorioparana.com,https://admin.expresorioparana.com` (LLE-71).
+- Orígenes configurables via `CORS_ORIGINS` (env var en formato **JSON array**, ej: `["https://ejemplo.com"]` — es lo que requiere pydantic-settings; ver `.env.example`).
+- Producción: `["https://expresorioparana.com","https://admin.expresorioparana.com"]` (LLE-71).
 
 ### app/services/http.py — call_with_retry
 - Async, reintenta solo en 429. Backoff exponencial con jitter. Max 3 reintentos.
