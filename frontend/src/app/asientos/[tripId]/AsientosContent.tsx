@@ -156,7 +156,7 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
       timeZone: "America/Argentina/Buenos_Aires",
       hour: "2-digit",
       minute: "2-digit",
-      hour12: false,
+      hourCycle: "h23",
     });
     return `${datePart} · ${timePart}`;
   }
