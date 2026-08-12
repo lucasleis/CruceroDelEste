@@ -19,13 +19,13 @@ export const STATUS_BADGE: Record<
 };
 
 export const dateFormatter = new Intl.DateTimeFormat("es-AR", {
-  timeZone: "America/Buenos_Aires",
+  timeZone: "America/Argentina/Buenos_Aires",
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
-  hour12: false,
+  hourCycle: "h23",
 });
 
 export function formatDate(iso: string): string {

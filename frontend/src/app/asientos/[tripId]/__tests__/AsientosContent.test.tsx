@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import { AsientosContent } from "../AsientosContent";
+import { getTrip } from "@/api";
 
 // LLE-336: cuando ?passengers falta o es inválido, AsientosContent debe
 // redirigir a /resultados en vez de renderizar un selector sin tope de
@@ -97,5 +98,38 @@ describe("AsientosContent — ?passengers ausente/inválido (LLE-336)", () => {
       expect(toastErrorMock).not.toHaveBeenCalled();
     });
     expect(pushMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("AsientosContent — formatDateTime en medianoche (LLE-374)", () => {
+  beforeEach(() => {
+    pushMock.mockReset();
+    toastErrorMock.mockReset();
+  });
+
+  it("muestra 00:00, no 24:00, cuando la salida es medianoche en hora argentina", async () => {
+    mockSearchParams = new URLSearchParams("passengers=1");
+    vi.mocked(getTrip).mockResolvedValueOnce({
+      id: "trip-1",
+      route: {
+        id: "route-1",
+        origin_stop: { id: "stop-ar", name: "Retiro", country: "AR", province: null, created_at: "" },
+        destination_stop: { id: "stop-py", name: "Asunción", country: "PY", province: null, created_at: "" },
+      },
+      // 03:00Z = 00:00 en America/Argentina/Buenos_Aires (-03:00).
+      departure_at: "2026-01-01T03:00:00Z",
+      arrival_at: "2026-01-01T13:00:00Z",
+      status: "scheduled",
+      available_seats_count: 10,
+      current_price_cama: 20000,
+      current_price_semi_cama: 15000,
+    });
+
+    const { container } = render(<AsientosContent tripId="trip-1" />);
+
+    await waitFor(() => {
+      expect(container.textContent).toContain("00:00");
+    });
+    expect(container.textContent).not.toContain("24:00");
   });
 });
