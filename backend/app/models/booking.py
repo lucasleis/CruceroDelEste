@@ -12,6 +12,7 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -69,6 +70,25 @@ class Booking(Base):
             "idx_bookings_expires",
             "expires_at",
             postgresql_where=Column("status") == "pending_payment",
+        ),
+        # These three indexes exist in production since migration d1e2f3a4 but
+        # were missing from the model — autogenerate would have emitted DROP INDEX
+        # for all three, silently destroying the partial indexes that back
+        # tasks/reminders.py. Declared here so the model matches production.
+        Index(
+            "idx_bookings_mp_payment_id",
+            "mp_payment_id",
+            postgresql_where=text("mp_payment_id IS NOT NULL"),
+        ),
+        Index(
+            "idx_bookings_pending_reminder",
+            "trip_id",
+            postgresql_where=text("status = 'confirmed' AND reminder_sent = false"),
+        ),
+        Index(
+            "idx_bookings_pending_feedback",
+            "trip_id",
+            postgresql_where=text("status = 'confirmed' AND feedback_sent = false"),
         ),
     )
 

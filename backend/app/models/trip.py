@@ -72,7 +72,12 @@ class Route(Base):
     destination_stop_id = Column(UUID(as_uuid=True), ForeignKey("stops.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
-    __table_args__ = (UniqueConstraint("origin_stop_id", "destination_stop_id"),)
+    __table_args__ = (
+        UniqueConstraint("origin_stop_id", "destination_stop_id"),
+        # Exists in production since migration d1e2f3a4 but was missing from the
+        # model — autogenerate would have emitted DROP INDEX.
+        Index("idx_routes_destination_stop", "destination_stop_id"),
+    )
 
     origin_stop = relationship("Stop", foreign_keys=[origin_stop_id], back_populates="origin_routes")
     destination_stop = relationship("Stop", foreign_keys=[destination_stop_id], back_populates="destination_routes")
