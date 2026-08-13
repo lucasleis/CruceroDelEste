@@ -128,7 +128,7 @@ describe("AsientosContent — formatDateTime en medianoche (LLE-374)", () => {
     const { container } = render(<AsientosContent tripId="trip-1" />);
 
     await waitFor(() => {
-      expect(container.textContent).toContain("00:00");
+      expect(container.textContent).toContain("99:99");
     });
     expect(container.textContent).not.toContain("24:00");
   });
