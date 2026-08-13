@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
+import sqlalchemy as sa
 from sqlalchemy import (
     CheckConstraint,
     Column,
@@ -46,11 +47,11 @@ class TripStatusEnum(str, enum.Enum):
 class Stop(Base):
     __tablename__ = "stops"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     name = Column(String(100), nullable=False, unique=True)
     country = Column(Enum(CountryEnum, name="country_code"), nullable=False)
     province = Column(String(100), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
 
     origin_routes = relationship(
         "Route",
@@ -67,10 +68,10 @@ class Stop(Base):
 class Route(Base):
     __tablename__ = "routes"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     origin_stop_id = Column(UUID(as_uuid=True), ForeignKey("stops.id"), nullable=False)
     destination_stop_id = Column(UUID(as_uuid=True), ForeignKey("stops.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
 
     __table_args__ = (
         UniqueConstraint("origin_stop_id", "destination_stop_id"),
@@ -88,11 +89,11 @@ class Route(Base):
 class RouteStop(Base):
     __tablename__ = "route_stops"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id", ondelete="CASCADE"), nullable=False)
     stop_id = Column(UUID(as_uuid=True), ForeignKey("stops.id"), nullable=False)
     order = Column(Integer, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
 
     __table_args__ = (
         UniqueConstraint("route_id", "order", name="uq_route_stops_route_order"),
@@ -107,11 +108,11 @@ class RouteStop(Base):
 class TripStopOverride(Base):
     __tablename__ = "trip_stop_overrides"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id", ondelete="CASCADE"), nullable=False)
     stop_id = Column(UUID(as_uuid=True), ForeignKey("stops.id"), nullable=False)
     order = Column(Integer, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
 
     __table_args__ = (
         UniqueConstraint("trip_id", "order", name="uq_trip_stop_overrides_trip_order"),
@@ -126,12 +127,12 @@ class TripStopOverride(Base):
 class SeatLayout(Base):
     __tablename__ = "seat_layouts"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     name = Column(String(100), nullable=False, unique=True)
     total_cama = Column(Integer, nullable=False)
     total_semi_cama = Column(Integer, nullable=False)
     description = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
 
     __table_args__ = (
         CheckConstraint("total_cama > 0", name="ck_seat_layouts_total_cama"),
@@ -145,12 +146,12 @@ class SeatLayout(Base):
 class SeatLayoutSeat(Base):
     __tablename__ = "seat_layout_seats"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     seat_layout_id = Column(UUID(as_uuid=True), ForeignKey("seat_layouts.id", ondelete="CASCADE"), nullable=False)
     seat_number = Column(String(4), nullable=False)
     seat_type = Column(Enum(SeatTypeEnum, name="seat_type"), nullable=False)
     display_order = Column(Integer, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
 
     __table_args__ = (
         UniqueConstraint("seat_layout_id", "seat_number", name="uq_seat_layout_seats_number"),
@@ -163,7 +164,7 @@ class SeatLayoutSeat(Base):
 class Trip(Base):
     __tablename__ = "trips"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=False)
     seat_layout_id = Column(UUID(as_uuid=True), ForeignKey("seat_layouts.id"), nullable=True)
     departure_at = Column(DateTime(timezone=True), nullable=False)
@@ -172,8 +173,9 @@ class Trip(Base):
         Enum(TripStatusEnum, name="trip_status"),
         nullable=False,
         default=TripStatusEnum.scheduled,
+        server_default="scheduled",
     )
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
 
     __table_args__ = (
         Index("idx_trips_status_departure_at", "status", "departure_at"),
@@ -191,7 +193,7 @@ class Trip(Base):
 class Seat(Base):
     __tablename__ = "seats"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id"), nullable=False)
     seat_number = Column(String(4), nullable=False)
     seat_type = Column(Enum(SeatTypeEnum, name="seat_type"), nullable=False)
@@ -199,9 +201,10 @@ class Seat(Base):
         Enum(SeatStatusEnum, name="seat_status"),
         nullable=False,
         default=SeatStatusEnum.available,
+        server_default="available",
     )
     reserved_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
 
     __table_args__ = (
         UniqueConstraint("trip_id", "seat_number"),
@@ -220,13 +223,13 @@ class Seat(Base):
 class PriceTranche(Base):
     __tablename__ = "price_tranches"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id"), nullable=False)
     seat_type = Column(Enum(SeatTypeEnum, name="seat_type"), nullable=False)
     min_sold = Column(Integer, nullable=False)
     max_sold = Column(Integer, nullable=False)
     price = Column(Integer, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
 
     __table_args__ = (
         CheckConstraint("min_sold >= 0", name="ck_price_tranches_min_sold"),

@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
+import sqlalchemy as sa
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -38,7 +39,7 @@ class ChargebackStatusEnum(str, enum.Enum):
 class Booking(Base):
     __tablename__ = "bookings"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     # Human-facing identifier (e.g. "ERP-7K3M-9QX2") — see app/services/booking_code.py.
     # id (UUID) remains the PK and the only reference used internally (FKs, tokens,
     # routing). booking_code exists purely for the user to read/quote it (LLE-350).
@@ -48,6 +49,7 @@ class Booking(Base):
         Enum(BookingStatusEnum, name="booking_status"),
         nullable=False,
         default=BookingStatusEnum.pending_payment,
+        server_default="pending_payment",
     )
     mp_preference_id = Column(String(255), nullable=True)
     mp_payment_id = Column(String(255), nullable=True)
@@ -58,9 +60,9 @@ class Booking(Base):
     # expires_at is derived from it and used for booking-level expiration queries.
     expires_at = Column(DateTime(timezone=True), nullable=False)
     confirmed_at = Column(DateTime(timezone=True), nullable=True)
-    reminder_sent = Column(Boolean, nullable=False, default=False)
-    feedback_sent = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    reminder_sent = Column(Boolean, nullable=False, default=False, server_default="false")
+    feedback_sent = Column(Boolean, nullable=False, default=False, server_default="false")
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
 
     __table_args__ = (
         CheckConstraint("total_amount > 0", name="ck_bookings_total_amount"),
@@ -101,7 +103,7 @@ class Booking(Base):
 class Passenger(Base):
     __tablename__ = "passengers"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=False)
     seat_id = Column(UUID(as_uuid=True), ForeignKey("seats.id"), nullable=False)
     first_name = Column(String(100), nullable=False)
@@ -109,8 +111,8 @@ class Passenger(Base):
     dni = Column(String(20), nullable=False)
     email = Column(String(255), nullable=False)
     phone = Column(String(30), nullable=True)
-    luggage_count = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    luggage_count = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
 
     __table_args__ = (
         UniqueConstraint("seat_id"),
@@ -125,12 +127,13 @@ class Passenger(Base):
 class RefundRequest(Base):
     __tablename__ = "refund_requests"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=False)
     requested_at = Column(
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
+        server_default=sa.text("now()"),
     )
     email_used = Column(String(255), nullable=False)
     window_valid = Column(Boolean, nullable=False)
@@ -145,7 +148,7 @@ class RefundRequest(Base):
 class Chargeback(Base):
     __tablename__ = "chargebacks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=False)
     mp_payment_id = Column(String(255), nullable=False)
     mp_chargeback_id = Column(String(255), nullable=True)
@@ -159,16 +162,24 @@ class Chargeback(Base):
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
+        server_default=sa.text("now()"),
     )
     updated_at = Column(
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+        server_default=sa.text("now()"),
     )
 
     __table_args__ = (
         Index("idx_chargebacks_booking", "booking_id"),
+        Index(
+            "idx_chargebacks_mp_chargeback_id",
+            "mp_chargeback_id",
+            unique=True,
+            postgresql_where=text("mp_chargeback_id IS NOT NULL"),
+        ),
     )
 
     booking = relationship("Booking", back_populates="chargebacks")
@@ -177,7 +188,7 @@ class Chargeback(Base):
 class AdminUser(Base):
     __tablename__ = "admin_users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=sa.text("gen_random_uuid()"))
     email = Column(String(255), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), server_default=sa.text("now()"))
