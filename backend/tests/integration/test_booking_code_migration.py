@@ -146,7 +146,7 @@ def test_migration_backfills_existing_rows_and_reverts_cleanly(scratch_db):
         # Apply this migration on top of a table that already has a row —
         # this is the actual requirement (LLE-350 point 4), not just "runs
         # on an empty table".
-        command.upgrade(cfg, "head")
+        command.upgrade(cfg, "e2f4a8c6")
 
         engine = sa.create_engine(sync_url)
         with engine.connect() as conn:
@@ -188,7 +188,7 @@ def test_migration_backfills_existing_rows_and_reverts_cleanly(scratch_db):
 
         # Revert without error — the actual "aplicar y revertir sin error"
         # requirement.
-        command.downgrade(cfg, "-1")
+        command.downgrade(cfg, "d1e2f3a4")
 
         engine = sa.create_engine(sync_url)
         with engine.connect() as conn:

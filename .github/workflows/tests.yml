@@ -62,6 +62,78 @@ jobs:
         working-directory: backend
         run: uv run pytest
 
+  alembic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16.14
+        env:
+          POSTGRES_USER: alembic
+          POSTGRES_PASSWORD: alembic
+          POSTGRES_DB: alembic_check
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # DATABASE_URL: lo que usa Alembic para conectarse (async driver requerido
+      # por env.py, que usa async_engine_from_config).
+      DATABASE_URL: postgresql+asyncpg://alembic:alembic@localhost:5432/alembic_check
+      # Las 8 variables requeridas por Settings — dummies inconfundibles,
+      # sin nada real detrás. Alembic no las usa; son necesarias porque
+      # app.database importa app.config.settings a nivel de módulo, y
+      # Settings() lanza ValidationError si faltan.
+      SYNC_DATABASE_URL: postgresql://alembic:alembic@localhost:5432/alembic_check
+      SECRET_KEY: "00000000000000000000000000000000"
+      MERCADOPAGO_ACCESS_TOKEN: "TEST-alembic-ci-dummy"
+      MERCADOPAGO_WEBHOOK_SECRET: "alembic-ci-dummy"
+      RESEND_API_KEY: "re_alembic_ci_dummy"
+      FRONTEND_URL: "http://localhost:3000"
+      BACKEND_URL: "http://localhost:8000"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --locked --extra dev
+
+      - name: Apply migrations
+        working-directory: backend
+        run: uv run alembic upgrade head
+
+      - name: Verificar que las migraciones se aplicaron
+        working-directory: backend
+        run: |
+          COUNT=$(PGPASSWORD=alembic psql -h localhost -U alembic \
+            -d alembic_check -tAc \
+            "SELECT count(*) FROM information_schema.tables \
+             WHERE table_schema='public'")
+          echo "Tablas en public: $COUNT"
+          if [ "$COUNT" -lt 14 ]; then
+            echo "ERROR: se esperaban al menos 14 tablas (+ alembic_version)."
+            echo "El upgrade no se aplicó a la base que el check va a mirar."
+            exit 1
+          fi
+
+      - name: Check for schema drift
+        working-directory: backend
+        run: uv run alembic check
+
   frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 15
