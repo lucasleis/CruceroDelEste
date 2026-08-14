@@ -9,9 +9,13 @@ The Resend SDK is synchronous, so each `Emails.send` call is wrapped with
 FastAPI event loop free.
 
 Error semantics — matches the approved design:
-  - send_confirmation_email : raises on the first failed send (logger.error).
-    Called inline from the MercadoPago webhook handler; an exception bubbles
-    up to a 500, which causes MP to retry (acceptable per CLAUDE.md).
+  - send_confirmation_email : raises EmailDeliveryError on the first failed
+    send (logger.error). Called inline from the MercadoPago webhook handler,
+    which catches the exception and only logs it at WARNING — the webhook
+    still returns 200 OK, so MercadoPago does NOT retry. There is currently
+    no retry or reconciliation for a failed confirmation email: if it fails,
+    the passenger has paid and will not receive proof of purchase, and
+    nothing detects or surfaces that (see LLE-341, open).
   - send_reminder_email     : per-passenger failure is logged at WARNING and
     swallowed (never re-raised). Caller MUST NOT mark booking.reminder_sent
     when any passenger send was logged as failed.
@@ -69,14 +73,12 @@ def _context_for(booking: Booking, passenger: Passenger) -> dict:
     seat = passenger.seat
     return {
         "first_name": passenger.first_name,
-        "last_name": passenger.last_name,
         "booking_code": booking.booking_code,
         "seat_number": seat.seat_number,
         "seat_type": seat.seat_type.value,
         "origin": trip.route.origin_stop.name,
         "destination": trip.route.destination_stop.name,
         "departure_at": trip.departure_at,
-        "arrival_at": trip.arrival_at,
         "total_amount": booking.total_amount,
         "frontend_url": settings.frontend_url,
     }
