@@ -182,6 +182,46 @@ async def test_post_bookings_happy_path_201(client: AsyncClient, db: AsyncSessio
     assert "id" in pax
 
 
+async def test_post_bookings_luggage_count_persists_to_db(client: AsyncClient, db: AsyncSession):
+    # LLE-340: luggage_count was validated by the schema but dropped by the
+    # router/service before ever reaching the Passenger row. Assert on the
+    # DB row itself — a 201 alone would have let this bug through.
+    trip = await _make_scheduled_trip(db)
+    seat = await _make_seat(db, trip)
+    await _add_tranche(db, trip, SeatTypeEnum.cama, price=24500)
+
+    resp = await client.post(
+        "/bookings",
+        json=_booking_payload(trip.id, seat.id, luggage_count=3),
+    )
+
+    assert resp.status_code == 201
+    data = resp.json()
+    passenger_id = uuid.UUID(data["passengers"][0]["id"])
+
+    db.expire_all()
+    passenger = await db.get(Passenger, passenger_id)
+    assert passenger.luggage_count == 3
+
+
+async def test_post_bookings_luggage_count_omitted_defaults_to_zero_in_db(
+    client: AsyncClient, db: AsyncSession
+):
+    trip = await _make_scheduled_trip(db)
+    seat = await _make_seat(db, trip)
+    await _add_tranche(db, trip, SeatTypeEnum.cama, price=24500)
+
+    resp = await client.post("/bookings", json=_booking_payload(trip.id, seat.id))
+
+    assert resp.status_code == 201
+    data = resp.json()
+    passenger_id = uuid.UUID(data["passengers"][0]["id"])
+
+    db.expire_all()
+    passenger = await db.get(Passenger, passenger_id)
+    assert passenger.luggage_count == 0
+
+
 async def test_post_bookings_nonexistent_trip_returns_404(client: AsyncClient):
     fake_trip_id = uuid.uuid4()
     fake_seat_id = uuid.uuid4()

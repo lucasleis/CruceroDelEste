@@ -46,6 +46,7 @@ class PassengerData:
     dni: str
     email: str
     phone: str | None = None
+    luggage_count: int = 0
 
 
 async def create_booking(
@@ -107,6 +108,7 @@ async def create_booking(
             dni=data.dni,
             email=data.email,
             phone=data.phone,
+            luggage_count=data.luggage_count,
         ))
 
     return booking, items
