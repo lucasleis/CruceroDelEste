@@ -33,8 +33,7 @@ src/
 ├── app/
 │   ├── resultados/         ← página de resultados de búsqueda (construida)
 │   ├── compra/[tripId]/    ← formulario de datos de pasajeros (construido)
-│   ├── landing-v2/         ← landing v2 (construida)
-│   └── [secciones de preview: hero, navbar, footer, etc.] ← solo desarrollo, no producción
+│   └── landing-v2/         ← landing v2 (construida)
 ├── components/
 │   ├── core/               ← componentes base: BlueButton, Heading, BodyText, etc.
 │   ├── navigation/         ← Navbar
