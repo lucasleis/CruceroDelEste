@@ -37,7 +37,6 @@ Ubicados en `frontend/src/components/travel/`.
 | FilterPanel | FilterPanel.tsx | Panel de filtros visual completo. onFilterChange preparada pero desconectada (LLE-126 cancelado — pendiente de conectar al implementar filtros en /resultados) |
 | SearchSummaryBar | SearchSummaryBar.tsx | Barra de resumen de búsqueda activa. onEditClick delegado a la página padre |
 | CityInput | CityInput.tsx | Selector de origen/destino. Recibe stops como prop (no fetchea). Valores prefijados: "stop:Nombre" o "province:Nombre". Props: allowedStopIds, onStopSelected, onProvinceSelected |
-| DestinationLinkCard | DestinationLinkCard.tsx | Card clickeable que linkea a /resultados?destinationId={stopId}. Props: stopId, stopName, country. Sin estado interno. Usa CSS custom properties del sistema de tokens. |
 
 ---
 
