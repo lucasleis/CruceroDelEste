@@ -15,10 +15,10 @@ Sistema de venta de pasajes online para **Expreso Río Paraná**, empresa argent
 ```
 CruceroDelEste/           ← nombre del repo (histórico, no modificar)
 ├── backend/              ← FastAPI + PostgreSQL. Ver backend/CLAUDE.md
-├── frontend/             ← Next.js, sitio público + flujo de compra. Ver frontend/CLAUDE.md
+├── frontend/             ← Next.js, sitio público + flujo de compra. Ver frontend/AGENTS.md
 ├── frontend-admin/       ← React + Vite, panel de administración. Ver frontend-admin/CLAUDE.md
 ├── specs/                ← Documentación del proyecto
-│   ├── Crucero Del Este - Presupuesto.pdf
+│   ├── Crucero Del Este - Presupuesto.docx
 │   └── Crucero del Este - Modulos Extras.txt
 └── CLAUDE.md             ← este archivo
 ```
@@ -34,9 +34,11 @@ Ubicados en `frontend/src/components/travel/`.
 | AmenityBadge | AmenityBadge.tsx | Ícono de servicio a bordo. Modos: icon-only (Tooltip shadcn), icon-label. Variantes: wifi, ac, usb, bathroom, entertainment |
 | SeatTypeBadge | SeatTypeBadge.tsx | Pill badge de clase de asiento. Variantes: cama (azul sólido), semi-cama (aqua sólido), ejecutivo (outline) |
 | TripCard | TripCard.tsx | Card de resultado de búsqueda. Consume AmenityBadge y SeatTypeBadge. Borde izquierdo por disponibilidad: aqua >10, primary 5-10, accent 1-4 + badge urgencia. priceFrom acepta null |
-| FilterPanel | FilterPanel.tsx | Panel de filtros visual completo. onFilterChange preparada pero desconectada (LLE-126 cancelado — pendiente de conectar al implementar filtros en /resultados) |
+| FilterPanel | FilterPanel.tsx | Panel de filtros de búsqueda. |
 | SearchSummaryBar | SearchSummaryBar.tsx | Barra de resumen de búsqueda activa. onEditClick delegado a la página padre |
 | CityInput | CityInput.tsx | Selector de origen/destino. Recibe stops como prop (no fetchea). Valores prefijados: "stop:Nombre" o "province:Nombre". Props: allowedStopIds, onStopSelected, onProvinceSelected |
+
+Si alguna descripción de arriba menciona si algo está conectado, wireado o pendiente, no confíes en eso — es justo el tipo de afirmación que este archivo no debe llevar. Verificá contra el código o contra el Document de Linear (ver abajo).
 
 ---
 
@@ -44,7 +46,7 @@ Ubicados en `frontend/src/components/travel/`.
 
 | Página | Ruta | Archivo | Descripción |
 |--------|------|---------|-------------|
-| Resultados | /resultados | app/resultados/page.tsx | Fetch GET /trips, mapea TripRead a TripCard. Amenities hardcodeadas hasta que backend las devuelva. Ver LLE-132. Soporta query param `destinationId`: resuelve el stop via GET /stops, pre-llena destino en SearchSummaryBar y fetch de viajes. Flag `destinationResolved` evita llamada espuria antes de resolución. |
+| Resultados | /resultados | app/resultados/page.tsx | Fetch GET /trips, mapea TripRead a TripCard. Soporta query param `destinationId`: resuelve el stop via GET /stops, pre-llena destino en SearchSummaryBar y fetch de viajes. Flag `destinationResolved` evita llamada espuria antes de resolución. |
 
 ---
 
@@ -60,24 +62,9 @@ Ubicados en `frontend/src/types/`.
 
 ## Backend — Servicio de email
 
-`backend/app/services/email.py` — servicio Resend con Jinja2. Completamente implementado, pendiente de wiring con el flujo de compra (sprint MercadoPago).
+`backend/app/services/email.py` — servicio Resend con Jinja2. Templates en `backend/templates/email/` (path correcto — NO usar `backend/app/email_templates/`).
 
-- Templates en: `backend/templates/email/` (path correcto — NO usar `backend/app/email_templates/`)
-- Variables de contexto inyectadas por `_context_for()`: `first_name`, `last_name`, `booking_id`, `seat_number`, `seat_type`, `origin`, `destination`, `departure_at` (DateTime), `arrival_at` (DateTime), `total_amount` (Integer en pesos), `frontend_url`
-- Variables opcionales (condicionales en templates): `return_trip_url`, `boarding_point`, `survey_url`
-- Semántica de errores: `send_confirmation_email` re-lanza `EmailDeliveryError` (para que MP reintente). `send_reminder_email` y `send_feedback_email` tragan errores por pasajero y retornan `bool`.
-- `StrictUndefined` activo — todas las variables opcionales usan `{% if x is defined %}` en los templates.
-- `total_amount` ya está en pesos; se formatea en el template como: `{{ "%.2f"|format(total_amount) }}` (LLE-332 — antes dividía por 100 asumiendo centavos, era incorrecto)
-- `booking_id` es UUID — TODO: reemplazar con `booking_code` corto (ej: ERP-00423) cuando se agregue el campo al modelo.
-- `boarding_point` — `Stop` no tiene campo `address`. Pendiente: agregar `Stop.address` o inyectar desde config map en send logic.
-
-**Templates disponibles:**
-
-| Archivo | Descripción |
-|---------|-------------|
-| `confirmation.html` / `.txt` | Confirmación de compra. Navy header, tabla estructurada, aviso DNI/pasaporte, bloque cross-sell condicional. |
-| `reminder.html` / `.txt` | Recordatorio pre-viaje. Boarding point con fallback, 3 recordatorios numerados, bloque Starlink. |
-| `feedback.html` / `.txt` | Post-viaje. CTA condicional con fallback de texto cuando `survey_url` no está definido. |
+Qué variables de contexto inyecta cada template hoy, cuál es la semántica de error real de cada función de envío, y si está o no wireado al flujo de compra: no lo copies acá. Leé `_context_for()` en `app/services/email.py` directamente — son diez líneas y no mienten nunca. Una copia en este archivo sí puede mentir, y ya mintió cuatro veces en esta misma sección.
 
 ---
 
@@ -111,7 +98,7 @@ Este proyecto usa un flujo de tres capas: **Claude** (arquitectura y revisión) 
 
 Decile a Claude: "Leé CLAUDE.md y continuamos. El próximo paso es [descripción breve]."
 
-Claude va a leer el archivo, entender el estado del proyecto, y retomar desde donde quedó sin necesidad de re-explicar nada.
+Claude va a leer el archivo, entender las convenciones del proyecto, y pedir el estado actual al Document de Linear antes de proponer nada.
 
 ### Prompt de arranque para conversación nueva
 
@@ -157,62 +144,11 @@ No arranques a implementar nada hasta que Lucas apruebe explícitamente el paso 
 
 ---
 
-## Estado de la suite de tests (backend)
-
-| Fecha | Resultado | Comando |
-|-------|-----------|---------|
-| 20/07/2026 | ✅ 223/223 passed | `cd backend && pytest` |
-
-6 warnings de Starlette (`HTTP_422_UNPROCESSABLE_ENTITY` deprecated) — no requieren acción.
-
-## Estado de la suite de tests (frontend-admin)
-
-| Fecha | Resultado | Comando |
-|-------|-----------|---------|
-| 29/07/2026 | ✅ 29/29 passed | `cd frontend-admin && npx vitest run` |
-
-06/08/2026 — LLE-334 reescribió la suite completa contra cookie httpOnly (antes certificaba localStorage).
-
----
-
 ## Regla de negocio crítica — AR↔PY
 
 Los servicios son internacionales. **No se puede vender un tramo dentro del mismo país** (cabotaje extranjero prohibido). Cada parada está etiquetada con su país (`AR` o `PY`). Si el origen es Argentina, el destino solo puede ser Paraguay, y viceversa. Esta regla se valida tanto en frontend como en backend.
 
 Esta regla también está enforced en el frontend: al seleccionar un origen en SearchBar, el dropdown de destino filtra automáticamente las paradas del país opuesto. Si el origen es una parada específica, se llama GET /stops/{id}/valid-destinations. Si el origen es una provincia, se filtra en memoria por country opuesto.
-
----
-
-## Riesgos activos
-
-### 🔴 Doble venta de asientos
-
-El cliente vende simultáneamente por SOR, Plataforma 10 y Central de Pasajes. Sin sincronización con SOR, puede venderse el mismo asiento dos veces. No está definido si SOR tiene API. Acción requerida antes del lanzamiento.
-
-### 🟡 Norma de trazabilidad de equipaje (RESOL-2026-4-APN-ST#MEC)
-
-Exige vinculación nominal entre cada equipaje y el pasajero. El campo `luggage_count` actual no es suficiente. El módulo de Control de Pasajeros (QR) es el lugar natural para implementarlo. No afecta el MVP directamente.
-
-### 🟡 Disponibilidad del cliente
-
-El dueño está en un conflicto societario interno. El interlocutor real del proyecto es SPK_2. Prever demoras en materiales (logos, fotos, textos, datos de flota).
-
-### 🟡 Facturación electrónica AFIP (LLE-296)
-
-Al vender pasajes en Argentina hay obligación legal de emitir comprobantes fiscales (A/B/C según condición tributaria). No implementado. Requiere información del cliente antes de estimar. Ver LLE-296.
-
----
-
-## Módulos futuros (no implementar ahora)
-
-- Control de pasajeros con QR — $450.000, 5 días estimados
-- Tracking GPS — Opción B recomendada (dispositivo dedicado, $310.000 desarrollo + hardware cliente)
-- Gestión avanzada de ventas (cancelaciones con lógica de porcentajes)
-- Notificaciones por WhatsApp (requiere WhatsApp Business API)
-- Sistema de puntos / millas
-- Integración con SOR / Plataforma 10
-- Viajes recurrentes (LLE-117 — bloqueado por decisiones de producto)
-- Facturación electrónica AFIP (LLE-296 — post-MVP obligatorio, pendiente info cliente)
 
 ---
 
@@ -222,25 +158,16 @@ Al vender pasajes en Argentina hay obligación legal de emitir comprobantes fisc
 - **Project:** Expresio Rio Parana (sin acento — requerido por la API)
 - **Prefijo de tickets:** LLE-
 - **Lucas (user ID):** `3a547502-c723-4bbb-a05d-b4165f836768`
-- **Estados:** Done, Todo, Backlog, Canceled
+- **Estados:** Done, Todo, In Progress, Backlog, Canceled
 - **Prioridades:** 1=urgente, 2=alto, 3=medio, 4=bajo
 
 ---
 
-## Documentación histórica (Linear Documents)
+## Dónde está el estado del proyecto
 
-Los siguientes Documents viven en el proyecto "Expresio Rio Parana" en Linear (sección Resources de la Overview del proyecto):
+Este archivo no lleva estado de código: qué está hecho, qué falta, resultado de suites, riesgos activos, roadmap de módulos futuros, situación de cada componente. Todo eso vive en el **Document de Linear `017e9e10-f516-4f1d-8fee-8a08e7cbd03c`** ("CLAUDE.md — Expreso Río Paraná · Monorepo", proyecto Expresio Rio Parana, sección Resources de la Overview). Es la fuente — no lo dupliques acá. Ese Document también lista el resto de la documentación histórica (auditorías, bugs resueltos, features por área).
 
-| Document | Contenido |
-|----------|-----------|
-| 🛡️ Auditoría de Seguridad y Calidad | Hallazgos y decisiones de las rondas Audit-C1 a C4, SEC, Q, S (51 tickets) |
-| 🐛 Bugs — Histórico resueltos | Todos los bugs cerrados: reembolsos, asientos, MP, validaciones (16 tickets) |
-| 🧪 Tests — Histórico de fallas | Fallas de suite resueltas y patrón recurrente detectado (9 tickets) |
-| ⚙️ Admin Panel — Features | Features implementadas en frontend-admin (32 tickets) |
-| 🚀 Frontend Público — Features | Buscador, resultados, selector de asientos, flujo de compra (24 tickets) |
-| 🔖 Sprints, Arquitectura y Negocio | Decisiones de modelo de datos, cambio de entidad, sprints cerrados (10 tickets) |
-
-Consultar antes de preguntar "por qué se hizo X" — la mayoría de las decisiones técnicas y de negocio están documentadas ahí.
+Si este archivo y Linear se contradicen, gana Linear. Si Linear y el código se contradicen, gana el código.
 
 ---
 

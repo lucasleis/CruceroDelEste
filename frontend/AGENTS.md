@@ -30,10 +30,7 @@ Este patrón es obligatorio porque useSearchParams() requiere Suspense boundary 
 ## Estructura de carpetas relevante
 
 src/
-├── app/
-│   ├── resultados/         ← página de resultados de búsqueda (construida)
-│   ├── compra/[tripId]/    ← formulario de datos de pasajeros (construido)
-│   └── landing-v2/         ← landing v2 (construida)
+├── app/                    ← rutas del flujo de compra y páginas de contenido
 ├── components/
 │   ├── core/               ← componentes base: BlueButton, Heading, BodyText, etc.
 │   ├── navigation/         ← Navbar
@@ -46,17 +43,15 @@ src/
 └── types/
     └── trips.ts            ← StopRead y tipos compartidos. Importar desde aquí, no desde componentes.
 
+Qué rutas existen hoy dentro de `app/` y en qué estado está cada una: no lo listes acá, se desactualiza. Mirá el directorio o el Document de Linear (ver abajo).
+
 ---
 
-## Flujo de compra (estado actual)
+## El pago no es una página de este frontend
 
-/resultados         → lista de viajes (construido)
-/asientos/[tripId]  → selector de asientos (construido — LLE-145)
-/compra/[tripId]    → formulario de datos de pasajeros (construido)
-/pago               → integración MercadoPago (pendiente)
-/confirmacion       → pantalla de confirmación (pendiente)
+`/compra/[tripId]` termina en un redirect (`window.location.href = data.init_point`) al checkout hosteado de MercadoPago. El pago en sí ocurre ahí, no en una ruta propia. **No va a existir una ruta `/pago` en este frontend** — no es que esté pendiente, es que no aplica a esta arquitectura. Si estás buscando dónde se maneja el pago, es el punto donde se pide `init_point` al backend y se redirige, no una página nueva a construir.
 
-Navegación entre pasos vía query params:
+Navegación entre pasos del flujo vía query params:
 - /asientos/[tripId]?passengers=2
 - /compra/[tripId]?seats=1A,2B&passengers=2
 
@@ -65,7 +60,7 @@ Navegación entre pasos vía query params:
 ## Componentes clave — resumen rápido
 
 TripCard — components/travel/TripCard.tsx — Card de resultado. Borde izquierdo por disponibilidad. priceFrom acepta null.
-FilterPanel — components/travel/FilterPanel.tsx — Visual completo, onFilterChange desconectada (LLE-126)
+FilterPanel — components/travel/FilterPanel.tsx — Panel de filtros de búsqueda.
 SearchSummaryBar — components/travel/SearchSummaryBar.tsx — Barra de resumen de búsqueda activa
 CityInput — components/search/CityInput.tsx — Selector origen/destino. Recibe stops como prop. Filtra AR↔PY.
 BlueButton — components/core/BlueButton.tsx — Botón primario. Variantes: navy, blue. Usar para acciones principales.
@@ -94,18 +89,6 @@ Base URL: process.env.NEXT_PUBLIC_API_URL (definir en .env.local, no commitear)
 
 ---
 
-## Selector de asientos — implementado (LLE-145)
-
-/asientos/[tripId] está implementado. Layout real del cliente cargado (Standard - 2 Pisos, 12 Cama Ejecutivo + 48 Semi Cama).
-
-Componente: src/app/asientos/[tripId]/AsientosContent.tsx
-- PLANTA_ALTA y PLANTA_BAJA hardcodeados como grids (string | null)[][]
-- Fetch: GET /trips/{tripId}/seats con el mismo patrón de ResultadosContent.tsx
-- Selección múltiple via useState<Set<string>>
-- Navegación a /compra/[tripId]?seats=NUMBERS&passengers=N al confirmar
-
----
-
 ## Reglas del proceso
 
 - Propuesta antes de código — anunciá qué vas a hacer y esperá aprobación explícita
@@ -114,3 +97,11 @@ Componente: src/app/asientos/[tripId]/AsientosContent.tsx
 - Después de cada archivo: ✅ [nombre] — [descripción en una línea]
 - Si algo es ambiguo: detenete y consultá. No asumas.
 - Claude Code nunca mergea a main — Lucas revisa y commitea manualmente
+
+---
+
+## Dónde está el estado del frontend
+
+Este archivo no lleva qué páginas están construidas, qué componentes están conectados, ni el detalle de implementaciones puntuales (selector de asientos, etc.) — todo eso vive en el **Document de Linear `017e9e10-f516-4f1d-8fee-8a08e7cbd03c`** ("CLAUDE.md — Expreso Río Paraná · Monorepo"). Es la fuente — no lo dupliques acá.
+
+Si este archivo y Linear se contradicen, gana Linear. Si Linear y el código se contradicen, gana el código.
