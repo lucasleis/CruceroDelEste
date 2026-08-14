@@ -11,9 +11,21 @@ the injected request session), so we patch that name to a sessionmaker bound to
 the test engine. That is the only thing mocked; the real job logic runs against
 the real test database.
 
+The job's own notion of "now" (``datetime.now(timezone.utc)`` inside
+``tasks.reminders``) is also pinned via ``_frozen_now`` for every job
+invocation below. Without it, fixtures built relative to the module-level
+``_NOW`` are only "still valid" or "outside the window" for as long as real
+wall-clock time hasn't drifted past their margin — margins that range from
+10 minutes (LLE-373) to 24h depending on the test. A slow CI run, a loaded
+box, or just the suite growing is enough to eat that margin and produce a
+false failure with no bug behind it. Freezing the clock the job reads makes
+every assertion here measure the predicate, not how long pytest took to get
+here.
+
 Requires the same Postgres backend as every other integration test.
 """
 
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -42,6 +54,26 @@ def session_factory(test_engine):
     return async_sessionmaker(
         bind=test_engine, class_=AsyncSession, expire_on_commit=False
     )
+
+
+@contextmanager
+def _frozen_now(instant: datetime):
+    """Pin the "now" that ``tasks.reminders`` sees to a fixed instant.
+
+    The job reads ``datetime.now(timezone.utc)`` once per invocation. Patching
+    that lookup — rather than relying on the real clock staying inside a
+    fixture's margin — makes the job's predicate evaluation independent of how
+    long the test run took to get here. No new dependency (freezegun) needed:
+    this is the same technique used to demonstrate the LLE-373 mechanism.
+    """
+
+    class _FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return instant
+
+    with patch.object(reminders, "datetime", _FrozenDateTime):
+        yield
 
 
 async def _seed_pending_booking(
@@ -109,7 +141,7 @@ async def test_expire_bookings_job_expira_reserva_vencida_y_libera_su_asiento(
     )
 
     # act: correr el job con sus sesiones apuntando a la DB de test
-    with patch.object(reminders, "AsyncSessionLocal", session_factory):
+    with patch.object(reminders, "AsyncSessionLocal", session_factory), _frozen_now(_NOW):
         await reminders.expire_bookings_job()
 
     # assert: la reserva pasó a expired y el asiento volvió a available
@@ -127,7 +159,7 @@ async def test_expire_bookings_job_no_toca_reservas_aun_vigentes(session_factory
     )
 
     # act
-    with patch.object(reminders, "AsyncSessionLocal", session_factory):
+    with patch.object(reminders, "AsyncSessionLocal", session_factory), _frozen_now(_NOW):
         await reminders.expire_bookings_job()
 
     # assert: sigue pendiente y el asiento sigue reservado
@@ -136,6 +168,27 @@ async def test_expire_bookings_job_no_toca_reservas_aun_vigentes(session_factory
         seat = await db.get(Seat, seat_id)
         assert booking.status == BookingStatusEnum.pending_payment
         assert seat.status == SeatStatusEnum.reserved
+
+
+async def test_expire_bookings_job_expira_reserva_en_el_instante_exacto(
+    session_factory,
+):
+    # arrange: expires_at == now exactamente. El predicado del job es <=,
+    # así que una reserva que vence en este instante ya está vencida.
+    booking_id, seat_id = await _seed_pending_booking(
+        session_factory, expires_at=_NOW
+    )
+
+    # act: el job corre con "now" fijado exactamente en _NOW
+    with patch.object(reminders, "AsyncSessionLocal", session_factory), _frozen_now(_NOW):
+        await reminders.expire_bookings_job()
+
+    # assert: se expira (frontera inclusiva)
+    async with session_factory() as db:
+        booking = await db.get(Booking, booking_id)
+        seat = await db.get(Seat, seat_id)
+        assert booking.status == BookingStatusEnum.expired
+        assert seat.status == SeatStatusEnum.available
 
 
 # ---------------------------------------------------------------------------
@@ -206,7 +259,7 @@ async def test_send_reminders_job_envia_reminder_y_marca_sent(session_factory):
     )
 
     # act
-    with patch.object(reminders, "AsyncSessionLocal", session_factory):
+    with patch.object(reminders, "AsyncSessionLocal", session_factory), _frozen_now(_NOW):
         await reminders.send_reminders_job()
 
     # assert: reminder_sent pasó a True
@@ -222,7 +275,7 @@ async def test_send_reminders_job_no_toca_bookings_fuera_de_ventana(session_fact
     )
 
     # act
-    with patch.object(reminders, "AsyncSessionLocal", session_factory):
+    with patch.object(reminders, "AsyncSessionLocal", session_factory), _frozen_now(_NOW):
         await reminders.send_reminders_job()
 
     # assert: reminder_sent sigue en False
@@ -243,7 +296,7 @@ async def test_send_reminders_job_no_reenvía_si_ya_sent(session_factory):
         await db.commit()
 
     # act
-    with patch.object(reminders, "AsyncSessionLocal", session_factory):
+    with patch.object(reminders, "AsyncSessionLocal", session_factory), _frozen_now(_NOW):
         with patch("tasks.reminders.send_reminder_email") as mock_send:
             await reminders.send_reminders_job()
 
@@ -262,7 +315,7 @@ async def test_send_feedback_job_envia_feedback_y_marca_sent(session_factory):
     )
 
     # act
-    with patch.object(reminders, "AsyncSessionLocal", session_factory):
+    with patch.object(reminders, "AsyncSessionLocal", session_factory), _frozen_now(_NOW):
         await reminders.send_feedback_job()
 
     # assert: feedback_sent pasó a True
@@ -278,7 +331,7 @@ async def test_send_feedback_job_no_toca_bookings_fuera_de_ventana(session_facto
     )
 
     # act
-    with patch.object(reminders, "AsyncSessionLocal", session_factory):
+    with patch.object(reminders, "AsyncSessionLocal", session_factory), _frozen_now(_NOW):
         await reminders.send_feedback_job()
 
     # assert: feedback_sent sigue en False
@@ -298,7 +351,7 @@ async def test_send_feedback_job_no_reenvía_si_ya_sent(session_factory):
         await db.commit()
 
     # act
-    with patch.object(reminders, "AsyncSessionLocal", session_factory):
+    with patch.object(reminders, "AsyncSessionLocal", session_factory), _frozen_now(_NOW):
         with patch("tasks.reminders.send_feedback_email") as mock_send:
             await reminders.send_feedback_job()
 
