@@ -182,12 +182,20 @@ export function AsientosContent({ tripId }: AsientosContentProps) {
     const seat = seatsByNumber.get(seatNumber);
     if (!seat || seat.status !== "available") return;
 
+    const isSelected = selected.includes(seatNumber);
+    const atCapacity =
+      !isSelected && passengerCount !== null && selected.length >= passengerCount;
+
+    if (atCapacity) {
+      toast.info(
+        `Ya seleccionaste tus ${passengerCount} asiento${passengerCount === 1 ? "" : "s"}. Tocá uno para deseleccionarlo si querés cambiarlo.`
+      );
+      return;
+    }
+
     setSelected((prev) => {
       if (prev.includes(seatNumber)) {
         return prev.filter((s) => s !== seatNumber);
-      }
-      if (passengerCount !== null && prev.length >= passengerCount) {
-        return [...prev.slice(1), seatNumber];
       }
       return [...prev, seatNumber];
     });

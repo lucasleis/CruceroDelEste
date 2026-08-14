@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { TripTypeSelector } from "@/components/search/TripTypeSelector"
 import { CityInput } from "@/components/search/CityInput"
 import { DateInput } from "@/components/search/DateInput"
@@ -71,6 +71,7 @@ export function SearchBar({ onSearch, initialValues }: SearchBarProps) {
 
   const [allowedDestinationIds, setAllowedDestinationIds] = useState<Set<string> | undefined>(undefined)
   const [destinationFetchError, setDestinationFetchError] = useState<string | null>(null)
+  const latestOriginIdRef = useRef<string | null>(null)
 
   const [originError, setOriginError] = useState(false)
   const [destinationError, setDestinationError] = useState(false)
@@ -146,12 +147,18 @@ export function SearchBar({ onSearch, initialValues }: SearchBarProps) {
     setDestination("")
     setAllowedDestinationIds(undefined)
     setDestinationFetchError(null)
+    latestOriginIdRef.current = stop?.id ?? null
     if (stop === null) return
+    const requestedOriginId = stop.id
     try {
       const destinations = await getValidDestinations(stop.id)
+      // el origen pudo haber cambiado mientras esta respuesta estaba en
+      // vuelo (LLE-355) — descartarla si ya no es la última selección
+      if (latestOriginIdRef.current !== requestedOriginId) return
       setAllowedDestinationIds(new Set(destinations.map((d) => d.id)))
       setDestinationFetchError(null)
     } catch {
+      if (latestOriginIdRef.current !== requestedOriginId) return
       setAllowedDestinationIds(new Set())
       setDestinationFetchError("No se pudieron cargar los destinos disponibles. Intentá de nuevo.")
     }
