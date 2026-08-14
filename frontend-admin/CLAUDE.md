@@ -156,61 +156,17 @@ Ver `ADMIN_DESIGN.md` para la especificación completa. Puntos críticos:
 
 ## Rutas del admin panel
 
-| Ruta | Página | Estado |
-|------|--------|--------|
-| /login | LoginPage | ✅ |
-| /dashboard | placeholder div | pendiente |
-| /viajes | TripsPage | ✅ |
-| /viajes/:tripId | TripDetailPage | ✅ |
-| /configuracion | ConfiguracionPage | ✅ |
-| /reservas | BookingsPage | ✅ |
-| /reservas/:bookingId | BookingDetailPage | ✅ |
-| /reembolsos | RefundsPage | ✅ |
-| /contracargos | ChargebacksPage | ✅ |
-
-El sidebar muestra: Dashboard, Viajes, Reservas, Reembolsos, Contracargos, Catálogo.
-
----
-
-## Estado actual — pantallas implementadas
-
-### Viajes (`/viajes`, `/viajes/:tripId`)
-- Listado con tabla clickeable, badge de estado, layout de asientos
-- Crear viaje: form con ruta, layout, fechas (date+time inputs separados, timezone -03:00)
-- Detalle: info grid + price tranches (crear/eliminar)
-- Editar: dialog pre-populated con diff logic (solo envía campos cambiados al PATCH)
-- Eliminar: con confirmación, manejo de 409
-
-### Catálogo (`/configuracion`)
-- **Paradas:** crear (nombre + país AR/PY) y eliminar. GET usa `/stops` público (no existe GET /admin/stops).
-- **Rutas:** crear (origen + destino, validación AR↔PY client-side) y eliminar.
-
-### Reservas (`/reservas`, `/reservas/:bookingId`)
-- Listado con filtros por estado (confirmed, pending_payment, expired, refunded)
-- Detalle: info grid + tabla de pasajeros. Read-only.
-
-### Reembolsos (`/reembolsos`)
-- Listado con filtros "Todas" / "Dentro del plazo"
-- Link a reserva asociada. Read-only.
-
-### Contracargos (`/contracargos`)
-- Listado con filtros por estado (in_process, settled, reimbursed)
-- Link a reserva asociada. Read-only.
-
----
-
-## Deuda técnica conocida
-
-1. `TripDetailPage` tiene 16 `useState` — refactorizar form de edición a componente propio antes de agregar más features a esa página.
-2. `TRIP_STATUS_LABEL` en `TripDetailPage` — podría derivarse de `STATUS_BADGE` en tripUtils.
-3. Plural hardcodeado "pasajero(s)" en BookingsPage — mejorar cuando haya datos reales.
-4. `ConfiguracionPage` tiene 10+ `useState` — refactorizar cuando se agregue una tercera sección.
-5. `ChargebacksPage` tiene `STATUS_BADGE` local — mover a `tripUtils.ts` en próxima limpieza.
-6. Dashboard es un placeholder vacío — implementar cuando haya datos reales de reservas.
+El sidebar muestra: Dashboard, Viajes, Reservas, Reembolsos, Contracargos, Catálogo — ver `src/router.tsx` y `src/components/Sidebar.tsx` para las rutas exactas y cuáles están implementadas vs. placeholder.
 
 ---
 
 ## Endpoints del backend — referencia rápida
+
+El invariante de superficie HTTP del backend (cuántos endpoints hay, públicos vs. protegidos) se puede recalcular en cualquier momento — no le creas a la tabla de abajo sin correr esto en `backend/`:
+
+```
+grep -rhoE "^@(router|stops_router)\.(get|post|put|patch|delete)\(" app/routers/*.py | wc -l
+```
 
 Base URL: `VITE_API_BASE_URL` (default: `http://localhost:8000`)
 
@@ -264,3 +220,11 @@ Base URL: `VITE_API_BASE_URL` (default: `http://localhost:8000`)
 | POST /admin/trips | 422 | departure_in_past | "La fecha de salida no puede ser en el pasado." |
 | POST /admin/trips | 422 | arrival_before_departure | "La llegada debe ser posterior a la salida." |
 | POST /admin/trips/:id/price-tranches | 409 | tranche_overlap | "Este tramo se superpone con uno existente." |
+
+---
+
+## Dónde está el estado del admin panel
+
+Este archivo no lleva qué pantallas están implementadas, deuda técnica ni estado de cada ruta — todo eso vive en el **Document de Linear `017e9e10-f516-4f1d-8fee-8a08e7cbd03c`** ("CLAUDE.md — Expreso Río Paraná · Monorepo"). Es la fuente — no lo dupliques acá.
+
+Si este archivo y Linear se contradicen, gana Linear. Si Linear y el código se contradicen, gana el código.
