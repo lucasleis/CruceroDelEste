@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.booking import expire_booking
 from app.services.payment import generate_confirmation_token
 from app.models.booking import Booking, BookingStatusEnum, Passenger
+from app.schemas.bookings import PassengerCreate
 from app.services.booking_code import generate_booking_code
 from app.models.trip import (
     CountryEnum,
@@ -220,6 +221,74 @@ async def test_post_bookings_luggage_count_omitted_defaults_to_zero_in_db(
     db.expire_all()
     passenger = await db.get(Passenger, passenger_id)
     assert passenger.luggage_count == 0
+
+
+async def test_post_bookings_all_declared_passenger_fields_persist_to_db(
+    client: AsyncClient, db: AsyncSession
+):
+    # LLE-379: los campos de un pasajero se declaran 4 veces y se
+    # sincronizan a mano (PassengerCreate, routers/bookings.py, PassengerData,
+    # y la construcción de Passenger(...)). Omitir cualquiera de los
+    # últimos tres pierde el campo en silencio — 201, sin excepción, sin
+    # warning (LLE-340: exactamente esto le pasó a luggage_count).
+    #
+    # test_passenger_field_declarations_stay_in_sync (tests/unit/test_schemas.py)
+    # cubre que los TRES lugares declaren el mismo conjunto de campos, pero
+    # no puede ver si el valor efectivamente se propaga en runtime: un campo
+    # puede seguir declarado en todos lados y aun así perderse porque nadie
+    # lo asigna al construir. Este test ejecuta el flujo real end-to-end con
+    # un valor centinela distinguible por campo y confirma que cada uno
+    # llegó igual a la fila persistida.
+    sentinel_values = {
+        "first_name": "Sentinel-FirstName-LLE379",
+        "last_name": "Sentinel-LastName-LLE379",
+        "dni": "99988877",
+        "email": "sentinel-lle379@example.com",
+        "phone": "+549111234LLE379",
+        "luggage_count": 7,
+    }
+
+    # Guard: si PassengerCreate gana o pierde un campo (además de seat_id,
+    # que no es un valor arbitrario sino la referencia a un seat real) y
+    # sentinel_values no se actualizó, el test se niega a correr en vez de
+    # ignorar el campo nuevo. Sin este guard, un campo agregado sin
+    # propagar pasaría inadvertido para este test.
+    fields_to_check = set(PassengerCreate.model_fields) - {"seat_id"}
+    assert fields_to_check == set(sentinel_values), (
+        "PassengerCreate tiene un campo que este test no conoce todavía: "
+        f"{fields_to_check ^ set(sentinel_values)}. Agregá (o quitá) un valor "
+        "centinela para ese campo en sentinel_values dentro de "
+        "test_post_bookings_all_declared_passenger_fields_persist_to_db antes "
+        "de continuar — si no, este test no puede confirmar que el campo se "
+        "propaga hasta la DB (LLE-379)."
+    )
+
+    trip = await _make_scheduled_trip(db)
+    seat = await _make_seat(db, trip)
+    await _add_tranche(db, trip, SeatTypeEnum.cama, price=24500)
+
+    resp = await client.post(
+        "/bookings",
+        json=_booking_payload(trip.id, seat.id, **sentinel_values),
+    )
+
+    assert resp.status_code == 201
+    data = resp.json()
+    passenger_id = uuid.UUID(data["passengers"][0]["id"])
+
+    db.expire_all()
+    passenger = await db.get(Passenger, passenger_id)
+    assert passenger is not None
+
+    for field, expected in sentinel_values.items():
+        actual = getattr(passenger, field)
+        assert actual == expected, (
+            f"Passenger.{field} no coincide con lo enviado en PassengerCreate "
+            f"(se esperaba {expected!r}, se persistió {actual!r}). El campo se "
+            "perdió en algún salto entre routers/bookings.py::"
+            "create_booking_endpoint y services/booking.py (PassengerData o "
+            "la construcción de Passenger(...)). Ver LLE-379 / LLE-340."
+        )
 
 
 async def test_post_bookings_nonexistent_trip_returns_404(client: AsyncClient):
