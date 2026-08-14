@@ -22,6 +22,22 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => mockSearchParams,
 }));
 
+// LLE-370: mock parcial de sonner — solo lista los métodos de `toast` que
+// AsientosContent usa hoy (error, info). Si el componente empieza a llamar
+// otro método (toast.warning, toast.success, ...), este mock no lo va a
+// tener y el test va a explotar con
+// "TypeError: toast.<método> is not a function" — el error apunta acá, no
+// al cambio que lo causó.
+//
+// Evaluamos derivarlo del sonner real con vi.importActual + un Proxy que
+// envuelve cada método existente en un spy, para que cualquier método real
+// quede cubierto automáticamente y un typo (ej. toast.warn, que no existe)
+// siga explotando igual que en producción. Funciona — se probó con un
+// Proxy + Map cacheando los spies por nombre de método — pero se descartó
+// por legibilidad: hoy hay un solo componente con toasts, y el costo de
+// leer un Proxy+Map para entender este mock supera al de extenderlo a mano
+// mientras eso siga siendo cierto. Revisar cuando haya un segundo
+// componente testeado con toasts.
 vi.mock("sonner", () => ({
   toast: {
     error: (...args: unknown[]) => toastErrorMock(...args),

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CompraContent } from "../CompraContent";
@@ -41,8 +41,23 @@ async function fillPassenger(index: number) {
 }
 
 describe("CompraContent — mismatch seat_ids/passengers (LLE-336)", () => {
+  const originalLocation = window.location;
+
   beforeEach(() => {
     createBookingMock.mockReset();
+  });
+
+  afterEach(() => {
+    // LLE-370: el test de abajo reemplaza window.location por un stub
+    // plano para poder leer la redirección a MercadoPago (jsdom no
+    // implementa navegación real). Sin restaurarlo, cualquier test que
+    // se agregue después de este en el archivo hereda un
+    // window.location sin origin/pathname/assign().
+    Object.defineProperty(window, "location", {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    });
   });
 
   it('muestra kind "invalid_selection" y nunca llama createBooking cuando las longitudes no coinciden', async () => {
