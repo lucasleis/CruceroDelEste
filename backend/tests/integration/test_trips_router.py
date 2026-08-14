@@ -244,6 +244,96 @@ async def test_list_trips_filter_by_departure_date(client: AsyncClient, db: Asyn
     assert len(data) == 1
 
 
+# ---------------------------------------------------------------------------
+# GET /trips — limit/offset (LLE-343)
+# ---------------------------------------------------------------------------
+
+async def test_list_trips_limit_caps_results(client: AsyncClient, db: AsyncSession):
+    route = await _make_route(db)
+    for i in range(5):
+        trip = await _make_trip(db, route, departure_offset_days=i + 1)
+        await _add_tranche(db, trip, SeatTypeEnum.cama)
+
+    resp = await client.get("/trips", params={"limit": 3})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 3
+
+
+async def test_list_trips_offset_advances_through_results(
+    client: AsyncClient, db: AsyncSession
+):
+    route = await _make_route(db)
+    trips = []
+    for i in range(5):
+        trip = await _make_trip(db, route, departure_offset_days=i + 1)
+        await _add_tranche(db, trip, SeatTypeEnum.cama)
+        trips.append(trip)
+
+    first_page = await client.get("/trips", params={"limit": 2, "offset": 0})
+    second_page = await client.get("/trips", params={"limit": 2, "offset": 2})
+    assert first_page.status_code == 200
+    assert second_page.status_code == 200
+
+    first_ids = [t["id"] for t in first_page.json()]
+    second_ids = [t["id"] for t in second_page.json()]
+
+    # Orden por departure_at asc: los ids de trips[0:2] y trips[2:4].
+    assert first_ids == [str(trips[0].id), str(trips[1].id)]
+    assert second_ids == [str(trips[2].id), str(trips[3].id)]
+    assert set(first_ids).isdisjoint(second_ids)
+
+
+async def test_list_trips_limit_zero_returns_422(client: AsyncClient):
+    resp = await client.get("/trips", params={"limit": 0})
+    assert resp.status_code == 422
+
+
+async def test_list_trips_limit_over_max_returns_422(client: AsyncClient):
+    resp = await client.get("/trips", params={"limit": 500})
+    assert resp.status_code == 422
+
+
+async def test_list_trips_offset_negative_returns_422(client: AsyncClient):
+    resp = await client.get("/trips", params={"offset": -1})
+    assert resp.status_code == 422
+
+
+async def test_list_trips_without_departure_date_excludes_trips_beyond_two_weeks(
+    client: AsyncClient, db: AsyncSession
+):
+    route = await _make_route(db)
+    trip_near = await _make_trip(db, route, departure_offset_days=5)
+    trip_far = await _make_trip(db, route, departure_offset_days=60)
+    await _add_tranche(db, trip_near, SeatTypeEnum.cama)
+    await _add_tranche(db, trip_far, SeatTypeEnum.cama)
+
+    resp = await client.get("/trips")
+    assert resp.status_code == 200
+    data = resp.json()
+    ids = [t["id"] for t in data]
+    assert str(trip_near.id) in ids
+    assert str(trip_far.id) not in ids
+
+
+async def test_list_trips_explicit_departure_date_ignores_two_week_window(
+    client: AsyncClient, db: AsyncSession
+):
+    # Compra anticipada en temporada alta (LLE-343): un trip a 60 días con
+    # departure_date explícito debe aparecer, aunque exceda la ventana de
+    # 2 semanas que se aplica solo cuando no se especifica fecha.
+    route = await _make_route(db)
+    trip_far = await _make_trip(db, route, departure_offset_days=60)
+    await _add_tranche(db, trip_far, SeatTypeEnum.cama)
+
+    far_date = (datetime.now(timezone.utc) + timedelta(days=60)).date()
+    resp = await client.get("/trips", params={"departure_date": str(far_date)})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["id"] == str(trip_far.id)
+
+
 async def test_list_trips_seat_layout_supported_is_none(
     client: AsyncClient, db: AsyncSession
 ):

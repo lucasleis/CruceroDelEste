@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -41,6 +41,8 @@ async def list_trips(
     origin_province: str | None = Query(default=None),
     destination_province: str | None = Query(default=None),
     departure_date: date | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ) -> list[TripRead]:
     now = datetime.now(timezone.utc)
@@ -78,8 +80,17 @@ async def list_trips(
             Trip.departure_at >= day_start,
             Trip.departure_at <= day_end,
         )
+    else:
+        # Sin departure_date no hay una pantalla útil que mostrar con "todas
+        # las salidas futuras" (potencialmente meses de catálogo, ej. desde
+        # DestinationLinkCard). Se acota a las próximas 2 semanas para que el
+        # recorte sea explícito y tenga sentido de negocio, en vez de quedar
+        # implícito en el "primeras N por orden de fecha" que da limit/offset
+        # solos. Con departure_date explícito NO se aplica este tope: la
+        # compra anticipada en temporada alta (LLE-343) depende de eso.
+        query = query.where(Trip.departure_at <= now + timedelta(days=14))
 
-    query = query.order_by(Trip.departure_at.asc())
+    query = query.order_by(Trip.departure_at.asc()).offset(offset).limit(limit)
 
     result = await db.execute(query)
     trips = list(result.scalars().all())
