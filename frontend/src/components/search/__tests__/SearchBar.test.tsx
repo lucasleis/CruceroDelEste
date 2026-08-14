@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SearchBar } from "@/components/search/SearchBar";
 import { getStops, getValidDestinations } from "@/api";
@@ -155,6 +155,64 @@ describe("SearchBar — estados de carga/error de fetchStops", () => {
     expect(screen.queryByText("Argentina")).not.toBeInTheDocument();
     expect(screen.queryByText("Paraguay")).not.toBeInTheDocument();
     expect(screen.queryByText(/Asunción/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Encarnación/)).not.toBeInTheDocument();
+  });
+});
+
+// LLE-355 (Bug 2): handleOriginStopSelected no tenía token de cancelación.
+// Dos cambios de origen en vuelo podían resolver fuera de orden y dejar
+// allowedDestinationIds correspondiendo al origen viejo. El test controla
+// el orden de resolución a mano (resolve guardado, no setTimeout) para no
+// depender de timing real — la misma lección de LLE-373.
+describe("SearchBar — carrera al cambiar el origen (LLE-355)", () => {
+  const STOPS_TWO_ORIGINS: StopRead[] = [
+    ...STOPS,
+    { id: "ar-2", name: "La Plata", country: "AR", province: "Buenos Aires", created_at: "" },
+  ];
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("resuelve el origen B antes que el A → allowedDestinationIds corresponde a B, no a A", async () => {
+    mockedGetStops.mockResolvedValue(STOPS_TWO_ORIGINS);
+
+    const resolvers: Record<string, (value: StopRead[]) => void> = {};
+    mockedGetValidDestinations.mockImplementation(
+      (originId: string) =>
+        new Promise<StopRead[]>((resolve) => {
+          resolvers[originId] = resolve;
+        })
+    );
+
+    const onSearch = vi.fn();
+    render(<SearchBar onSearch={onSearch} />);
+    const user = userEvent.setup();
+
+    // seleccionar origen A: "Buenos Aires" (ar-1)
+    await user.click(screen.getByText("Origen"));
+    await user.click(await screen.findByText("└ Buenos Aires"));
+
+    // seleccionar origen B: "La Plata" (ar-2) — sin esperar a que A resuelva
+    await user.click(screen.getByText("Origen"));
+    await user.click(await screen.findByText("└ La Plata"));
+
+    // ambas requests están en vuelo
+    expect(mockedGetValidDestinations).toHaveBeenCalledTimes(2);
+    expect(resolvers["ar-1"]).toBeDefined();
+    expect(resolvers["ar-2"]).toBeDefined();
+
+    // orden invertido: B (la última selección) resuelve primero, A después
+    await act(async () => {
+      resolvers["ar-2"]([STOPS[1]]); // B → solo Asunción
+    });
+    await act(async () => {
+      resolvers["ar-1"]([STOPS[1], STOPS[2]]); // A → Asunción + Encarnación, llega tarde
+    });
+
+    // abrir destino: debe reflejar lo que trajo B, no lo que trajo A
+    await user.click(screen.getByText("Destino"));
+    expect(screen.getByText(/Asunción/)).toBeInTheDocument();
     expect(screen.queryByText(/Encarnación/)).not.toBeInTheDocument();
   });
 });
