@@ -76,6 +76,7 @@ async def create_booking_endpoint(
             dni=p.dni,
             email=p.email,
             phone=p.phone,
+            luggage_count=p.luggage_count,
         )
         for p in booking_in.passengers
     ]
