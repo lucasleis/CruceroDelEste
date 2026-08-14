@@ -9,9 +9,11 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
+from app.models.booking import Passenger
 from app.models.trip import SeatTypeEnum
 from app.schemas.admin import PriceTrancheCreate
 from app.schemas.bookings import BookingCreate, PassengerCreate
+from app.services.booking import PassengerData
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -238,3 +240,58 @@ def test_tranche_create_max_sold_less_than_min_sold():
 def test_tranche_create_invalid_seat_type_string():
     with pytest.raises(ValidationError):
         PriceTrancheCreate(seat_type="executive", min_sold=0, max_sold=10, price=1000)
+
+
+# ---------------------------------------------------------------------------
+# LLE-379 — los campos de un pasajero se declaran en 4 lugares y se
+# sincronizan a mano: PassengerCreate (este archivo), PassengerData
+# (services/booking.py), la construcción de Passenger(...) en
+# services/booking.py, y la construcción de PassengerData(...) en
+# routers/bookings.py. Omitir un campo en cualquiera de los últimos tres
+# lo pierde en silencio (201, sin excepción, sin warning) — LLE-340 fue
+# exactamente eso con luggage_count.
+#
+# Esta prueba compara los conjuntos de campos por introspección y detecta
+# el salto 2 (dataclass) y el salto 4 vía columnas del modelo (si el
+# nombre del campo desaparece de alguno de los tres). NO detecta que el
+# salto 3 (router -> PassengerData(...)) o el salto 4 (PassengerData ->
+# Passenger(...)) efectivamente *pasen* el valor en tiempo de ejecución
+# — un campo puede seguir declarado en ambos lados y aun así perderse
+# porque nadie lo asigna al construir. Ese caso lo cubre
+# test_post_bookings_all_declared_passenger_fields_persist_to_db en
+# tests/integration/test_bookings_router.py, que sí ejecuta el flujo real.
+# ---------------------------------------------------------------------------
+
+def test_passenger_field_declarations_stay_in_sync():
+    schema_fields = set(PassengerCreate.model_fields)
+    dataclass_fields = set(PassengerData.__dataclass_fields__)
+
+    # Excepciones: columnas de Passenger que legítimamente NO vienen del
+    # input del cliente. Cada una lleva el motivo, no solo el nombre —
+    # si se agrega una excepción nueva sin poder justificar por qué no
+    # viene del cliente, no es una excepción, es un campo que falta
+    # propagar.
+    model_only_fields = {
+        # Generado por el server (default=uuid.uuid4 / server_default
+        # gen_random_uuid()); el cliente nunca lo envía.
+        "id",
+        # Lo asigna el service a partir del Booking recién creado. No es
+        # parte del payload de un pasajero individual — es compartido
+        # por todos los pasajeros de esa reserva.
+        "booking_id",
+        # Timestamp generado por el server al insertar la fila.
+        "created_at",
+    }
+    model_fields = set(Passenger.__table__.columns.keys()) - model_only_fields
+
+    assert schema_fields == dataclass_fields == model_fields, (
+        "PassengerCreate, PassengerData y Passenger.__table__ divergieron en "
+        "los campos de pasajero (LLE-379).\n"
+        f"  PassengerCreate:  {sorted(schema_fields)}\n"
+        f"  PassengerData:    {sorted(dataclass_fields)}\n"
+        f"  Passenger (menos {sorted(model_only_fields)}): {sorted(model_fields)}\n"
+        "Si agregaste o quitaste un campo de pasajero, actualizá los tres "
+        "lugares. Si es un campo server-side legítimo (como id/booking_id/"
+        "created_at), agregalo a model_only_fields en este test con un "
+        "comentario que explique por qué no viene del cliente."
+    )
