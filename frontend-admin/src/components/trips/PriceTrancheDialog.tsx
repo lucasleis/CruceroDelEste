@@ -81,6 +81,7 @@ export function PriceTrancheDialog({
   const [price, setPrice] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [camaOpen, setCamaOpen] = useState(false);
   const [semiCamaOpen, setSemiCamaOpen] = useState(false);
@@ -104,13 +105,26 @@ export function PriceTrancheDialog({
 
   async function handleConfirmDeleteTranche() {
     if (!trancheToDelete) return;
+    setDeleting(true);
     try {
       await deletePriceTranche(tripId, trancheToDelete.id);
       toast.success("Tramo eliminado");
       onSuccess();
-    } catch {
-      toast.error("Error al eliminar el tramo.");
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 404) {
+        // El tramo ya no existe — el resultado deseado por el borrado ya se
+        // cumplió (doble click, dos pestañas, reintento de red). No es un
+        // error: se trata como éxito y se refresca contra la verdad del
+        // backend. Este manejo vive solo acá, no en deletePriceTranche() ni
+        // en el interceptor — un 404 sí es un error en otras operaciones.
+        toast.success("Tramo eliminado");
+        onSuccess();
+      } else {
+        toast.error("Error al eliminar el tramo.");
+      }
     } finally {
+      setDeleting(false);
       setTrancheToDelete(null);
     }
   }
@@ -247,6 +261,7 @@ export function PriceTrancheDialog({
                       variant="ghost"
                       size="icon-sm"
                       className="text-[#E87B7B]"
+                      aria-label="Eliminar tramo"
                       onClick={() => setTrancheToDelete(tranche)}
                     >
                       <Trash2 className="size-4" />
@@ -332,8 +347,12 @@ export function PriceTrancheDialog({
             <Button variant="outline" onClick={() => setTrancheToDelete(null)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleConfirmDeleteTranche}>
-              Eliminar
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDeleteTranche}
+              disabled={deleting}
+            >
+              {deleting ? "Eliminando..." : "Eliminar"}
             </Button>
           </DialogFooter>
         </DialogContent>
