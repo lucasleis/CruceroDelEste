@@ -16,5 +16,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    // El repo vive sobre drvfs (/mnt/c/ en WSL2). El pool `forks` (default de
+    // vitest 4) levanta un proceso por archivo y el arranque supera el timeout:
+    // la suite reporta "no tests" con 0 tests ejecutados. `threads` evita el
+    // spawn de procesos y arranca sin problema. Ver LLE-368.
+    pool: "threads",
   },
 });
