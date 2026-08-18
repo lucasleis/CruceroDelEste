@@ -69,6 +69,13 @@ describe("ConfirmacionContent — status != approved (sin polling)", () => {
   });
 
   // test 7
+  //
+  // Sabotaje de lógica: en el JSX de ConfirmacionContent, cambiar
+  //   {status === "pending" && (
+  // por
+  //   {status === "__never__" && (
+  // Resultado: status="pending" ya no activa el bloque → "Pago en proceso"
+  // no aparece en el DOM → test falla.
   it("status=pending muestra 'Pago en proceso' sin llamar a getBooking", () => {
     mockSearchParams = new URLSearchParams("status=pending&payment_id=999");
     render(<ConfirmacionContent />);
@@ -78,6 +85,14 @@ describe("ConfirmacionContent — status != approved (sin polling)", () => {
   });
 
   // test 8
+  //
+  // Sabotaje de lógica: en el JSX de ConfirmacionContent, cambiar
+  //   {status !== "approved" && status !== "pending" && (
+  // por
+  //   {status !== "approved" && status === "pending" && (
+  // Resultado: status="failure" hace que "failure !== pending" sea true,
+  // pero "failure === pending" es false → el bloque no renderiza →
+  // "Hubo un problema con tu pago" no aparece → test falla.
   it("status=failure muestra 'Hubo un problema con tu pago' sin llamar a getBooking", () => {
     mockSearchParams = new URLSearchParams("status=failure&payment_id=999");
     render(<ConfirmacionContent />);
@@ -105,6 +120,14 @@ describe("ConfirmacionContent — status=approved, polling (fake timers)", () =>
   });
 
   // test 9
+  //
+  // Sabotaje de lógica: en poll(), cambiar
+  //   if (data.status === "confirmed") {
+  // por
+  //   if (data.status === "__never__") {
+  // Resultado: el estado confirmed nunca activa la rama terminal →
+  // poll cae al retry, que agota el MAX_POLL_MS y muestra "exhausted" →
+  // "¡Compra confirmada!" no aparece → test falla.
   it("muestra '¡Compra confirmada!' cuando el primer poll devuelve status confirmed", async () => {
     vi.mocked(getBooking).mockResolvedValueOnce(makeBookingRead({ status: "confirmed" }));
 
@@ -123,6 +146,13 @@ describe("ConfirmacionContent — status=approved, polling (fake timers)", () =>
   });
 
   // test 10
+  //
+  // Sabotaje de lógica: en poll(), cambiar
+  //   if (data.status === "expired") {
+  // por
+  //   if (data.status === "__never__") {
+  // Resultado: el estado expired no activa la rama terminal →
+  // se reintenta hasta MAX_POLL_MS → "Tu reserva venció" no aparece → test falla.
   it("muestra 'Tu reserva venció' cuando el poll devuelve status expired", async () => {
     vi.mocked(getBooking).mockResolvedValueOnce(makeBookingRead({ status: "expired" }));
 
@@ -136,6 +166,13 @@ describe("ConfirmacionContent — status=approved, polling (fake timers)", () =>
   });
 
   // test 11
+  //
+  // Sabotaje de lógica: en el catch de poll(), cambiar
+  //   setPollState("token_invalid");
+  // por
+  //   setPollState("exhausted");
+  // Resultado: getBooking lanzando va a "exhausted" en vez de "token_invalid" →
+  // se renderiza la pantalla de timeout, no "¡Compra registrada!" → test falla.
   it("muestra '¡Compra registrada!' cuando getBooking lanza (token inválido/vencido)", async () => {
     vi.mocked(getBooking).mockRejectedValueOnce(new Error("401 Unauthorized"));
 
@@ -148,5 +185,63 @@ describe("ConfirmacionContent — status=approved, polling (fake timers)", () =>
     expect(screen.getByText("¡Compra registrada!")).toBeInTheDocument();
     // Confirmar que NO se muestra el mensaje de "fallo de pago" (mensaje diferente).
     expect(screen.queryByText("Hubo un problema con tu pago")).not.toBeInTheDocument();
+  });
+
+  // test F: getBooking rechaza → poll se detiene; exactamente 1 llamada tras 60s
+  //
+  // Sabotaje de lógica: en el catch de poll(), quitar el `return` final:
+  //   setPollState("token_invalid");
+  //   replaceUrlOnce();
+  //   // return; ← eliminado
+  // Resultado: la ejecución cae fuera del catch con `data` sin inicializar.
+  // `data.status` lanza TypeError → promesa rechazada sin manejar →
+  // vitest detecta el rechazo y falla el test.
+  it("getBooking rechaza → poll se detiene: exactamente 1 llamada tras avanzar 60s", async () => {
+    vi.mocked(getBooking).mockRejectedValueOnce(new Error("401"));
+
+    render(<ConfirmacionContent />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(vi.mocked(getBooking)).toHaveBeenCalledTimes(1);
+  });
+
+  // test G: pending_payment → backoff exponencial 2s / 4s / ...
+  //
+  // Sabotaje de lógica: en poll(), cambiar
+  //   timeoutId = setTimeout(() => poll(attempt + 1), nextDelayMs(attempt));
+  // por
+  //   timeoutId = setTimeout(() => poll(attempt + 1), 10_000);
+  // Resultado: el delay fijo de 10s hace que a t=2.1s aún no haya disparado
+  // el segundo poll → getBooking sigue en 1 llamada → la aserción de
+  // "2 llamadas a t=2.1s" falla.
+  it("pending_payment: a 1.9s hay 1 llamada; a 2.1s hay 2; a 6.1s hay 3", async () => {
+    // getBooking siempre devuelve pending_payment → el poll nunca termina,
+    // siempre programa el siguiente timeout.
+    vi.mocked(getBooking).mockResolvedValue(makeBookingRead({ status: "pending_payment" }));
+
+    render(<ConfirmacionContent />);
+
+    // poll(0) se lanza de inmediato. nextDelayMs(0) = min(30000, 2000*1) = 2000ms.
+    // A 1.9s: poll(0) completó (microtask), programó poll(1) a t=2000ms. No disparó aún.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_900);
+    });
+    expect(vi.mocked(getBooking)).toHaveBeenCalledTimes(1);
+
+    // A 2.1s (200ms más): el setTimeout de 2000ms disparó → poll(1) → 2ª llamada.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(vi.mocked(getBooking)).toHaveBeenCalledTimes(2);
+
+    // nextDelayMs(1) = min(30000, 2000*2) = 4000ms. poll(2) dispara a t=2000+4000=6000ms.
+    // A 6.1s (4000ms más): poll(2) corrió → 3ª llamada.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000);
+    });
+    expect(vi.mocked(getBooking)).toHaveBeenCalledTimes(3);
   });
 });
