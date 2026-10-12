@@ -18,7 +18,8 @@ class Settings(BaseSettings):
 
     # MercadoPago
     mercadopago_access_token: str
-    mercadopago_webhook_secret: str
+    # Required only when mercadopago_webhook_enabled is True (validated below).
+    mercadopago_webhook_secret: str = ""
     # False: POST /webhooks/mercadopago acknowledges and ignores payment
     # notifications, and bookings are confirmed only by the check the
     # confirmation page triggers (POST /bookings/{id}/payments/{pid}/verify).
@@ -56,6 +57,11 @@ class Settings(BaseSettings):
             raise ValueError(
                 "secret_key must be at least 32 characters long. "
                 "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        if self.mercadopago_webhook_enabled and not self.mercadopago_webhook_secret:
+            raise ValueError(
+                "mercadopago_webhook_secret is required when "
+                "mercadopago_webhook_enabled is true"
             )
         parsed = urlparse(self.backend_url)
         if not parsed.scheme or not parsed.netloc:
