@@ -11,3 +11,7 @@ node_modules/
 
 
 .claude/settings.local.json
+
+# Specs y docs scrapeadas de SISORG (mapeo de integración, no forman parte del código)
+jsons/
+z-obtener-doc/
